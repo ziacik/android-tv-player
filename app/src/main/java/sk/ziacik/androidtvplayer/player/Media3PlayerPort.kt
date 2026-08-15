@@ -81,6 +81,11 @@ class Media3PlayerPort(context: Context) : PlayerPort {
         player.play()
     }
 
+    override fun stop() {
+        player.stop()
+        player.clearMediaItems()
+    }
+
     override fun release() = player.release()
 
     override fun setListener(listener: PlayerPort.Listener) {

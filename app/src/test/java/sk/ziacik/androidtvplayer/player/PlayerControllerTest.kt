@@ -1,6 +1,7 @@
 package sk.ziacik.androidtvplayer.player
 
 import java.io.IOException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceTimeBy
@@ -96,7 +97,7 @@ class PlayerControllerTest {
         val controller = PlayerController(
             scope = this,
             initialChannel = TvChannel.JEDNOTKA,
-            resolve = {
+            resolve = { _ ->
                 resolveCalls += 1
                 StreamResolution.Playable(
                     program = PROGRAM,
@@ -168,7 +169,7 @@ class PlayerControllerTest {
     fun `player failure records Media3 diagnostic without a stream URL`() = runTest {
         val diagnostics = mutableListOf<Pair<String, Throwable?>>()
         val player = FakePlayerPort()
-        PlayerController(
+        val controller = PlayerController(
             scope = this,
             initialChannel = TvChannel.JEDNOTKA,
             resolve = { playableResolution() },
@@ -176,6 +177,8 @@ class PlayerControllerTest {
             diagnostics = { message, cause -> diagnostics += message to cause },
         )
 
+        controller.start()
+        advanceUntilIdle()
         player.registeredListener.onError("ERROR_CODE_IO_BAD_HTTP_STATUS")
 
         assertEquals(
@@ -223,13 +226,13 @@ class PlayerControllerTest {
 
     @Test
     fun `restricted program retries two seconds after announced end`() = runTest {
-        var resolveCalls = 0
+        val resolvedChannels = mutableListOf<TvChannel>()
         val controller = PlayerController(
             scope = this,
             initialChannel = TvChannel.JEDNOTKA,
-            resolve = {
-                resolveCalls += 1
-                if (resolveCalls == 1) {
+            resolve = { channel ->
+                resolvedChannels += channel
+                if (resolvedChannels.size == 1) {
                     StreamResolution.Unavailable(PROGRAM.copy(endsAtMs = 20_000L))
                 } else {
                     playableResolution()
@@ -244,10 +247,10 @@ class PlayerControllerTest {
         assertTrue(controller.state.value is PlayerUiState.Unavailable)
         advanceTimeBy(11_999L)
         runCurrent()
-        assertEquals(1, resolveCalls)
+        assertEquals(listOf(TvChannel.JEDNOTKA), resolvedChannels)
         advanceTimeBy(1L)
         runCurrent()
-        assertEquals(2, resolveCalls)
+        assertEquals(listOf(TvChannel.JEDNOTKA, TvChannel.JEDNOTKA), resolvedChannels)
     }
 
     @Test
@@ -256,7 +259,7 @@ class PlayerControllerTest {
         val controller = PlayerController(
             scope = this,
             initialChannel = TvChannel.JEDNOTKA,
-            resolve = {
+            resolve = { _ ->
                 resolveCalls += 1
                 StreamResolution.Unavailable(PROGRAM.copy(endsAtMs = null))
             },
@@ -277,13 +280,13 @@ class PlayerControllerTest {
 
     @Test
     fun `manual retry cancels scheduled restricted retry`() = runTest {
-        var resolveCalls = 0
+        val resolvedChannels = mutableListOf<TvChannel>()
         val controller = PlayerController(
             scope = this,
             initialChannel = TvChannel.JEDNOTKA,
-            resolve = {
-                resolveCalls += 1
-                if (resolveCalls == 1) {
+            resolve = { channel ->
+                resolvedChannels += channel
+                if (resolvedChannels.size == 1) {
                     StreamResolution.Unavailable(PROGRAM.copy(endsAtMs = 70_000L))
                 } else {
                     playableResolution()
@@ -300,7 +303,7 @@ class PlayerControllerTest {
         advanceTimeBy(62_000L)
         runCurrent()
 
-        assertEquals(2, resolveCalls)
+        assertEquals(listOf(TvChannel.JEDNOTKA, TvChannel.JEDNOTKA), resolvedChannels)
     }
 
     @Test
@@ -310,7 +313,7 @@ class PlayerControllerTest {
         val controller = PlayerController(
             scope = this,
             initialChannel = TvChannel.JEDNOTKA,
-            resolve = {
+            resolve = { _ ->
                 resolveCalls += 1
                 StreamResolution.Unavailable(PROGRAM.copy(endsAtMs = null))
             },
@@ -327,6 +330,134 @@ class PlayerControllerTest {
         assertEquals(1, player.releaseCalls)
     }
 
+    @Test
+    fun `channel up stops old source loads Dvojka and persists it`() = runTest {
+        val resolvedChannels = mutableListOf<TvChannel>()
+        val savedChannels = mutableListOf<TvChannel>()
+        val player = FakePlayerPort()
+        val controller = PlayerController(
+            scope = this,
+            initialChannel = TvChannel.JEDNOTKA,
+            resolve = { channel ->
+                resolvedChannels += channel
+                playableResolution(channel.storageKey)
+            },
+            playerPort = player,
+            onChannelSelected = savedChannels::add,
+        )
+
+        controller.start()
+        advanceUntilIdle()
+        controller.channelUp()
+        advanceUntilIdle()
+
+        assertEquals(listOf(TvChannel.JEDNOTKA, TvChannel.DVOJKA), resolvedChannels)
+        assertEquals(listOf(TvChannel.DVOJKA), savedChannels)
+        assertEquals(1, player.stopCalls)
+        assertEquals(TvChannel.DVOJKA, controller.state.value.channel)
+        assertEquals("https://cdn.example/dvojka.m3u8", player.loadedSources.last().url)
+    }
+
+    @Test
+    fun `channel down wraps from Jednotka to Dvojka`() = runTest {
+        val controller = controller(FakePlayerPort(), this)
+
+        controller.channelDown()
+        advanceUntilIdle()
+
+        assertEquals(TvChannel.DVOJKA, controller.state.value.channel)
+    }
+
+    @Test
+    fun `stale cancelled resolve cannot replace latest channel`() = runTest {
+        val jednotka = CompletableDeferred<StreamResolution>()
+        val dvojka = CompletableDeferred<StreamResolution>()
+        val player = FakePlayerPort()
+        val controller = PlayerController(
+            scope = this,
+            initialChannel = TvChannel.JEDNOTKA,
+            resolve = { channel ->
+                if (channel == TvChannel.JEDNOTKA) jednotka.await() else dvojka.await()
+            },
+            playerPort = player,
+        )
+
+        controller.start()
+        runCurrent()
+        controller.channelUp()
+        runCurrent()
+        dvojka.complete(playableResolution("dvojka"))
+        advanceUntilIdle()
+        jednotka.complete(playableResolution("jednotka"))
+        advanceUntilIdle()
+
+        assertEquals(TvChannel.DVOJKA, controller.state.value.channel)
+        assertEquals(
+            listOf("https://cdn.example/dvojka.m3u8"),
+            player.loadedSources.map(StreamSource::url),
+        )
+    }
+
+    @Test
+    fun `old player callbacks cannot overwrite a channel being resolved`() = runTest {
+        val dvojka = CompletableDeferred<StreamResolution>()
+        val diagnostics = mutableListOf<String>()
+        val player = FakePlayerPort()
+        val controller = PlayerController(
+            scope = this,
+            initialChannel = TvChannel.JEDNOTKA,
+            resolve = { channel ->
+                if (channel == TvChannel.JEDNOTKA) {
+                    playableResolution("jednotka")
+                } else {
+                    dvojka.await()
+                }
+            },
+            playerPort = player,
+            diagnostics = { message, _ -> diagnostics += message },
+        )
+
+        controller.start()
+        advanceUntilIdle()
+        player.registeredListener.onReady(isPlaying = true)
+        controller.channelUp()
+        runCurrent()
+        player.registeredListener.onReady(isPlaying = true)
+        player.registeredListener.onError("OLD_SOURCE_ERROR")
+
+        assertEquals(PlayerUiState.Resolving(TvChannel.DVOJKA), controller.state.value)
+        assertTrue(diagnostics.isEmpty())
+        dvojka.complete(playableResolution("dvojka"))
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun `switching cancels restricted retry for old channel`() = runTest {
+        val calls = mutableListOf<TvChannel>()
+        val controller = PlayerController(
+            scope = this,
+            initialChannel = TvChannel.JEDNOTKA,
+            resolve = { channel ->
+                calls += channel
+                if (channel == TvChannel.JEDNOTKA) {
+                    StreamResolution.Unavailable(PROGRAM.copy(endsAtMs = null))
+                } else {
+                    playableResolution("dvojka")
+                }
+            },
+            playerPort = FakePlayerPort(),
+        )
+
+        controller.start()
+        runCurrent()
+        controller.channelUp()
+        runCurrent()
+        advanceTimeBy(60_000L)
+        runCurrent()
+
+        assertEquals(listOf(TvChannel.JEDNOTKA, TvChannel.DVOJKA), calls)
+    }
+
     private fun controller(
         player: FakePlayerPort,
         scope: CoroutineScope,
@@ -338,9 +469,9 @@ class PlayerControllerTest {
         playerPort = player,
     )
 
-    private fun playableResolution() = StreamResolution.Playable(
+    private fun playableResolution(suffix: String = "live") = StreamResolution.Playable(
         program = PROGRAM,
-        source = StreamSource("https://cdn.example/live.m3u8", "ua"),
+        source = StreamSource("https://cdn.example/$suffix.m3u8", "ua"),
     )
 
     private fun playback(
@@ -370,6 +501,7 @@ class PlayerControllerTest {
         val loadedSources = mutableListOf<StreamSource>()
         val seekPositions = mutableListOf<Long>()
         var goLiveCalls = 0
+        var stopCalls = 0
         var releaseCalls = 0
 
         override fun snapshot() = snapshot
@@ -392,6 +524,10 @@ class PlayerControllerTest {
 
         override fun goLive() {
             goLiveCalls += 1
+        }
+
+        override fun stop() {
+            stopCalls += 1
         }
 
         override fun release() {

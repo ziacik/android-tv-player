@@ -9,7 +9,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import sk.ziacik.androidtvplayer.channel.TvChannel
+import sk.ziacik.androidtvplayer.channel.SharedPreferencesChannelStore
 import sk.ziacik.androidtvplayer.player.Media3PlayerPort
 import sk.ziacik.androidtvplayer.player.PlayerController
 import sk.ziacik.androidtvplayer.resolver.OkHttpStvrClient
@@ -33,12 +33,14 @@ class MainActivity : ComponentActivity() {
 
         val playerPort = Media3PlayerPort(this)
         val resolver = StvrResolver(OkHttpStvrClient())
+        val channelStore = SharedPreferencesChannelStore(this)
         val overlayController = OverlayController(appScope)
         playerController = PlayerController(
             scope = appScope,
-            initialChannel = TvChannel.JEDNOTKA,
-            resolve = { resolver.resolve(TvChannel.JEDNOTKA) },
+            initialChannel = channelStore.load(),
+            resolve = resolver::resolve,
             playerPort = playerPort,
+            onChannelSelected = channelStore::save,
             diagnostics = { message, cause ->
                 Log.e("AndroidTvPlayer", message, cause)
             },

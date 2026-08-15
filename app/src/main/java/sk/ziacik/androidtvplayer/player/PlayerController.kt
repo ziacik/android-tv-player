@@ -15,9 +15,10 @@ import sk.ziacik.androidtvplayer.resolver.StreamResolution
 class PlayerController(
     private val scope: CoroutineScope,
     private val initialChannel: TvChannel,
-    private val resolve: suspend () -> StreamResolution,
+    private val resolve: suspend (TvChannel) -> StreamResolution,
     private val playerPort: PlayerPort,
     private val nowMs: () -> Long = System::currentTimeMillis,
+    private val onChannelSelected: (TvChannel) -> Unit = {},
     private val diagnostics: (message: String, cause: Throwable?) -> Unit = { _, _ -> },
 ) {
     private val mutableState = MutableStateFlow<PlayerUiState>(
@@ -25,46 +26,76 @@ class PlayerController(
     )
     val state: StateFlow<PlayerUiState> = mutableState.asStateFlow()
 
+    private var currentChannel = initialChannel
     private var activeProgram: ProgramMetadata? = null
+    private var activePlaybackChannel: TvChannel? = null
     private var resolveJob: Job? = null
     private var restrictedRetryJob: Job? = null
+    private var resolveGeneration = 0L
 
     init {
         playerPort.setListener(
             object : PlayerPort.Listener {
                 override fun onReady(isPlaying: Boolean) {
+                    if (activePlaybackChannel != currentChannel) return
                     updateReadyState(isPlaying)
                 }
 
                 override fun onPlayingChanged(isPlaying: Boolean) {
-                    if (mutableState.value is PlayerUiState.Ready) {
+                    if (
+                        activePlaybackChannel == currentChannel &&
+                        mutableState.value is PlayerUiState.Ready
+                    ) {
                         updateReadyState(isPlaying)
                     }
                 }
 
                 override fun onError(message: String) {
+                    if (activePlaybackChannel != currentChannel) return
                     diagnostics("Media3 playback failed: $message", null)
-                    mutableState.value = PlayerUiState.Error(initialChannel, ERROR_MESSAGE)
+                    activePlaybackChannel = null
+                    mutableState.value = PlayerUiState.Error(currentChannel, ERROR_MESSAGE)
                 }
             },
         )
     }
 
-    fun start() = retry()
+    fun start() = resolveCurrentChannel()
 
-    fun retry() {
+    fun retry() = resolveCurrentChannel()
+
+    fun channelUp() = switchTo(currentChannel.next())
+
+    fun channelDown() = switchTo(currentChannel.previous())
+
+    private fun switchTo(channel: TvChannel) {
+        if (channel == currentChannel) return
+        currentChannel = channel
+        onChannelSelected(channel)
+        activeProgram = null
+        activePlaybackChannel = null
+        playerPort.stop()
+        resolveCurrentChannel()
+    }
+
+    private fun resolveCurrentChannel() {
         resolveJob?.cancel()
         restrictedRetryJob?.cancel()
         restrictedRetryJob = null
+        val channel = currentChannel
+        val generation = ++resolveGeneration
         resolveJob = scope.launch {
-            mutableState.value = PlayerUiState.Resolving(initialChannel)
+            mutableState.value = PlayerUiState.Resolving(channel)
             try {
-                applyResolution(resolve())
+                val resolution = resolve(channel)
+                if (generation != resolveGeneration || channel != currentChannel) return@launch
+                applyResolution(channel, resolution)
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
+                if (generation != resolveGeneration || channel != currentChannel) return@launch
                 diagnostics("STVR resolve failed", error)
-                mutableState.value = PlayerUiState.Error(initialChannel, ERROR_MESSAGE)
+                mutableState.value = PlayerUiState.Error(channel, ERROR_MESSAGE)
             }
         }
     }
@@ -103,30 +134,33 @@ class PlayerController(
     }
 
     fun release() {
+        resolveGeneration += 1
         resolveJob?.cancel()
         restrictedRetryJob?.cancel()
         playerPort.release()
     }
 
-    private fun applyResolution(resolution: StreamResolution) {
+    private fun applyResolution(channel: TvChannel, resolution: StreamResolution) {
         when (resolution) {
             is StreamResolution.Playable -> {
                 activeProgram = resolution.program
-                mutableState.value = PlayerUiState.Preparing(initialChannel)
+                activePlaybackChannel = channel
+                mutableState.value = PlayerUiState.Preparing(channel)
                 playerPort.load(resolution.source)
             }
             is StreamResolution.Unavailable -> {
                 activeProgram = null
+                activePlaybackChannel = null
                 mutableState.value = PlayerUiState.Unavailable(
-                    channel = initialChannel,
+                    channel = channel,
                     program = resolution.program,
                 )
-                scheduleRestrictedRetry(resolution.program.endsAtMs)
+                scheduleRestrictedRetry(channel, resolution.program.endsAtMs)
             }
         }
     }
 
-    private fun scheduleRestrictedRetry(endsAtMs: Long?) {
+    private fun scheduleRestrictedRetry(channel: TvChannel, endsAtMs: Long?) {
         restrictedRetryJob?.cancel()
         val untilEnd = endsAtMs?.minus(nowMs())
         val retryDelayMs = if (untilEnd != null && untilEnd > 0L) {
@@ -136,14 +170,14 @@ class PlayerController(
         }
         restrictedRetryJob = scope.launch {
             delay(retryDelayMs)
-            retry()
+            if (channel == currentChannel) retry()
         }
     }
 
     private fun updateReadyState(isPlaying: Boolean) {
         val program = activeProgram ?: return
         mutableState.value = PlayerUiState.Ready(
-            channel = initialChannel,
+            channel = currentChannel,
             program = program,
             playback = playerPort.snapshot().copy(isPlaying = isPlaying),
         )
