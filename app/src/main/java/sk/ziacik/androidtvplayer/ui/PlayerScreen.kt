@@ -1,6 +1,7 @@
 package sk.ziacik.androidtvplayer.ui
 
 import android.view.KeyEvent
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
@@ -54,6 +55,10 @@ fun PlayerScreen(
 
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
+    }
+
+    BackHandler {
+        if (overlayVisible) overlayController.hide() else onExit()
     }
 
     Box(
@@ -118,6 +123,8 @@ fun PlayerScreen(
                     useController = false
                     resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                     keepScreenOn = true
+                    isFocusable = false
+                    isFocusableInTouchMode = false
                     this.player = player
                 }
             },

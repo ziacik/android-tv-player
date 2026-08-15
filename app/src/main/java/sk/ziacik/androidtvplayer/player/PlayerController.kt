@@ -13,6 +13,7 @@ class PlayerController(
     private val scope: CoroutineScope,
     private val resolve: suspend () -> StreamSource,
     private val playerPort: PlayerPort,
+    private val diagnostics: (message: String, cause: Throwable?) -> Unit = { _, _ -> },
 ) {
     private val mutableState = MutableStateFlow<PlayerUiState>(PlayerUiState.Resolving)
     val state: StateFlow<PlayerUiState> = mutableState.asStateFlow()
@@ -37,6 +38,7 @@ class PlayerController(
                 }
 
                 override fun onError(message: String) {
+                    diagnostics("Media3 playback failed: $message", null)
                     mutableState.value = PlayerUiState.Error(ERROR_MESSAGE)
                 }
             },
@@ -56,6 +58,7 @@ class PlayerController(
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
+                diagnostics("STVR resolve failed", error)
                 mutableState.value = PlayerUiState.Error(ERROR_MESSAGE)
             }
         }

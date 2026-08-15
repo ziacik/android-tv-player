@@ -6,6 +6,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import sk.ziacik.androidtvplayer.resolver.StreamSource
@@ -102,6 +103,44 @@ class PlayerControllerTest {
             PlayerUiState.Error("Stream sa nepodarilo načítať"),
             controller.state.value,
         )
+    }
+
+    @Test
+    fun `resolve failure records its diagnostic cause`() = runTest {
+        val failure = IOException("offline")
+        val diagnostics = mutableListOf<Pair<String, Throwable?>>()
+        val controller = PlayerController(
+            scope = this,
+            resolve = { throw failure },
+            playerPort = FakePlayerPort(),
+            diagnostics = { message, cause -> diagnostics += message to cause },
+        )
+
+        controller.start()
+        advanceUntilIdle()
+
+        assertEquals("STVR resolve failed", diagnostics.single().first)
+        assertSame(failure, diagnostics.single().second)
+    }
+
+    @Test
+    fun `player failure records Media3 diagnostic without a stream URL`() = runTest {
+        val diagnostics = mutableListOf<Pair<String, Throwable?>>()
+        val player = FakePlayerPort()
+        PlayerController(
+            scope = this,
+            resolve = { StreamSource("https://cdn.example/secret.m3u8", "ua") },
+            playerPort = player,
+            diagnostics = { message, cause -> diagnostics += message to cause },
+        )
+
+        player.registeredListener.onError("ERROR_CODE_IO_BAD_HTTP_STATUS")
+
+        assertEquals(
+            "Media3 playback failed: ERROR_CODE_IO_BAD_HTTP_STATUS",
+            diagnostics.single().first,
+        )
+        assertEquals(null, diagnostics.single().second)
     }
 
     @Test

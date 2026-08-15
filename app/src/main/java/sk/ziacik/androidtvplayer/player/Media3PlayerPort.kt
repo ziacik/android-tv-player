@@ -31,6 +31,14 @@ class Media3PlayerPort(context: Context) : PlayerPort {
                     listener?.onPlayingChanged(isPlaying)
                 }
 
+                override fun onAvailableCommandsChanged(
+                    availableCommands: Player.Commands,
+                ) {
+                    if (player.playbackState == Player.STATE_READY) {
+                        listener?.onReady(player.isPlaying)
+                    }
+                }
+
                 override fun onPlayerError(error: PlaybackException) {
                     listener?.onError(error.errorCodeName)
                 }
