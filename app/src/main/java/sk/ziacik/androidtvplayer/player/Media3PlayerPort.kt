@@ -46,18 +46,15 @@ class Media3PlayerPort(context: Context) : PlayerPort {
         )
     }
 
-    override val currentPositionMs: Long
-        get() = player.currentPosition
-
-    override val durationMs: Long?
-        get() = player.duration
-            .takeUnless { duration -> duration == C.TIME_UNSET || duration < 0L }
-
-    override val isSeekable: Boolean
-        get() = player.isCurrentMediaItemSeekable
-
-    override val isPlaying: Boolean
-        get() = player.isPlaying
+    override fun snapshot() = PlaybackSnapshot(
+        currentPositionMs = player.currentPosition.coerceAtLeast(0L),
+        durationMs = player.duration
+            .takeUnless { duration -> duration == C.TIME_UNSET || duration < 0L },
+        liveOffsetMs = player.currentLiveOffset
+            .takeUnless { offset -> offset == C.TIME_UNSET || offset < 0L },
+        isSeekable = player.isCurrentMediaItemSeekable,
+        isPlaying = player.isPlaying,
+    )
 
     override fun load(source: StreamSource) {
         val dataSourceFactory = DefaultHttpDataSource.Factory()

@@ -146,6 +146,10 @@ fun PlayerScreen(
                     focusedControl = focusedControl,
                 )
             }
+            is PlayerUiState.Unavailable -> ErrorPanel(
+                message = "Tento program nie je dostupný online",
+                modifier = Modifier.align(Alignment.Center),
+            )
             is PlayerUiState.Error -> ErrorPanel(
                 message = current.message,
                 modifier = Modifier.align(Alignment.Center),

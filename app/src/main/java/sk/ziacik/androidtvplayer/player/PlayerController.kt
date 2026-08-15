@@ -3,37 +3,38 @@ package sk.ziacik.androidtvplayer.player
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import sk.ziacik.androidtvplayer.resolver.StreamSource
+import sk.ziacik.androidtvplayer.resolver.ProgramMetadata
+import sk.ziacik.androidtvplayer.resolver.StreamResolution
 
 class PlayerController(
     private val scope: CoroutineScope,
-    private val resolve: suspend () -> StreamSource,
+    private val resolve: suspend () -> StreamResolution,
     private val playerPort: PlayerPort,
+    private val nowMs: () -> Long = System::currentTimeMillis,
     private val diagnostics: (message: String, cause: Throwable?) -> Unit = { _, _ -> },
 ) {
     private val mutableState = MutableStateFlow<PlayerUiState>(PlayerUiState.Resolving)
     val state: StateFlow<PlayerUiState> = mutableState.asStateFlow()
 
+    private var activeProgram: ProgramMetadata? = null
     private var resolveJob: Job? = null
+    private var restrictedRetryJob: Job? = null
 
     init {
         playerPort.setListener(
             object : PlayerPort.Listener {
                 override fun onReady(isPlaying: Boolean) {
-                    mutableState.value = PlayerUiState.Ready(
-                        isPlaying = isPlaying,
-                        isSeekable = playerPort.isSeekable,
-                    )
+                    updateReadyState(isPlaying)
                 }
 
                 override fun onPlayingChanged(isPlaying: Boolean) {
-                    val current = mutableState.value
-                    if (current is PlayerUiState.Ready) {
-                        mutableState.value = current.copy(isPlaying = isPlaying)
+                    if (mutableState.value is PlayerUiState.Ready) {
+                        updateReadyState(isPlaying)
                     }
                 }
 
@@ -49,12 +50,12 @@ class PlayerController(
 
     fun retry() {
         resolveJob?.cancel()
+        restrictedRetryJob?.cancel()
+        restrictedRetryJob = null
         resolveJob = scope.launch {
             mutableState.value = PlayerUiState.Resolving
             try {
-                val source = resolve()
-                mutableState.value = PlayerUiState.Preparing
-                playerPort.load(source)
+                applyResolution(resolve())
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
@@ -64,22 +65,33 @@ class PlayerController(
         }
     }
 
+    fun refreshPlaybackSnapshot() {
+        val current = mutableState.value
+        if (current is PlayerUiState.Ready) {
+            mutableState.value = current.copy(playback = playerPort.snapshot())
+        }
+    }
+
     fun seekBack() {
-        if (!playerPort.isSeekable) return
-        playerPort.seekTo((playerPort.currentPositionMs - SEEK_INCREMENT_MS).coerceAtLeast(0L))
+        val snapshot = playerPort.snapshot()
+        if (!snapshot.isSeekable) return
+        playerPort.seekTo(
+            (snapshot.currentPositionMs - SEEK_INCREMENT_MS).coerceAtLeast(0L),
+        )
     }
 
     fun seekForward() {
-        if (!playerPort.isSeekable) return
-        val requested = playerPort.currentPositionMs + SEEK_INCREMENT_MS
-        val target = playerPort.durationMs?.let { duration ->
+        val snapshot = playerPort.snapshot()
+        if (!snapshot.isSeekable) return
+        val requested = snapshot.currentPositionMs + SEEK_INCREMENT_MS
+        val target = snapshot.durationMs?.let { duration ->
             requested.coerceIn(0L, duration.coerceAtLeast(0L))
         } ?: requested
         playerPort.seekTo(target)
     }
 
     fun togglePlayback() {
-        if (playerPort.isPlaying) playerPort.pause() else playerPort.play()
+        if (playerPort.snapshot().isPlaying) playerPort.pause() else playerPort.play()
     }
 
     fun goLive() {
@@ -88,11 +100,51 @@ class PlayerController(
 
     fun release() {
         resolveJob?.cancel()
+        restrictedRetryJob?.cancel()
         playerPort.release()
+    }
+
+    private fun applyResolution(resolution: StreamResolution) {
+        when (resolution) {
+            is StreamResolution.Playable -> {
+                activeProgram = resolution.program
+                mutableState.value = PlayerUiState.Preparing
+                playerPort.load(resolution.source)
+            }
+            is StreamResolution.Unavailable -> {
+                activeProgram = null
+                mutableState.value = PlayerUiState.Unavailable(resolution.program)
+                scheduleRestrictedRetry(resolution.program.endsAtMs)
+            }
+        }
+    }
+
+    private fun scheduleRestrictedRetry(endsAtMs: Long?) {
+        restrictedRetryJob?.cancel()
+        val untilEnd = endsAtMs?.minus(nowMs())
+        val retryDelayMs = if (untilEnd != null && untilEnd > 0L) {
+            untilEnd + RETRY_AFTER_END_PADDING_MS
+        } else {
+            RESTRICTED_RETRY_FALLBACK_MS
+        }
+        restrictedRetryJob = scope.launch {
+            delay(retryDelayMs)
+            retry()
+        }
+    }
+
+    private fun updateReadyState(isPlaying: Boolean) {
+        val program = activeProgram ?: return
+        mutableState.value = PlayerUiState.Ready(
+            program = program,
+            playback = playerPort.snapshot().copy(isPlaying = isPlaying),
+        )
     }
 
     private companion object {
         const val SEEK_INCREMENT_MS = 10_000L
+        const val RETRY_AFTER_END_PADDING_MS = 2_000L
+        const val RESTRICTED_RETRY_FALLBACK_MS = 60_000L
         const val ERROR_MESSAGE = "Stream sa nepodarilo načítať"
     }
 }

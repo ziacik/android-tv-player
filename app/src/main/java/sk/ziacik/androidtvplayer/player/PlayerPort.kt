@@ -3,10 +3,7 @@ package sk.ziacik.androidtvplayer.player
 import sk.ziacik.androidtvplayer.resolver.StreamSource
 
 interface PlayerPort {
-    val currentPositionMs: Long
-    val durationMs: Long?
-    val isSeekable: Boolean
-    val isPlaying: Boolean
+    fun snapshot(): PlaybackSnapshot
 
     fun load(source: StreamSource)
     fun play()
@@ -22,4 +19,3 @@ interface PlayerPort {
         fun onError(message: String)
     }
 }
-
