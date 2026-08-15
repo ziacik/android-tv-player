@@ -1,0 +1,30 @@
+package sk.ziacik.androidtvplayer.resolver
+
+const val STVR_LANDING_URL = "https://www.rtvs.sk/televizia/tv"
+const val STVR_LIVE_URL =
+    "https://www.rtvs.sk/json/live5f.json?c=1&ad=1&b=chrome&p=win&v=77&f=0&d=1"
+const val STVR_USER_AGENT =
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+        "Chrome/77.0.3865.90 Safari/537.36"
+
+class StvrResolver(
+    private val httpClient: StvrHttpClient,
+    private val parser: StvrJsonParser = StvrJsonParser(),
+) {
+    suspend fun resolve(): StreamSource {
+        val headers = mapOf("User-Agent" to STVR_USER_AGENT)
+
+        return try {
+            httpClient.get(STVR_LANDING_URL, headers)
+            val body = httpClient.get(STVR_LIVE_URL, headers)
+            StreamSource(
+                url = parser.parseHlsUrl(body),
+                userAgent = STVR_USER_AGENT,
+            )
+        } catch (error: StreamResolveException) {
+            throw error
+        } catch (error: Exception) {
+            throw StreamResolveException("STVR request failed", error)
+        }
+    }
+}
