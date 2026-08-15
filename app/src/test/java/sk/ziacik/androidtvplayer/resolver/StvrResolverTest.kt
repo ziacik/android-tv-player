@@ -6,6 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import sk.ziacik.androidtvplayer.channel.TvChannel
 
 class StvrResolverTest {
     @Test
@@ -19,10 +20,10 @@ class StvrResolverTest {
             ),
         )
 
-        val result = StvrResolver(http).resolve()
+        val result = StvrResolver(http).resolve(TvChannel.JEDNOTKA)
 
         assertEquals(
-            listOf(STVR_LANDING_URL, STVR_LIVE_URL),
+            listOf(STVR_LANDING_URL, stvrLiveUrl(TvChannel.JEDNOTKA)),
             http.calls.map(Call::url),
         )
         assertEquals(STVR_USER_AGENT, http.calls[0].headers["User-Agent"])
@@ -31,6 +32,29 @@ class StvrResolverTest {
         result as StreamResolution.Playable
         assertEquals("https://cdn.example/first.m3u8?auth=one", result.source.url)
         assertEquals(STVR_USER_AGENT, result.source.userAgent)
+    }
+
+    @Test
+    fun `loads Dvojka live JSON and returns playable source`() = runTest {
+        val http = RecordingHttpClient(
+            responses = ArrayDeque(
+                listOf(
+                    "landing",
+                    responseWith("https://cdn.example/dvojka.m3u8?auth=two"),
+                ),
+            ),
+        )
+
+        val result = StvrResolver(http).resolve(TvChannel.DVOJKA)
+
+        assertEquals(STVR_LANDING_URL, http.calls[0].url)
+        assertEquals(
+            "https://www.rtvs.sk/json/live5f.json?c=2&ad=1&b=chrome&p=win&v=77&f=0&d=1",
+            http.calls[1].url,
+        )
+        assertTrue(result is StreamResolution.Playable)
+        result as StreamResolution.Playable
+        assertEquals("https://cdn.example/dvojka.m3u8?auth=two", result.source.url)
     }
 
     @Test
@@ -47,8 +71,8 @@ class StvrResolverTest {
         )
         val resolver = StvrResolver(http)
 
-        resolver.resolve()
-        val second = resolver.resolve() as StreamResolution.Playable
+        resolver.resolve(TvChannel.JEDNOTKA)
+        val second = resolver.resolve(TvChannel.JEDNOTKA) as StreamResolution.Playable
 
         assertEquals(4, http.calls.size)
         assertEquals("https://cdn.example/second.m3u8?auth=two", second.source.url)
@@ -80,7 +104,7 @@ class StvrResolverTest {
                     internetAllowed = false,
                 ),
             ),
-            StvrResolver(http).resolve(),
+            StvrResolver(http).resolve(TvChannel.JEDNOTKA),
         )
     }
 
@@ -95,7 +119,7 @@ class StvrResolverTest {
                     ),
                 ),
             ),
-        ).resolve()
+        ).resolve(TvChannel.JEDNOTKA)
 
         assertTrue(result is StreamResolution.Playable)
     }
@@ -114,7 +138,7 @@ class StvrResolverTest {
         )
 
         val error = assertThrows(StreamResolveException::class.java) {
-            runTest { resolver.resolve() }
+            runTest { resolver.resolve(TvChannel.JEDNOTKA) }
         }
 
         assertEquals("STVR response does not contain an HLS source", error.message)
@@ -132,7 +156,7 @@ class StvrResolverTest {
         )
 
         val error = assertThrows(StreamResolveException::class.java) {
-            runTest { resolver.resolve() }
+            runTest { resolver.resolve(TvChannel.JEDNOTKA) }
         }
 
         assertEquals("STVR request failed", error.message)

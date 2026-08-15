@@ -9,6 +9,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import sk.ziacik.androidtvplayer.channel.TvChannel
 import sk.ziacik.androidtvplayer.player.Media3PlayerPort
 import sk.ziacik.androidtvplayer.player.PlayerController
 import sk.ziacik.androidtvplayer.resolver.OkHttpStvrClient
@@ -35,7 +36,7 @@ class MainActivity : ComponentActivity() {
         val overlayController = OverlayController(appScope)
         playerController = PlayerController(
             scope = appScope,
-            resolve = resolver::resolve,
+            resolve = { resolver.resolve(TvChannel.JEDNOTKA) },
             playerPort = playerPort,
             diagnostics = { message, cause ->
                 Log.e("AndroidTvPlayer", message, cause)
