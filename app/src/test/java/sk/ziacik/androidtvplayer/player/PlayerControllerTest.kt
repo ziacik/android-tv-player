@@ -368,7 +368,7 @@ class PlayerControllerTest {
         controller.channelDown()
         advanceUntilIdle()
 
-        assertEquals(TvChannel.SZTS, controller.state.value.channel)
+        assertEquals(TvChannel.BBC_FOOD, controller.state.value.channel)
     }
 
     @Test

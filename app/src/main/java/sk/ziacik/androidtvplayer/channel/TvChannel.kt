@@ -39,7 +39,14 @@ enum class TvChannel(
     TA3("ta3", null, "TA3", ChannelProvider.TA3),
     NOVA_CINEMA("nova-cinema", null, "NOVA CINEMA", ChannelProvider.NOVA),
     CNN_PRIMA_NEWS("cnn-prima-news", null, "CNN PRIMA NEWS", ChannelProvider.CNN_PRIMA_NEWS),
-    SZTS("szts", null, "SZTŠ", ChannelProvider.DIRECT, "https://dash2.antik.sk/live/tanecnesutaze/index.m3u8");
+    SZTS("szts", null, "SZTŠ", ChannelProvider.DIRECT, "https://dash2.antik.sk/live/tanecnesutaze/index.m3u8"),
+    WILD_EARTH("wild-earth", null, "WILD EARTH", ChannelProvider.DIRECT, "https://dqga3jatxofgx.cloudfront.net/WildEarth.m3u8"),
+    WATERBEAR("waterbear", null, "WATERBEAR", ChannelProvider.DIRECT, "https://waterbear-waterbear-rakuten.amagi.tv/playlist.m3u8"),
+    LOVE_NATURE("love-nature", null, "LOVE NATURE", ChannelProvider.DIRECT, "https://aegis-cloudfront-1.tubi.video/6d6d0f24-8445-4b4c-bdf6-44f9e38beaa4/playlist.m3u8"),
+    GUSTO_TV("gusto-tv", null, "GUSTO TV", ChannelProvider.DIRECT, "https://563f72af.wurl.com/master/f36d25e7e52f1ba8d7e56eb859c636563214f541/UmFrdXRlblRWLWV1X0d1c3RvVFZfSExT/playlist.m3u8"),
+    TASTEMADE("tastemade", null, "TASTEMADE", ChannelProvider.DIRECT, "https://tastemade-tdint-rakuten.amagi.tv/playlist.m3u8"),
+    TV5MONDE_CHEFS("tv5monde-chefs", null, "TV5MONDE CHEFS", ChannelProvider.DIRECT, "https://tvf-tv5ch.otteravision.com/tvf/tv5ch/tv5ch.m3u8"),
+    BBC_FOOD("bbc-food", null, "BBC FOOD", ChannelProvider.DIRECT, "https://d1e9r0b71zfwk7.cloudfront.net/playlist.m3u8");
 
     fun next(): TvChannel = entries[(ordinal + 1) % entries.size]
 
