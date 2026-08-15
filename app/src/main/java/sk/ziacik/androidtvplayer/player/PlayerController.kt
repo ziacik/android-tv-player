@@ -204,6 +204,12 @@ class PlayerController(
                 )
                 scheduleRestrictedRetry(channel, resolution.program.endsAtMs)
             }
+            is StreamResolution.RequiresCredentials -> {
+                activeProgram = null
+                activePlaybackChannel = null
+                activeLoadId = null
+                mutableState.value = PlayerUiState.CredentialsRequired(resolution.channel)
+            }
         }
     }
 

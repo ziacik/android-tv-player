@@ -21,6 +21,10 @@ sealed interface PlayerUiState {
         val program: ProgramMetadata,
     ) : PlayerUiState
 
+    data class CredentialsRequired(
+        override val channel: TvChannel,
+    ) : PlayerUiState
+
     data class Error(
         override val channel: TvChannel,
         val message: String,

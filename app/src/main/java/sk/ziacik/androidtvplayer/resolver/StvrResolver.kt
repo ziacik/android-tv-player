@@ -10,7 +10,7 @@ const val STVR_USER_AGENT =
         "Chrome/77.0.3865.90 Safari/537.36"
 
 internal fun stvrLiveUrl(channel: TvChannel): String =
-    "$STVR_LIVE_BASE_URL?c=${channel.stvrId}&ad=1&b=chrome&p=win&v=77&f=0&d=1"
+    "$STVR_LIVE_BASE_URL?c=${requireNotNull(channel.stvrId)}&ad=1&b=chrome&p=win&v=77&f=0&d=1"
 
 class StvrResolver(
     private val httpClient: StvrHttpClient,

@@ -2,11 +2,12 @@ package sk.ziacik.androidtvplayer.channel
 
 enum class TvChannel(
     val storageKey: String,
-    val stvrId: String,
+    val stvrId: String?,
     val displayName: String,
 ) {
     JEDNOTKA("jednotka", "1", "JEDNOTKA"),
-    DVOJKA("dvojka", "2", "DVOJKA");
+    DVOJKA("dvojka", "2", "DVOJKA"),
+    MARKIZA("markiza", null, "MARKÍZA");
 
     fun next(): TvChannel = entries[(ordinal + 1) % entries.size]
 

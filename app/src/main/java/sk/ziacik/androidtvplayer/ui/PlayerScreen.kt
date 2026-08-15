@@ -8,11 +8,14 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -31,6 +34,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -49,6 +53,7 @@ fun PlayerScreen(
     controller: PlayerController,
     player: Player,
     overlayController: OverlayController,
+    onSaveMarkizaCredentials: (String, String) -> Unit,
     onExit: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -87,6 +92,9 @@ fun PlayerScreen(
                 }
 
                 val keyCode = event.nativeKeyEvent.keyCode
+                if (state is PlayerUiState.CredentialsRequired) {
+                    return@onPreviewKeyEvent false
+                }
                 val retryable = state is PlayerUiState.Unavailable || state is PlayerUiState.Error
                 if (retryable && keyCode.isCenterKey()) {
                     controller.retry()
@@ -161,6 +169,7 @@ fun PlayerScreen(
             overlayVisible = overlayVisible,
             focusedControl = focusedControl,
             formatTime = { millis -> timeFormat.format(Date(millis)) },
+            onSaveMarkizaCredentials = onSaveMarkizaCredentials,
             modifier = Modifier.align(Alignment.Center),
         )
     }
@@ -172,6 +181,7 @@ internal fun PlayerStateLayer(
     overlayVisible: Boolean,
     focusedControl: FocusedControl,
     formatTime: (Long) -> String,
+    onSaveMarkizaCredentials: (String, String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when (val current = state) {
@@ -197,12 +207,56 @@ internal fun PlayerStateLayer(
             modifier = modifier,
         )
 
+        is PlayerUiState.CredentialsRequired -> MarkizaCredentialsPanel(
+            onSave = onSaveMarkizaCredentials,
+            modifier = modifier,
+        )
+
         is PlayerUiState.Error -> ErrorPanel(
             channelLabel = current.channel.displayName,
             message = current.message,
             actionText = "Skúsiť znova",
             modifier = modifier,
         )
+    }
+}
+
+@Composable
+private fun MarkizaCredentialsPanel(
+    onSave: (String, String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    Column(
+        modifier = modifier
+            .fillMaxWidth(0.68f)
+            .background(Color(0xE6111114), RoundedCornerShape(22.dp))
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Text("MARKÍZA", color = Color.White.copy(alpha = 0.68f), fontWeight = FontWeight.Bold)
+        Text("Prihlásenie k bezplatnému účtu", color = Color.White, fontSize = 22.sp)
+        OutlinedTextField(
+            value = email,
+            onValueChange = { email = it },
+            label = { Text("E-mail") },
+            singleLine = true,
+        )
+        OutlinedTextField(
+            value = password,
+            onValueChange = { password = it },
+            label = { Text("Heslo") },
+            visualTransformation = PasswordVisualTransformation(),
+            singleLine = true,
+        )
+        Button(
+            onClick = { onSave(email, password) },
+            enabled = email.isNotBlank() && password.isNotBlank(),
+        ) {
+            Text("Prihlásiť sa")
+        }
     }
 }
 

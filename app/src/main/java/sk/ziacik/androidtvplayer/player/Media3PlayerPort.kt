@@ -55,6 +55,7 @@ class Media3PlayerPort(context: Context) : PlayerPort {
         }
         val dataSourceFactory = DefaultHttpDataSource.Factory()
             .setUserAgent(source.userAgent)
+            .setDefaultRequestProperties(source.headers)
         val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
         val mediaItem = MediaItem.Builder()
             .setUri(source.url)

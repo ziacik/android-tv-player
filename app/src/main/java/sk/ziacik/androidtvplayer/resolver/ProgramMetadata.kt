@@ -1,5 +1,7 @@
 package sk.ziacik.androidtvplayer.resolver
 
+import sk.ziacik.androidtvplayer.channel.TvChannel
+
 data class ProgramMetadata(
     val title: String,
     val startsAtMs: Long?,
@@ -15,6 +17,10 @@ sealed interface StreamResolution {
 
     data class Unavailable(
         val program: ProgramMetadata,
+    ) : StreamResolution
+
+    data class RequiresCredentials(
+        val channel: TvChannel,
     ) : StreamResolution
 }
 

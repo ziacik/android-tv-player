@@ -12,7 +12,12 @@ import kotlinx.coroutines.cancel
 import sk.ziacik.androidtvplayer.channel.SharedPreferencesChannelStore
 import sk.ziacik.androidtvplayer.player.Media3PlayerPort
 import sk.ziacik.androidtvplayer.player.PlayerController
+import sk.ziacik.androidtvplayer.resolver.ChannelResolver
+import sk.ziacik.androidtvplayer.resolver.MarkizaCredentials
+import sk.ziacik.androidtvplayer.resolver.MarkizaResolver
+import sk.ziacik.androidtvplayer.resolver.OkHttpMarkizaClient
 import sk.ziacik.androidtvplayer.resolver.OkHttpStvrClient
+import sk.ziacik.androidtvplayer.resolver.SharedPreferencesMarkizaCredentialsStore
 import sk.ziacik.androidtvplayer.resolver.StvrResolver
 import sk.ziacik.androidtvplayer.ui.AndroidTvPlayerTheme
 import sk.ziacik.androidtvplayer.ui.OverlayController
@@ -32,7 +37,14 @@ class MainActivity : ComponentActivity() {
                 View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
 
         val playerPort = Media3PlayerPort(this)
-        val resolver = StvrResolver(OkHttpStvrClient())
+        val markizaCredentials = SharedPreferencesMarkizaCredentialsStore(this)
+        val resolver = ChannelResolver(
+            resolveStvr = StvrResolver(OkHttpStvrClient())::resolve,
+            resolveMarkiza = MarkizaResolver(
+                httpClient = OkHttpMarkizaClient(),
+                credentials = markizaCredentials::load,
+            )::resolve,
+        )
         val channelStore = SharedPreferencesChannelStore(this)
         val overlayController = OverlayController(appScope)
         playerController = PlayerController(
@@ -52,6 +64,10 @@ class MainActivity : ComponentActivity() {
                     controller = playerController,
                     player = playerPort.player,
                     overlayController = overlayController,
+                    onSaveMarkizaCredentials = { email, password ->
+                        markizaCredentials.save(MarkizaCredentials(email, password))
+                        playerController.retry()
+                    },
                     onExit = ::finish,
                 )
             }
