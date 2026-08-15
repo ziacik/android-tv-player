@@ -219,10 +219,10 @@ private fun LoadingChannelPanel(
         CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
         Text(
             text = "$channelLabel · NAČÍTAVAM",
-            color = Color.White.copy(alpha = 0.68f),
+            color = Color.White.copy(alpha = 0.78f),
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold,
-            letterSpacing = 1.4.sp,
+            letterSpacing = 1.sp,
         )
     }
 }
