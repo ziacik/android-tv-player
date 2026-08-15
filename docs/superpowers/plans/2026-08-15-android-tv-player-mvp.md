@@ -6,7 +6,7 @@
 
 **Architecture:** A single `app` module keeps network resolution, playback control, and Compose UI separate. `StvrResolver` returns a short-lived `StreamSource`; `PlayerController` owns playback state through a small `PlayerPort`; `PlayerScreen` renders Media3 video and a custom TV overlay while `RemoteCommandMapper` keeps remote behavior testable.
 
-**Tech Stack:** Kotlin 2.3.21 through AGP built-in Kotlin, Android Gradle Plugin 9.3.1, Gradle 9.5.0, compile/target SDK 36, min SDK 26, Jetpack Compose BOM 2026.08.00, Media3 1.10.1, OkHttp 5.1.0, kotlinx-coroutines 1.10.2, JUnit 4.
+**Tech Stack:** Kotlin 2.3.21 through AGP built-in Kotlin, Android Gradle Plugin 9.3.1, Gradle 9.5.0, compile/target SDK 36, min SDK 26, Jetpack Compose BOM 2026.06.00, Media3 1.10.1, OkHttp 5.1.0, kotlinx-coroutines 1.10.2, JUnit 4.
 
 ---
 
@@ -51,7 +51,7 @@ The catalog must pin:
 [versions]
 agp = "9.3.1"
 kotlin = "2.3.21"
-composeBom = "2026.08.00"
+composeBom = "2026.06.00"
 activityCompose = "1.13.0"
 media3 = "1.10.1"
 okhttp = "5.1.0"
