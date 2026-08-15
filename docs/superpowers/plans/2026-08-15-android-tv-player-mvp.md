@@ -309,7 +309,6 @@ The fake implements this exact boundary:
 
 ```kotlin
 interface PlayerPort {
-    val player: Player
     val currentPositionMs: Long
     val durationMs: Long
     val isSeekable: Boolean
@@ -349,7 +348,7 @@ sealed interface PlayerUiState {
 }
 ```
 
-`PlayerController` receives `CoroutineScope`, a `suspend () -> StreamSource` resolver, and `PlayerPort`. It exposes `val player: Player get() = playerPort.player` for rendering only, owns `MutableStateFlow<PlayerUiState>`, cancels the previous resolve job on retry, sets `Resolving`, resolves, sets `Preparing`, then calls `load`. It implements exact ±10,000 ms clamped with `coerceIn(0, durationMs)` when duration is known, plus play/pause, go-live, and release.
+`PlayerController` receives `CoroutineScope`, a `suspend () -> StreamSource` resolver, and `PlayerPort`. It owns `MutableStateFlow<PlayerUiState>`, cancels the previous resolve job on retry, sets `Resolving`, resolves, sets `Preparing`, then calls `load`. It implements exact ±10,000 ms clamped with `coerceIn(0, durationMs)` when duration is known, plus play/pause, go-live, and release.
 
 - [ ] **Step 4: Implement Media3 adapter**
 
@@ -431,7 +430,7 @@ git commit -m "feat: add TV remote interaction rules"
 
 - [ ] **Step 1: Add the Media3 video surface**
 
-Use `AndroidView` with `PlayerView(context).apply { useController = false; resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT; player = controller.player }`. In `DisposableEffect`, detach the player when the composition leaves.
+Pass the underlying Media3 `Player` separately from the pure `PlayerController`, then use `AndroidView` with `PlayerView(context).apply { useController = false; resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT; player = media3Player }`. Activity lifecycle cleanup releases the player when the screen leaves.
 
 - [ ] **Step 2: Add the custom overlay**
 

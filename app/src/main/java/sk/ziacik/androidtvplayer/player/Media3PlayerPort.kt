@@ -6,11 +6,13 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import sk.ziacik.androidtvplayer.resolver.StreamSource
 
+@androidx.annotation.OptIn(UnstableApi::class)
 class Media3PlayerPort(context: Context) : PlayerPort {
     val player: ExoPlayer = ExoPlayer.Builder(context).build()
 
