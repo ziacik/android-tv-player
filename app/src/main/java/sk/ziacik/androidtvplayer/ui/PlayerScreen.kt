@@ -141,8 +141,7 @@ fun PlayerScreen(
             )
             is PlayerUiState.Ready -> if (overlayVisible) {
                 PlayerOverlay(
-                    isPlaying = current.isPlaying,
-                    isSeekable = current.isSeekable,
+                    model = PlayerOverlayModel.from(current),
                     focusedControl = focusedControl,
                 )
             }
