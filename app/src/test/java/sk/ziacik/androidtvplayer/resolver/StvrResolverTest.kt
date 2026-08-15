@@ -4,11 +4,12 @@ import java.io.IOException
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class StvrResolverTest {
     @Test
-    fun `loads landing page before live JSON and returns HLS source`() = runTest {
+    fun `loads landing page before live JSON and returns playable source`() = runTest {
         val http = RecordingHttpClient(
             responses = ArrayDeque(
                 listOf(
@@ -18,7 +19,7 @@ class StvrResolverTest {
             ),
         )
 
-        val source = StvrResolver(http).resolve()
+        val result = StvrResolver(http).resolve()
 
         assertEquals(
             listOf(STVR_LANDING_URL, STVR_LIVE_URL),
@@ -26,8 +27,10 @@ class StvrResolverTest {
         )
         assertEquals(STVR_USER_AGENT, http.calls[0].headers["User-Agent"])
         assertEquals(STVR_USER_AGENT, http.calls[1].headers["User-Agent"])
-        assertEquals("https://cdn.example/first.m3u8?auth=one", source.url)
-        assertEquals(STVR_USER_AGENT, source.userAgent)
+        assertTrue(result is StreamResolution.Playable)
+        result as StreamResolution.Playable
+        assertEquals("https://cdn.example/first.m3u8?auth=one", result.source.url)
+        assertEquals(STVR_USER_AGENT, result.source.userAgent)
     }
 
     @Test
@@ -45,10 +48,76 @@ class StvrResolverTest {
         val resolver = StvrResolver(http)
 
         resolver.resolve()
-        val second = resolver.resolve()
+        val second = resolver.resolve() as StreamResolution.Playable
 
         assertEquals(4, http.calls.size)
-        assertEquals("https://cdn.example/second.m3u8?auth=two", second.url)
+        assertEquals("https://cdn.example/second.m3u8?auth=two", second.source.url)
+    }
+
+    @Test
+    fun `internet N returns unavailable without requiring HLS`() = runTest {
+        val http = RecordingHttpClient(
+            ArrayDeque(
+                listOf(
+                    "landing",
+                    """{"clip":{
+                      "series":"Ordinácia v Eifeli",
+                      "subtitle":"Šance",
+                      "internet":"N",
+                      "timestop":"1786791292000",
+                      "sources":[]
+                    }}""",
+                ),
+            ),
+        )
+
+        assertEquals(
+            StreamResolution.Unavailable(
+                ProgramMetadata(
+                    title = "Ordinácia v Eifeli: Šance",
+                    startsAtMs = null,
+                    endsAtMs = 1_786_791_292_000L,
+                    internetAllowed = false,
+                ),
+            ),
+            StvrResolver(http).resolve(),
+        )
+    }
+
+    @Test
+    fun `missing internet flag remains playable when HLS exists`() = runTest {
+        val result = StvrResolver(
+            RecordingHttpClient(
+                ArrayDeque(
+                    listOf(
+                        "landing",
+                        responseWith("https://cdn.example/live.m3u8"),
+                    ),
+                ),
+            ),
+        ).resolve()
+
+        assertTrue(result is StreamResolution.Playable)
+    }
+
+    @Test
+    fun `playable response without HLS is rejected`() {
+        val resolver = StvrResolver(
+            RecordingHttpClient(
+                ArrayDeque(
+                    listOf(
+                        "landing",
+                        """{"clip":{"internet":"Y","sources":[]}}""",
+                    ),
+                ),
+            ),
+        )
+
+        val error = assertThrows(StreamResolveException::class.java) {
+            runTest { resolver.resolve() }
+        }
+
+        assertEquals("STVR response does not contain an HLS source", error.message)
     }
 
     @Test

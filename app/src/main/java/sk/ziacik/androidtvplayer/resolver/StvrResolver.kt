@@ -11,15 +11,26 @@ class StvrResolver(
     private val httpClient: StvrHttpClient,
     private val parser: StvrJsonParser = StvrJsonParser(),
 ) {
-    suspend fun resolve(): StreamSource {
+    suspend fun resolve(): StreamResolution {
         val headers = mapOf("User-Agent" to STVR_USER_AGENT)
 
         return try {
             httpClient.get(STVR_LANDING_URL, headers)
             val body = httpClient.get(STVR_LIVE_URL, headers)
-            StreamSource(
-                url = parser.parseHlsUrl(body),
-                userAgent = STVR_USER_AGENT,
+            val parsed = parser.parse(body)
+            if (parsed.program.internetAllowed == false) {
+                return StreamResolution.Unavailable(parsed.program)
+            }
+            val hlsUrl = parsed.hlsUrl
+                ?: throw StreamResolveException(
+                    "STVR response does not contain an HLS source",
+                )
+            StreamResolution.Playable(
+                program = parsed.program,
+                source = StreamSource(
+                    url = hlsUrl,
+                    userAgent = STVR_USER_AGENT,
+                ),
             )
         } catch (error: StreamResolveException) {
             throw error
