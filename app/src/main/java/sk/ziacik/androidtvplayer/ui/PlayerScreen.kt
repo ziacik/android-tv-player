@@ -1,5 +1,6 @@
 package sk.ziacik.androidtvplayer.ui
 
+import android.text.format.DateFormat
 import android.view.KeyEvent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -28,6 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -35,6 +37,8 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import java.util.Date
+import kotlinx.coroutines.delay
 import sk.ziacik.androidtvplayer.player.PlayerController
 import sk.ziacik.androidtvplayer.player.PlayerUiState
 
@@ -52,9 +56,19 @@ fun PlayerScreen(
     var focusedControl by remember { mutableStateOf(FocusedControl.PLAY_PAUSE) }
     val focusRequester = remember { FocusRequester() }
     val commandMapper = remember { RemoteCommandMapper() }
+    val context = LocalContext.current
+    val timeFormat = remember(context) { DateFormat.getTimeFormat(context) }
 
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
+    }
+
+    LaunchedEffect(overlayVisible, state is PlayerUiState.Ready) {
+        if (!overlayVisible || state !is PlayerUiState.Ready) return@LaunchedEffect
+        while (true) {
+            controller.refreshPlaybackSnapshot()
+            delay(1_000L)
+        }
     }
 
     BackHandler {
@@ -72,7 +86,8 @@ fun PlayerScreen(
                 }
 
                 val keyCode = event.nativeKeyEvent.keyCode
-                if (state is PlayerUiState.Error && keyCode.isCenterKey()) {
+                val retryable = state is PlayerUiState.Unavailable || state is PlayerUiState.Error
+                if (retryable && keyCode.isCenterKey()) {
                     controller.retry()
                     return@onPreviewKeyEvent true
                 }
@@ -132,34 +147,58 @@ fun PlayerScreen(
             modifier = Modifier.fillMaxSize(),
         )
 
-        when (val current = state) {
-            PlayerUiState.Resolving,
-            PlayerUiState.Preparing,
-            -> CircularProgressIndicator(
-                modifier = Modifier.align(Alignment.Center),
-                color = MaterialTheme.colorScheme.primary,
-            )
-            is PlayerUiState.Ready -> if (overlayVisible) {
-                PlayerOverlay(
-                    model = PlayerOverlayModel.from(current),
-                    focusedControl = focusedControl,
-                )
-            }
-            is PlayerUiState.Unavailable -> ErrorPanel(
-                message = "Tento program nie je dostupný online",
-                modifier = Modifier.align(Alignment.Center),
-            )
-            is PlayerUiState.Error -> ErrorPanel(
-                message = current.message,
-                modifier = Modifier.align(Alignment.Center),
+        PlayerStateLayer(
+            state = state,
+            overlayVisible = overlayVisible,
+            focusedControl = focusedControl,
+            formatTime = { millis -> timeFormat.format(Date(millis)) },
+            modifier = Modifier.align(Alignment.Center),
+        )
+    }
+}
+
+@Composable
+internal fun PlayerStateLayer(
+    state: PlayerUiState,
+    overlayVisible: Boolean,
+    focusedControl: FocusedControl,
+    formatTime: (Long) -> String,
+    modifier: Modifier = Modifier,
+) {
+    when (val current = state) {
+        PlayerUiState.Resolving,
+        PlayerUiState.Preparing,
+        -> CircularProgressIndicator(
+            modifier = modifier,
+            color = MaterialTheme.colorScheme.primary,
+        )
+
+        is PlayerUiState.Ready -> if (overlayVisible) {
+            PlayerOverlay(
+                model = PlayerOverlayModel.from(current),
+                focusedControl = focusedControl,
+                modifier = modifier,
             )
         }
+
+        is PlayerUiState.Unavailable -> RestrictedProgramPanel(
+            programTitle = current.program.title,
+            retryTime = current.program.endsAtMs?.let(formatTime),
+            modifier = modifier,
+        )
+
+        is PlayerUiState.Error -> ErrorPanel(
+            message = current.message,
+            actionText = "Skúsiť znova",
+            modifier = modifier,
+        )
     }
 }
 
 @Composable
 private fun ErrorPanel(
     message: String,
+    actionText: String,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -169,7 +208,7 @@ private fun ErrorPanel(
     ) {
         Text(text = message, color = Color.White, fontSize = 24.sp)
         Text(
-            text = "Retry",
+            text = actionText,
             modifier = Modifier
                 .background(
                     MaterialTheme.colorScheme.primary,

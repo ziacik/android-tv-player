@@ -293,7 +293,7 @@ fun RestrictedProgramPanel(
         )
         Text(
             text = retryTime?.let { "Vysielanie skúsime obnoviť o $it" }
-                ?: "Vysielanie skúsime obnoviť automaticky",
+                ?: "Vysielanie budeme skúšať obnoviť automaticky",
             color = Color.White.copy(alpha = 0.52f),
             fontSize = 14.sp,
             textAlign = TextAlign.Center,

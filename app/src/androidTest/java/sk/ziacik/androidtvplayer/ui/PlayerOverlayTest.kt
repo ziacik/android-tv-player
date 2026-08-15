@@ -6,6 +6,9 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import org.junit.Rule
 import org.junit.Test
+import sk.ziacik.androidtvplayer.player.PlaybackSnapshot
+import sk.ziacik.androidtvplayer.player.PlayerUiState
+import sk.ziacik.androidtvplayer.resolver.ProgramMetadata
 
 class PlayerOverlayTest {
     @get:Rule
@@ -55,5 +58,49 @@ class PlayerOverlayTest {
         compose.onNodeWithText("Ordinácia v Eifeli: Šance").assertIsDisplayed()
         compose.onNodeWithText("Vysielanie skúsime obnoviť o 12:54").assertIsDisplayed()
         compose.onNodeWithText("Skúsiť znova").assertIsDisplayed()
+    }
+
+    @Test
+    fun unavailableStateRendersRestrictedPanel() {
+        compose.setContent {
+            AndroidTvPlayerTheme {
+                PlayerStateLayer(
+                    state = PlayerUiState.Unavailable(
+                        ProgramMetadata(
+                            title = "Ordinácia v Eifeli: Šance",
+                            startsAtMs = null,
+                            endsAtMs = 20_000L,
+                            internetAllowed = false,
+                        ),
+                    ),
+                    overlayVisible = false,
+                    focusedControl = FocusedControl.PLAY_PAUSE,
+                    formatTime = { "12:54" },
+                )
+            }
+        }
+
+        compose.onNodeWithText("Tento program nie je dostupný online").assertIsDisplayed()
+        compose.onNodeWithText("Vysielanie skúsime obnoviť o 12:54").assertIsDisplayed()
+    }
+
+    @Test
+    fun readyStateHidesOverlayWhenVisibilityIsFalse() {
+        val ready = PlayerUiState.Ready(
+            program = ProgramMetadata("Večerný program", null, null, true),
+            playback = PlaybackSnapshot(90_000L, 100_000L, 10_000L, true, true),
+        )
+        compose.setContent {
+            AndroidTvPlayerTheme {
+                PlayerStateLayer(
+                    state = ready,
+                    overlayVisible = false,
+                    focusedControl = FocusedControl.PLAY_PAUSE,
+                    formatTime = { "12:54" },
+                )
+            }
+        }
+
+        compose.onNodeWithText("Večerný program").assertDoesNotExist()
     }
 }
