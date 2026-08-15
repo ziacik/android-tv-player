@@ -1,5 +1,6 @@
 package sk.ziacik.androidtvplayer.resolver
 
+import kotlinx.coroutines.CancellationException
 import sk.ziacik.androidtvplayer.channel.TvChannel
 
 const val STVR_LANDING_URL = "https://www.rtvs.sk/televizia/tv"
@@ -36,6 +37,8 @@ class StvrResolver(
                     userAgent = STVR_USER_AGENT,
                 ),
             )
+        } catch (error: CancellationException) {
+            throw error
         } catch (error: StreamResolveException) {
             throw error
         } catch (error: Exception) {

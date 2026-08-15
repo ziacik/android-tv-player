@@ -1,13 +1,16 @@
 package sk.ziacik.androidtvplayer.resolver
 
 import java.io.IOException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.suspendCancellableCoroutine
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.Cookie
 import okhttp3.CookieJar
 import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
 
 class OkHttpStvrClient(
     private val client: OkHttpClient = OkHttpClient.Builder()
@@ -19,7 +22,7 @@ class OkHttpStvrClient(
     override suspend fun get(
         url: String,
         headers: Map<String, String>,
-    ): String = withContext(Dispatchers.IO) {
+    ): String {
         val request = Request.Builder()
             .url(url)
             .apply {
@@ -27,11 +30,44 @@ class OkHttpStvrClient(
             }
             .build()
 
-        client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) {
-                throw IOException("HTTP ${response.code}")
+        return suspendCancellableCoroutine { continuation ->
+            val call = client.newCall(request)
+            val completed = AtomicBoolean(false)
+            continuation.invokeOnCancellation {
+                completed.compareAndSet(false, true)
+                call.cancel()
             }
-            response.body.string()
+            val callback = object : Callback {
+                override fun onFailure(call: Call, e: IOException) {
+                    if (completed.compareAndSet(false, true)) {
+                        continuation.resumeWith(Result.failure(e))
+                    }
+                }
+
+                override fun onResponse(call: Call, response: Response) {
+                    try {
+                        val body = response.use {
+                            if (!it.isSuccessful) throw IOException("HTTP ${it.code}")
+                            it.body.string()
+                        }
+                        if (completed.compareAndSet(false, true)) {
+                            continuation.resumeWith(Result.success(body))
+                        }
+                    } catch (error: Exception) {
+                        if (completed.compareAndSet(false, true)) {
+                            continuation.resumeWith(Result.failure(error))
+                        }
+                    }
+                }
+            }
+
+            try {
+                call.enqueue(callback)
+            } catch (error: Exception) {
+                if (completed.compareAndSet(false, true)) {
+                    continuation.resumeWith(Result.failure(error))
+                }
+            }
         }
     }
 }
@@ -60,4 +96,3 @@ private class InMemoryCookieJar : CookieJar {
         return cookies.filter { cookie -> cookie.matches(url) }
     }
 }
-

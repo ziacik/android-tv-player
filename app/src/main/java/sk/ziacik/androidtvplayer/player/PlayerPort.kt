@@ -5,7 +5,7 @@ import sk.ziacik.androidtvplayer.resolver.StreamSource
 interface PlayerPort {
     fun snapshot(): PlaybackSnapshot
 
-    fun load(source: StreamSource)
+    fun load(loadId: Long, source: StreamSource)
     fun play()
     fun pause()
     fun seekTo(positionMs: Long)
@@ -15,8 +15,8 @@ interface PlayerPort {
     fun setListener(listener: Listener)
 
     interface Listener {
-        fun onReady(isPlaying: Boolean)
-        fun onPlayingChanged(isPlaying: Boolean)
-        fun onError(message: String)
+        fun onReady(loadId: Long, isPlaying: Boolean)
+        fun onPlayingChanged(loadId: Long, isPlaying: Boolean)
+        fun onError(loadId: Long, message: String)
     }
 }

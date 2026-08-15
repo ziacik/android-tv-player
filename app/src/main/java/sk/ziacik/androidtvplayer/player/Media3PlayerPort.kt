@@ -17,34 +17,7 @@ class Media3PlayerPort(context: Context) : PlayerPort {
     val player: ExoPlayer = ExoPlayer.Builder(context).build()
 
     private var listener: PlayerPort.Listener? = null
-
-    init {
-        player.addListener(
-            object : Player.Listener {
-                override fun onPlaybackStateChanged(playbackState: Int) {
-                    if (playbackState == Player.STATE_READY) {
-                        listener?.onReady(player.isPlaying)
-                    }
-                }
-
-                override fun onIsPlayingChanged(isPlaying: Boolean) {
-                    listener?.onPlayingChanged(isPlaying)
-                }
-
-                override fun onAvailableCommandsChanged(
-                    availableCommands: Player.Commands,
-                ) {
-                    if (player.playbackState == Player.STATE_READY) {
-                        listener?.onReady(player.isPlaying)
-                    }
-                }
-
-                override fun onPlayerError(error: PlaybackException) {
-                    listener?.onError(error.errorCodeName)
-                }
-            },
-        )
-    }
+    private var activePlayerListener: Player.Listener? = null
 
     override fun snapshot() = PlaybackSnapshot(
         currentPositionMs = player.currentPosition.coerceAtLeast(0L),
@@ -56,7 +29,30 @@ class Media3PlayerPort(context: Context) : PlayerPort {
         isPlaying = player.isPlaying,
     )
 
-    override fun load(source: StreamSource) {
+    override fun load(loadId: Long, source: StreamSource) {
+        val loadListener = object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_READY) {
+                    listener?.onReady(loadId, player.isPlaying)
+                }
+            }
+
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                listener?.onPlayingChanged(loadId, isPlaying)
+            }
+
+            override fun onAvailableCommandsChanged(
+                availableCommands: Player.Commands,
+            ) {
+                if (player.playbackState == Player.STATE_READY) {
+                    listener?.onReady(loadId, player.isPlaying)
+                }
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                listener?.onError(loadId, error.errorCodeName)
+            }
+        }
         val dataSourceFactory = DefaultHttpDataSource.Factory()
             .setUserAgent(source.userAgent)
         val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
@@ -65,9 +61,17 @@ class Media3PlayerPort(context: Context) : PlayerPort {
             .setMimeType(MimeTypes.APPLICATION_M3U8)
             .build()
 
-        player.setMediaSource(mediaSourceFactory.createMediaSource(mediaItem))
-        player.prepare()
-        player.playWhenReady = true
+        detachActivePlayerListener()
+        try {
+            player.setMediaSource(mediaSourceFactory.createMediaSource(mediaItem))
+            activePlayerListener = loadListener
+            player.addListener(loadListener)
+            player.prepare()
+            player.playWhenReady = true
+        } catch (error: Exception) {
+            detachActivePlayerListener()
+            throw error
+        }
     }
 
     override fun play() = player.play()
@@ -82,13 +86,22 @@ class Media3PlayerPort(context: Context) : PlayerPort {
     }
 
     override fun stop() {
+        detachActivePlayerListener()
         player.stop()
         player.clearMediaItems()
     }
 
-    override fun release() = player.release()
+    override fun release() {
+        detachActivePlayerListener()
+        player.release()
+    }
 
     override fun setListener(listener: PlayerPort.Listener) {
         this.listener = listener
+    }
+
+    private fun detachActivePlayerListener() {
+        activePlayerListener?.let(player::removeListener)
+        activePlayerListener = null
     }
 }

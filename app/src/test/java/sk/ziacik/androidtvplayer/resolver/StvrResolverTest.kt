@@ -1,8 +1,10 @@
 package sk.ziacik.androidtvplayer.resolver
 
 import java.io.IOException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -160,6 +162,25 @@ class StvrResolverTest {
         }
 
         assertEquals("STVR request failed", error.message)
+    }
+
+    @Test
+    fun `cancellation is not wrapped as a stream resolve failure`() {
+        val cancellation = CancellationException("channel switched")
+        val resolver = StvrResolver(
+            object : StvrHttpClient {
+                override suspend fun get(
+                    url: String,
+                    headers: Map<String, String>,
+                ): String = throw cancellation
+            },
+        )
+
+        val error = assertThrows(CancellationException::class.java) {
+            runTest { resolver.resolve(TvChannel.JEDNOTKA) }
+        }
+
+        assertSame(cancellation, error)
     }
 
     private fun responseWith(url: String): String = """

@@ -29,31 +29,36 @@ class PlayerController(
     private var currentChannel = initialChannel
     private var activeProgram: ProgramMetadata? = null
     private var activePlaybackChannel: TvChannel? = null
+    private var activeLoadId: Long? = null
     private var resolveJob: Job? = null
     private var restrictedRetryJob: Job? = null
     private var resolveGeneration = 0L
+    private var nextLoadId = 0L
+    private var released = false
 
     init {
         playerPort.setListener(
             object : PlayerPort.Listener {
-                override fun onReady(isPlaying: Boolean) {
-                    if (activePlaybackChannel != currentChannel) return
+                override fun onReady(loadId: Long, isPlaying: Boolean) {
+                    if (!acceptsPlaybackCallback(loadId)) return
                     updateReadyState(isPlaying)
                 }
 
-                override fun onPlayingChanged(isPlaying: Boolean) {
+                override fun onPlayingChanged(loadId: Long, isPlaying: Boolean) {
                     if (
-                        activePlaybackChannel == currentChannel &&
+                        acceptsPlaybackCallback(loadId) &&
                         mutableState.value is PlayerUiState.Ready
                     ) {
                         updateReadyState(isPlaying)
                     }
                 }
 
-                override fun onError(message: String) {
-                    if (activePlaybackChannel != currentChannel) return
+                override fun onError(loadId: Long, message: String) {
+                    if (!acceptsPlaybackCallback(loadId)) return
                     diagnostics("Media3 playback failed: $message", null)
+                    activeProgram = null
                     activePlaybackChannel = null
+                    activeLoadId = null
                     mutableState.value = PlayerUiState.Error(currentChannel, ERROR_MESSAGE)
                 }
             },
@@ -69,31 +74,49 @@ class PlayerController(
     fun channelDown() = switchTo(currentChannel.previous())
 
     private fun switchTo(channel: TvChannel) {
+        if (released) return
         if (channel == currentChannel) return
         currentChannel = channel
         onChannelSelected(channel)
         activeProgram = null
         activePlaybackChannel = null
+        activeLoadId = null
         playerPort.stop()
         resolveCurrentChannel()
     }
 
     private fun resolveCurrentChannel() {
+        if (released) return
         resolveJob?.cancel()
         restrictedRetryJob?.cancel()
         restrictedRetryJob = null
         val channel = currentChannel
         val generation = ++resolveGeneration
         resolveJob = scope.launch {
+            if (released || generation != resolveGeneration || channel != currentChannel) {
+                return@launch
+            }
             mutableState.value = PlayerUiState.Resolving(channel)
             try {
                 val resolution = resolve(channel)
-                if (generation != resolveGeneration || channel != currentChannel) return@launch
+                if (
+                    released ||
+                    generation != resolveGeneration ||
+                    channel != currentChannel
+                ) {
+                    return@launch
+                }
                 applyResolution(channel, resolution)
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
-                if (generation != resolveGeneration || channel != currentChannel) return@launch
+                if (
+                    released ||
+                    generation != resolveGeneration ||
+                    channel != currentChannel
+                ) {
+                    return@launch
+                }
                 diagnostics("STVR resolve failed", error)
                 mutableState.value = PlayerUiState.Error(channel, ERROR_MESSAGE)
             }
@@ -101,6 +124,7 @@ class PlayerController(
     }
 
     fun refreshPlaybackSnapshot() {
+        if (released) return
         val current = mutableState.value
         if (current is PlayerUiState.Ready) {
             mutableState.value = current.copy(playback = playerPort.snapshot())
@@ -108,6 +132,7 @@ class PlayerController(
     }
 
     fun seekBack() {
+        if (released) return
         val snapshot = playerPort.snapshot()
         if (!snapshot.isSeekable) return
         playerPort.seekTo(
@@ -116,6 +141,7 @@ class PlayerController(
     }
 
     fun seekForward() {
+        if (released) return
         val snapshot = playerPort.snapshot()
         if (!snapshot.isSeekable) return
         val requested = snapshot.currentPositionMs + SEEK_INCREMENT_MS
@@ -126,17 +152,26 @@ class PlayerController(
     }
 
     fun togglePlayback() {
+        if (released) return
         if (playerPort.snapshot().isPlaying) playerPort.pause() else playerPort.play()
     }
 
     fun goLive() {
+        if (released) return
         playerPort.goLive()
     }
 
     fun release() {
+        if (released) return
+        released = true
         resolveGeneration += 1
         resolveJob?.cancel()
+        resolveJob = null
         restrictedRetryJob?.cancel()
+        restrictedRetryJob = null
+        activeProgram = null
+        activePlaybackChannel = null
+        activeLoadId = null
         playerPort.release()
     }
 
@@ -145,12 +180,24 @@ class PlayerController(
             is StreamResolution.Playable -> {
                 activeProgram = resolution.program
                 activePlaybackChannel = channel
+                val loadId = ++nextLoadId
+                activeLoadId = loadId
                 mutableState.value = PlayerUiState.Preparing(channel)
-                playerPort.load(resolution.source)
+                try {
+                    playerPort.load(loadId, resolution.source)
+                } catch (_: Exception) {
+                    if (!acceptsPlaybackCallback(loadId)) return
+                    activeProgram = null
+                    activePlaybackChannel = null
+                    activeLoadId = null
+                    diagnostics("Media3 load failed", null)
+                    mutableState.value = PlayerUiState.Error(channel, ERROR_MESSAGE)
+                }
             }
             is StreamResolution.Unavailable -> {
                 activeProgram = null
                 activePlaybackChannel = null
+                activeLoadId = null
                 mutableState.value = PlayerUiState.Unavailable(
                     channel = channel,
                     program = resolution.program,
@@ -170,9 +217,14 @@ class PlayerController(
         }
         restrictedRetryJob = scope.launch {
             delay(retryDelayMs)
-            if (channel == currentChannel) retry()
+            if (!released && channel == currentChannel) retry()
         }
     }
+
+    private fun acceptsPlaybackCallback(loadId: Long): Boolean =
+        !released &&
+            loadId == activeLoadId &&
+            activePlaybackChannel == currentChannel
 
     private fun updateReadyState(isPlaying: Boolean) {
         val program = activeProgram ?: return

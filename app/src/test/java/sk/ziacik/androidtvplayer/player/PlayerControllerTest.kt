@@ -36,7 +36,7 @@ class PlayerControllerTest {
 
         controller.start()
         advanceUntilIdle()
-        player.registeredListener.onReady(isPlaying = true)
+        player.registeredListener.onReady(player.latestLoadId, isPlaying = true)
 
         val ready = controller.state.value as PlayerUiState.Ready
         assertEquals(TvChannel.DVOJKA, ready.channel)
@@ -179,7 +179,10 @@ class PlayerControllerTest {
 
         controller.start()
         advanceUntilIdle()
-        player.registeredListener.onError("ERROR_CODE_IO_BAD_HTTP_STATUS")
+        player.registeredListener.onError(
+            player.latestLoadId,
+            "ERROR_CODE_IO_BAD_HTTP_STATUS",
+        )
 
         assertEquals(
             "Media3 playback failed: ERROR_CODE_IO_BAD_HTTP_STATUS",
@@ -203,7 +206,7 @@ class PlayerControllerTest {
 
         controller.start()
         advanceUntilIdle()
-        player.registeredListener.onReady(isPlaying = true)
+        player.registeredListener.onReady(player.latestLoadId, isPlaying = true)
         controller.refreshPlaybackSnapshot()
 
         assertEquals(PROGRAM, (controller.state.value as PlayerUiState.Ready).program)
@@ -216,10 +219,10 @@ class PlayerControllerTest {
         val controller = controller(player, this)
         controller.start()
         advanceUntilIdle()
-        player.registeredListener.onReady(isPlaying = false)
+        player.registeredListener.onReady(player.latestLoadId, isPlaying = false)
 
         player.snapshot = player.snapshot.copy(isPlaying = true)
-        player.registeredListener.onPlayingChanged(isPlaying = true)
+        player.registeredListener.onPlayingChanged(player.latestLoadId, isPlaying = true)
 
         assertTrue((controller.state.value as PlayerUiState.Ready).playback.isPlaying)
     }
@@ -419,11 +422,12 @@ class PlayerControllerTest {
 
         controller.start()
         advanceUntilIdle()
-        player.registeredListener.onReady(isPlaying = true)
+        val oldLoadId = player.latestLoadId
+        player.registeredListener.onReady(oldLoadId, isPlaying = true)
         controller.channelUp()
         runCurrent()
-        player.registeredListener.onReady(isPlaying = true)
-        player.registeredListener.onError("OLD_SOURCE_ERROR")
+        player.registeredListener.onReady(oldLoadId, isPlaying = true)
+        player.registeredListener.onError(oldLoadId, "OLD_SOURCE_ERROR")
 
         assertEquals(PlayerUiState.Resolving(TvChannel.DVOJKA), controller.state.value)
         assertTrue(diagnostics.isEmpty())
@@ -456,6 +460,151 @@ class PlayerControllerTest {
         runCurrent()
 
         assertEquals(listOf(TvChannel.JEDNOTKA, TvChannel.DVOJKA), calls)
+    }
+
+    @Test
+    fun `callbacks from replaced load are ignored after Dvojka loads`() = runTest {
+        val diagnostics = mutableListOf<String>()
+        val player = FakePlayerPort()
+        val controller = PlayerController(
+            scope = this,
+            initialChannel = TvChannel.JEDNOTKA,
+            resolve = { channel -> playableResolution(channel.storageKey) },
+            playerPort = player,
+            diagnostics = { message, _ -> diagnostics += message },
+        )
+
+        controller.start()
+        advanceUntilIdle()
+        val jednotkaLoadId = player.latestLoadId
+        controller.channelUp()
+        advanceUntilIdle()
+        val dvojkaLoadId = player.latestLoadId
+
+        player.registeredListener.onReady(jednotkaLoadId, isPlaying = true)
+        player.registeredListener.onError(jednotkaLoadId, "OLD_SOURCE_ERROR")
+
+        assertEquals(PlayerUiState.Preparing(TvChannel.DVOJKA), controller.state.value)
+        assertTrue(diagnostics.isEmpty())
+        player.registeredListener.onReady(dvojkaLoadId, isPlaying = true)
+        assertEquals(TvChannel.DVOJKA, controller.state.value.channel)
+        assertTrue(controller.state.value is PlayerUiState.Ready)
+    }
+
+    @Test
+    fun `callbacks from first Jednotka load are ignored after A B A switching`() = runTest {
+        val diagnostics = mutableListOf<String>()
+        val player = FakePlayerPort()
+        val controller = PlayerController(
+            scope = this,
+            initialChannel = TvChannel.JEDNOTKA,
+            resolve = { channel -> playableResolution(channel.storageKey) },
+            playerPort = player,
+            diagnostics = { message, _ -> diagnostics += message },
+        )
+
+        controller.start()
+        advanceUntilIdle()
+        val firstJednotkaLoadId = player.latestLoadId
+        controller.channelUp()
+        advanceUntilIdle()
+        controller.channelUp()
+        advanceUntilIdle()
+        val latestJednotkaLoadId = player.latestLoadId
+
+        player.registeredListener.onReady(firstJednotkaLoadId, isPlaying = true)
+        player.registeredListener.onError(firstJednotkaLoadId, "VERY_OLD_SOURCE_ERROR")
+
+        assertEquals(PlayerUiState.Preparing(TvChannel.JEDNOTKA), controller.state.value)
+        assertTrue(diagnostics.isEmpty())
+        player.registeredListener.onReady(latestJednotkaLoadId, isPlaying = true)
+        assertTrue(controller.state.value is PlayerUiState.Ready)
+    }
+
+    @Test
+    fun `release is terminal and idempotent`() = runTest {
+        var resolveCalls = 0
+        val savedChannels = mutableListOf<TvChannel>()
+        val diagnostics = mutableListOf<String>()
+        val player = FakePlayerPort()
+        val controller = PlayerController(
+            scope = this,
+            initialChannel = TvChannel.JEDNOTKA,
+            resolve = {
+                resolveCalls += 1
+                playableResolution()
+            },
+            playerPort = player,
+            onChannelSelected = savedChannels::add,
+            diagnostics = { message, _ -> diagnostics += message },
+        )
+
+        controller.start()
+        advanceUntilIdle()
+        val releasedLoadId = player.latestLoadId
+        val stateAtRelease = controller.state.value
+        controller.release()
+        controller.release()
+
+        controller.start()
+        controller.retry()
+        controller.channelUp()
+        controller.channelDown()
+        controller.refreshPlaybackSnapshot()
+        controller.seekBack()
+        controller.seekForward()
+        controller.togglePlayback()
+        controller.goLive()
+        player.registeredListener.onReady(releasedLoadId, isPlaying = true)
+        player.registeredListener.onPlayingChanged(releasedLoadId, isPlaying = false)
+        player.registeredListener.onError(releasedLoadId, "AFTER_RELEASE")
+        advanceUntilIdle()
+
+        assertEquals(1, resolveCalls)
+        assertEquals(1, player.releaseCalls)
+        assertEquals(0, player.stopCalls)
+        assertTrue(player.seekPositions.isEmpty())
+        assertEquals(0, player.playCalls)
+        assertEquals(0, player.pauseCalls)
+        assertEquals(0, player.goLiveCalls)
+        assertTrue(savedChannels.isEmpty())
+        assertTrue(diagnostics.isEmpty())
+        assertEquals(stateAtRelease, controller.state.value)
+    }
+
+    @Test
+    fun `synchronous player load failure emits channel error and rejects callbacks`() = runTest {
+        val failure = IllegalStateException("https://cdn.example/secret-token.m3u8")
+        val diagnostics = mutableListOf<Pair<String, Throwable?>>()
+        val player = FakePlayerPort(loadFailure = failure)
+        val controller = PlayerController(
+            scope = this,
+            initialChannel = TvChannel.DVOJKA,
+            resolve = { playableResolution("secret-token") },
+            playerPort = player,
+            diagnostics = { message, cause -> diagnostics += message to cause },
+        )
+
+        controller.start()
+        advanceUntilIdle()
+        val failedLoadId = player.latestLoadId
+
+        assertEquals(
+            PlayerUiState.Error(TvChannel.DVOJKA, "Stream sa nepodarilo načítať"),
+            controller.state.value,
+        )
+        assertEquals("Media3 load failed", diagnostics.single().first)
+        assertEquals(null, diagnostics.single().second)
+        assertTrue(!diagnostics.single().first.contains("secret-token"))
+
+        player.registeredListener.onReady(failedLoadId, isPlaying = true)
+        player.registeredListener.onError(failedLoadId, "LATE_LOAD_CALLBACK")
+
+        assertEquals(
+            PlayerUiState.Error(TvChannel.DVOJKA, "Stream sa nepodarilo načítať"),
+            controller.state.value,
+        )
+        assertEquals(1, diagnostics.size)
     }
 
     private fun controller(
@@ -496,25 +645,36 @@ class PlayerControllerTest {
             isSeekable = true,
             isPlaying = true,
         ),
+        var loadFailure: Throwable? = null,
     ) : PlayerPort {
         lateinit var registeredListener: PlayerPort.Listener
         val loadedSources = mutableListOf<StreamSource>()
+        val loadIds = mutableListOf<Long>()
         val seekPositions = mutableListOf<Long>()
         var goLiveCalls = 0
+        var playCalls = 0
+        var pauseCalls = 0
         var stopCalls = 0
         var releaseCalls = 0
 
         override fun snapshot() = snapshot
 
-        override fun load(source: StreamSource) {
+        val latestLoadId: Long
+            get() = loadIds.last()
+
+        override fun load(loadId: Long, source: StreamSource) {
+            loadIds += loadId
             loadedSources += source
+            loadFailure?.let { throw it }
         }
 
         override fun play() {
+            playCalls += 1
             snapshot = snapshot.copy(isPlaying = true)
         }
 
         override fun pause() {
+            pauseCalls += 1
             snapshot = snapshot.copy(isPlaying = false)
         }
 
