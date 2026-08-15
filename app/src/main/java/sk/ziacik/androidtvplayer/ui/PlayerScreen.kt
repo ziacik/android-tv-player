@@ -30,6 +30,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -99,6 +100,14 @@ fun PlayerScreen(
                         focusedControl = focusedControl,
                     )
                 ) {
+                    RemoteCommand.ChannelUp -> {
+                        controller.channelUp()
+                        overlayController.show()
+                    }
+                    RemoteCommand.ChannelDown -> {
+                        controller.channelDown()
+                        overlayController.show()
+                    }
                     RemoteCommand.ShowOverlay -> overlayController.show()
                     RemoteCommand.SeekBack -> {
                         controller.seekBack()
@@ -168,9 +177,9 @@ internal fun PlayerStateLayer(
     when (val current = state) {
         is PlayerUiState.Resolving,
         is PlayerUiState.Preparing,
-        -> CircularProgressIndicator(
+        -> LoadingChannelPanel(
+            channelLabel = current.channel.displayName,
             modifier = modifier,
-            color = MaterialTheme.colorScheme.primary,
         )
 
         is PlayerUiState.Ready -> if (overlayVisible) {
@@ -182,12 +191,14 @@ internal fun PlayerStateLayer(
         }
 
         is PlayerUiState.Unavailable -> RestrictedProgramPanel(
+            channelLabel = current.channel.displayName,
             programTitle = current.program.title,
             retryTime = current.program.endsAtMs?.let(formatTime),
             modifier = modifier,
         )
 
         is PlayerUiState.Error -> ErrorPanel(
+            channelLabel = current.channel.displayName,
             message = current.message,
             actionText = "Skúsiť znova",
             modifier = modifier,
@@ -196,7 +207,29 @@ internal fun PlayerStateLayer(
 }
 
 @Composable
+private fun LoadingChannelPanel(
+    channelLabel: String,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(18.dp),
+    ) {
+        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+        Text(
+            text = "$channelLabel · NAČÍTAVAM",
+            color = Color.White.copy(alpha = 0.68f),
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.4.sp,
+        )
+    }
+}
+
+@Composable
 private fun ErrorPanel(
+    channelLabel: String,
     message: String,
     actionText: String,
     modifier: Modifier = Modifier,
@@ -206,6 +239,13 @@ private fun ErrorPanel(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(22.dp),
     ) {
+        Text(
+            text = channelLabel,
+            color = Color.White.copy(alpha = 0.68f),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.4.sp,
+        )
         Text(text = message, color = Color.White, fontSize = 24.sp)
         Text(
             text = actionText,

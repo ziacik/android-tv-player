@@ -259,6 +259,7 @@ private fun LivePill(
 
 @Composable
 fun RestrictedProgramPanel(
+    channelLabel: String,
     programTitle: String,
     retryTime: String?,
     modifier: Modifier = Modifier,
@@ -271,6 +272,13 @@ fun RestrictedProgramPanel(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        Text(
+            text = channelLabel,
+            color = MutedWhite,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.4.sp,
+        )
         Box(
             modifier = Modifier
                 .size(8.dp)

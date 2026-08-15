@@ -8,6 +8,26 @@ class RemoteCommandMapperTest {
     private val mapper = RemoteCommandMapper()
 
     @Test
+    fun `channel keys switch independently of overlay visibility and focus`() {
+        assertEquals(
+            RemoteCommand.ChannelUp,
+            mapper.map(KeyEvent.KEYCODE_CHANNEL_UP, false, FocusedControl.PLAY_PAUSE),
+        )
+        assertEquals(
+            RemoteCommand.ChannelUp,
+            mapper.map(KeyEvent.KEYCODE_CHANNEL_UP, true, FocusedControl.LIVE),
+        )
+        assertEquals(
+            RemoteCommand.ChannelDown,
+            mapper.map(KeyEvent.KEYCODE_CHANNEL_DOWN, false, FocusedControl.LIVE),
+        )
+        assertEquals(
+            RemoteCommand.ChannelDown,
+            mapper.map(KeyEvent.KEYCODE_CHANNEL_DOWN, true, FocusedControl.PLAY_PAUSE),
+        )
+    }
+
+    @Test
     fun `left and right always seek directly`() {
         assertEquals(
             RemoteCommand.SeekBack,

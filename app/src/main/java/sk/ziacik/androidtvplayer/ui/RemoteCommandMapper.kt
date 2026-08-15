@@ -8,6 +8,8 @@ enum class FocusedControl {
 }
 
 sealed interface RemoteCommand {
+    data object ChannelUp : RemoteCommand
+    data object ChannelDown : RemoteCommand
     data object ShowOverlay : RemoteCommand
     data object SeekBack : RemoteCommand
     data object SeekForward : RemoteCommand
@@ -26,6 +28,8 @@ class RemoteCommandMapper {
         overlayVisible: Boolean,
         focusedControl: FocusedControl,
     ): RemoteCommand = when (keyCode) {
+        KeyEvent.KEYCODE_CHANNEL_UP -> RemoteCommand.ChannelUp
+        KeyEvent.KEYCODE_CHANNEL_DOWN -> RemoteCommand.ChannelDown
         KeyEvent.KEYCODE_DPAD_LEFT -> RemoteCommand.SeekBack
         KeyEvent.KEYCODE_DPAD_RIGHT -> RemoteCommand.SeekForward
         KeyEvent.KEYCODE_DPAD_UP -> RemoteCommand.FocusPlayPause

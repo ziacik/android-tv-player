@@ -49,6 +49,7 @@ class PlayerOverlayTest {
         compose.setContent {
             AndroidTvPlayerTheme {
                 RestrictedProgramPanel(
+                    channelLabel = "JEDNOTKA",
                     programTitle = "Ordinácia v Eifeli: Šance",
                     retryTime = "12:54",
                 )
@@ -59,6 +60,54 @@ class PlayerOverlayTest {
         compose.onNodeWithText("Ordinácia v Eifeli: Šance").assertIsDisplayed()
         compose.onNodeWithText("Vysielanie skúsime obnoviť o 12:54").assertIsDisplayed()
         compose.onNodeWithText("Skúsiť znova").assertIsDisplayed()
+    }
+
+    @Test
+    fun readyDvojkaStateRendersChannelAndProgramWhenOverlayIsVisible() {
+        compose.setContent {
+            AndroidTvPlayerTheme {
+                PlayerStateLayer(
+                    state = PlayerUiState.Ready(
+                        channel = TvChannel.DVOJKA,
+                        program = ProgramMetadata(
+                            title = "Večerný program",
+                            startsAtMs = null,
+                            endsAtMs = null,
+                            internetAllowed = true,
+                        ),
+                        playback = PlaybackSnapshot(
+                            currentPositionMs = 90_000L,
+                            durationMs = 100_000L,
+                            liveOffsetMs = 10_000L,
+                            isPlaying = true,
+                            isSeekable = true,
+                        ),
+                    ),
+                    overlayVisible = true,
+                    focusedControl = FocusedControl.PLAY_PAUSE,
+                    formatTime = { "12:54" },
+                )
+            }
+        }
+
+        compose.onNodeWithText("DVOJKA · NAŽIVO").assertIsDisplayed()
+        compose.onNodeWithText("Večerný program").assertIsDisplayed()
+    }
+
+    @Test
+    fun resolvingDvojkaStateShowsChannelWhileOverlayIsHidden() {
+        compose.setContent {
+            AndroidTvPlayerTheme {
+                PlayerStateLayer(
+                    state = PlayerUiState.Resolving(TvChannel.DVOJKA),
+                    overlayVisible = false,
+                    focusedControl = FocusedControl.PLAY_PAUSE,
+                    formatTime = { "12:54" },
+                )
+            }
+        }
+
+        compose.onNodeWithText("DVOJKA · NAČÍTAVAM").assertIsDisplayed()
     }
 
     @Test
@@ -82,6 +131,32 @@ class PlayerOverlayTest {
             }
         }
 
+        compose.onNodeWithText("Tento program nie je dostupný online").assertIsDisplayed()
+        compose.onNodeWithText("Vysielanie skúsime obnoviť o 12:54").assertIsDisplayed()
+    }
+
+    @Test
+    fun unavailableDvojkaStateRendersChannelRestrictionAndRetryTime() {
+        compose.setContent {
+            AndroidTvPlayerTheme {
+                PlayerStateLayer(
+                    state = PlayerUiState.Unavailable(
+                        channel = TvChannel.DVOJKA,
+                        program = ProgramMetadata(
+                            title = "Ordinácia v Eifeli: Šance",
+                            startsAtMs = null,
+                            endsAtMs = 20_000L,
+                            internetAllowed = false,
+                        ),
+                    ),
+                    overlayVisible = false,
+                    focusedControl = FocusedControl.PLAY_PAUSE,
+                    formatTime = { "12:54" },
+                )
+            }
+        }
+
+        compose.onNodeWithText("DVOJKA").assertIsDisplayed()
         compose.onNodeWithText("Tento program nie je dostupný online").assertIsDisplayed()
         compose.onNodeWithText("Vysielanie skúsime obnoviť o 12:54").assertIsDisplayed()
     }
