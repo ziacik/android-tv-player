@@ -13,13 +13,20 @@ import sk.ziacik.androidtvplayer.channel.SharedPreferencesChannelStore
 import sk.ziacik.androidtvplayer.player.Media3PlayerPort
 import sk.ziacik.androidtvplayer.player.PlayerController
 import sk.ziacik.androidtvplayer.resolver.ChannelResolver
+import sk.ziacik.androidtvplayer.resolver.CnnPrimaNewsResolver
+import sk.ziacik.androidtvplayer.resolver.CtResolver
+import sk.ziacik.androidtvplayer.resolver.DirectResolver
+import sk.ziacik.androidtvplayer.resolver.JojResolver
 import sk.ziacik.androidtvplayer.resolver.MarkizaCredentials
 import sk.ziacik.androidtvplayer.resolver.MarkizaCredentialsProvider
 import sk.ziacik.androidtvplayer.resolver.MarkizaResolver
 import sk.ziacik.androidtvplayer.resolver.OkHttpMarkizaClient
+import sk.ziacik.androidtvplayer.resolver.OkHttpFreeviewClient
 import sk.ziacik.androidtvplayer.resolver.OkHttpStvrClient
+import sk.ziacik.androidtvplayer.resolver.NovaResolver
 import sk.ziacik.androidtvplayer.resolver.SharedPreferencesMarkizaCredentialsStore
 import sk.ziacik.androidtvplayer.resolver.StvrResolver
+import sk.ziacik.androidtvplayer.resolver.Ta3Resolver
 import sk.ziacik.androidtvplayer.ui.AndroidTvPlayerTheme
 import sk.ziacik.androidtvplayer.ui.OverlayController
 import sk.ziacik.androidtvplayer.ui.PlayerScreen
@@ -40,12 +47,19 @@ class MainActivity : ComponentActivity() {
         val playerPort = Media3PlayerPort(this)
         val markizaCredentials = SharedPreferencesMarkizaCredentialsStore(this)
         val markizaCredentialsProvider = MarkizaCredentialsProvider(markizaCredentials::load)
+        val freeviewHttpClient = OkHttpFreeviewClient()
         val resolver = ChannelResolver(
             resolveStvr = StvrResolver(OkHttpStvrClient())::resolve,
             resolveMarkiza = MarkizaResolver(
                 httpClient = OkHttpMarkizaClient(),
                 credentials = markizaCredentialsProvider::load,
             )::resolve,
+            resolveJoj = JojResolver(freeviewHttpClient)::resolve,
+            resolveCt = CtResolver(freeviewHttpClient)::resolve,
+            resolveTa3 = Ta3Resolver(freeviewHttpClient)::resolve,
+            resolveNova = NovaResolver(freeviewHttpClient)::resolve,
+            resolveCnnPrimaNews = CnnPrimaNewsResolver(freeviewHttpClient)::resolve,
+            resolveDirect = DirectResolver()::resolve,
         )
         val channelStore = SharedPreferencesChannelStore(this)
         val overlayController = OverlayController(appScope)

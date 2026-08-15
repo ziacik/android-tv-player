@@ -5,11 +5,12 @@ import org.junit.Test
 
 class TvChannelTest {
     @Test
-    fun `catalogue contains Jednotka Dvojka then Markíza`() {
+    fun `catalogue retains base channels and includes the Freeview additions`() {
         assertEquals(
             listOf(TvChannel.JEDNOTKA, TvChannel.DVOJKA, TvChannel.MARKIZA),
-            TvChannel.entries.toList(),
+            TvChannel.entries.take(3),
         )
+        assertEquals(33, TvChannel.entries.size)
         assertEquals("1", TvChannel.JEDNOTKA.stvrId)
         assertEquals("2", TvChannel.DVOJKA.stvrId)
         assertEquals("JEDNOTKA", TvChannel.JEDNOTKA.displayName)
@@ -23,9 +24,10 @@ class TvChannelTest {
     fun `next and previous wrap around the channel catalogue`() {
         assertEquals(TvChannel.DVOJKA, TvChannel.JEDNOTKA.next())
         assertEquals(TvChannel.MARKIZA, TvChannel.DVOJKA.next())
-        assertEquals(TvChannel.JEDNOTKA, TvChannel.MARKIZA.next())
-        assertEquals(TvChannel.MARKIZA, TvChannel.JEDNOTKA.previous())
-        assertEquals(TvChannel.DVOJKA, TvChannel.MARKIZA.previous())
+        assertEquals(TvChannel.STVR_24, TvChannel.MARKIZA.next())
+        assertEquals(TvChannel.JEDNOTKA, TvChannel.SZTS.next())
+        assertEquals(TvChannel.SZTS, TvChannel.JEDNOTKA.previous())
+        assertEquals(TvChannel.MARKIZA, TvChannel.STVR_24.previous())
     }
 
     @Test

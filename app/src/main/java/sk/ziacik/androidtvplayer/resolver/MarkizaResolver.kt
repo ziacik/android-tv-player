@@ -29,7 +29,7 @@ class MarkizaResolver(
     private val credentials: () -> MarkizaCredentials?,
 ) {
     suspend fun resolve(channel: TvChannel): StreamResolution {
-        require(channel == TvChannel.MARKIZA)
+        val liveUrl = requireNotNull(channel.providerValue)
         val account = credentials()?.takeIf {
             it.email.isNotBlank() && it.password.isNotBlank()
         } ?: return StreamResolution.RequiresCredentials(channel)
@@ -50,13 +50,13 @@ class MarkizaResolver(
             if (login.code != 302) return StreamResolution.RequiresCredentials(channel)
 
             val livePage = httpClient.get(
-                MARKIZA_LIVE_URL,
+                liveUrl,
                 headers + ("Referer" to MARKIZA_LOGIN_URL),
             )
             requireSuccess(livePage, "Markíza live page")
             val embedPage = httpClient.get(
                 embedUrl(livePage.body),
-                headers + ("Referer" to MARKIZA_LIVE_URL),
+                headers + ("Referer" to liveUrl),
             )
             requireSuccess(embedPage, "Markíza embed page")
 

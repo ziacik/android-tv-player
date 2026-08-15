@@ -362,13 +362,13 @@ class PlayerControllerTest {
     }
 
     @Test
-    fun `channel down wraps from Jednotka to Markíza`() = runTest {
+    fun `channel down wraps from Jednotka to the last channel`() = runTest {
         val controller = controller(FakePlayerPort(), this)
 
         controller.channelDown()
         advanceUntilIdle()
 
-        assertEquals(TvChannel.MARKIZA, controller.state.value.channel)
+        assertEquals(TvChannel.SZTS, controller.state.value.channel)
     }
 
     @Test
@@ -492,7 +492,7 @@ class PlayerControllerTest {
     }
 
     @Test
-    fun `callbacks from first Jednotka load are ignored after A B Markíza A switching`() = runTest {
+    fun `callbacks from first Jednotka load are ignored after a full channel cycle`() = runTest {
         val diagnostics = mutableListOf<String>()
         val player = FakePlayerPort()
         val controller = PlayerController(
@@ -506,12 +506,10 @@ class PlayerControllerTest {
         controller.start()
         advanceUntilIdle()
         val firstJednotkaLoadId = player.latestLoadId
-        controller.channelUp()
-        advanceUntilIdle()
-        controller.channelUp()
-        advanceUntilIdle()
-        controller.channelUp()
-        advanceUntilIdle()
+        repeat(TvChannel.entries.size) {
+            controller.channelUp()
+            advanceUntilIdle()
+        }
         val latestJednotkaLoadId = player.latestLoadId
 
         player.registeredListener.onReady(firstJednotkaLoadId, isPlaying = true)

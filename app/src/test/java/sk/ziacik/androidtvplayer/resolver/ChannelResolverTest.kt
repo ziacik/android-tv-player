@@ -7,7 +7,7 @@ import sk.ziacik.androidtvplayer.channel.TvChannel
 
 class ChannelResolverTest {
     @Test
-    fun `routes STVR and Markíza channels to their own resolvers`() = runTest {
+    fun `routes every provider to its resolver`() = runTest {
         val calls = mutableListOf<TvChannel>()
         val resolver = ChannelResolver(
             resolveStvr = { channel ->
@@ -18,16 +18,41 @@ class ChannelResolverTest {
                 calls += channel
                 StreamResolution.RequiresCredentials(channel)
             },
+            resolveJoj = { channel -> calls += channel; playable(channel) },
+            resolveCt = { channel -> calls += channel; playable(channel) },
+            resolveTa3 = { channel -> calls += channel; playable(channel) },
+            resolveNova = { channel -> calls += channel; playable(channel) },
+            resolveCnnPrimaNews = { channel -> calls += channel; playable(channel) },
+            resolveDirect = { channel -> calls += channel; playable(channel) },
         )
 
         resolver.resolve(TvChannel.JEDNOTKA)
-        resolver.resolve(TvChannel.DVOJKA)
         val markiza = resolver.resolve(TvChannel.MARKIZA)
+        resolver.resolve(TvChannel.JOJ)
+        resolver.resolve(TvChannel.CT_1)
+        resolver.resolve(TvChannel.TA3)
+        resolver.resolve(TvChannel.NOVA_CINEMA)
+        resolver.resolve(TvChannel.CNN_PRIMA_NEWS)
+        resolver.resolve(TvChannel.SZTS)
 
         assertEquals(
-            listOf(TvChannel.JEDNOTKA, TvChannel.DVOJKA, TvChannel.MARKIZA),
+            listOf(
+                TvChannel.JEDNOTKA,
+                TvChannel.MARKIZA,
+                TvChannel.JOJ,
+                TvChannel.CT_1,
+                TvChannel.TA3,
+                TvChannel.NOVA_CINEMA,
+                TvChannel.CNN_PRIMA_NEWS,
+                TvChannel.SZTS,
+            ),
             calls,
         )
         assertEquals(StreamResolution.RequiresCredentials(TvChannel.MARKIZA), markiza)
     }
+
+    private fun playable(channel: TvChannel) = StreamResolution.Playable(
+        ProgramMetadata(channel.displayName, null, null, true),
+        StreamSource("https://example.com/${channel.storageKey}.m3u8", "test"),
+    )
 }
