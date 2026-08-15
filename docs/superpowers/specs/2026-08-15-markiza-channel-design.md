@@ -12,7 +12,7 @@ The Markíza resolver uses one cookie-preserving HTTP client. It obtains a login
 
 The player data source forwards source headers for both manifest and media requests.
 
-Credentials are stored only in app-private SharedPreferences. No account is embedded in the APK. When credentials are absent, selecting Markíza shows one small login form; saving it retries the channel immediately. A rejected login uses the normal player error state.
+Credentials stored in app-private SharedPreferences override the public Freeview default account. When neither works, selecting Markíza shows one small login form; saving it retries the channel immediately.
 
 ## Verification
 

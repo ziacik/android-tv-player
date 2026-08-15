@@ -72,6 +72,28 @@ class MarkizaResolverTest {
         assertTrue(http.calls.isEmpty())
     }
 
+    @Test
+    fun `shows credential form after rejected login`() = runTest {
+        val http = RecordingHttpClient(
+            ArrayDeque(
+                listOf(
+                    MarkizaHttpResponse(
+                        code = 200,
+                        body = """<input type="hidden" name="_do" value="sign-loginForm-submit">""",
+                    ),
+                    MarkizaHttpResponse(code = 401, body = ""),
+                ),
+            ),
+        )
+
+        val result = MarkizaResolver(http) {
+            MarkizaCredentials("user@example.com", "wrong-password")
+        }.resolve(TvChannel.MARKIZA)
+
+        assertEquals(StreamResolution.RequiresCredentials(TvChannel.MARKIZA), result)
+        assertEquals(2, http.calls.size)
+    }
+
     private class RecordingHttpClient(
         private val responses: ArrayDeque<MarkizaHttpResponse>,
     ) : MarkizaHttpClient {

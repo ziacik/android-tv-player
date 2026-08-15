@@ -14,6 +14,7 @@ import sk.ziacik.androidtvplayer.player.Media3PlayerPort
 import sk.ziacik.androidtvplayer.player.PlayerController
 import sk.ziacik.androidtvplayer.resolver.ChannelResolver
 import sk.ziacik.androidtvplayer.resolver.MarkizaCredentials
+import sk.ziacik.androidtvplayer.resolver.MarkizaCredentialsProvider
 import sk.ziacik.androidtvplayer.resolver.MarkizaResolver
 import sk.ziacik.androidtvplayer.resolver.OkHttpMarkizaClient
 import sk.ziacik.androidtvplayer.resolver.OkHttpStvrClient
@@ -38,11 +39,12 @@ class MainActivity : ComponentActivity() {
 
         val playerPort = Media3PlayerPort(this)
         val markizaCredentials = SharedPreferencesMarkizaCredentialsStore(this)
+        val markizaCredentialsProvider = MarkizaCredentialsProvider(markizaCredentials::load)
         val resolver = ChannelResolver(
             resolveStvr = StvrResolver(OkHttpStvrClient())::resolve,
             resolveMarkiza = MarkizaResolver(
                 httpClient = OkHttpMarkizaClient(),
-                credentials = markizaCredentials::load,
+                credentials = markizaCredentialsProvider::load,
             )::resolve,
         )
         val channelStore = SharedPreferencesChannelStore(this)

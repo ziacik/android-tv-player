@@ -29,7 +29,7 @@ Expected: FAIL because the resolver does not exist.
 
 - [ ] **Step 3: Implement the resolver and HTTP client**
 
-Implement `MarkizaResolver.resolve()` to log in, extract `data-src` from the live page and the HLS `src` from the embed page. Return a `StreamSource` with `User-Agent`, `Referer`, and `Origin` headers. Do not embed third-party credentials.
+Implement `MarkizaResolver.resolve()` to log in, extract `data-src` from the live page and the HLS `src` from the embed page. Return a `StreamSource` with `User-Agent`, `Referer`, and `Origin` headers. Use the public Freeview defaults only when no locally saved credentials exist.
 
 - [ ] **Step 4: Run resolver tests and verify they pass**
 

@@ -47,7 +47,7 @@ class MarkizaResolver(
                 ),
                 headers = headers + ("Referer" to MARKIZA_LOGIN_URL),
             )
-            if (login.code != 302) throw StreamResolveException("Markíza login failed")
+            if (login.code != 302) return StreamResolution.RequiresCredentials(channel)
 
             val livePage = httpClient.get(
                 MARKIZA_LIVE_URL,
