@@ -6,6 +6,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import org.junit.Rule
 import org.junit.Test
+import sk.ziacik.androidtvplayer.channel.TvChannel
 import sk.ziacik.androidtvplayer.player.PlaybackSnapshot
 import sk.ziacik.androidtvplayer.player.PlayerUiState
 import sk.ziacik.androidtvplayer.resolver.ProgramMetadata
@@ -66,7 +67,8 @@ class PlayerOverlayTest {
             AndroidTvPlayerTheme {
                 PlayerStateLayer(
                     state = PlayerUiState.Unavailable(
-                        ProgramMetadata(
+                        channel = TvChannel.JEDNOTKA,
+                        program = ProgramMetadata(
                             title = "Ordinácia v Eifeli: Šance",
                             startsAtMs = null,
                             endsAtMs = 20_000L,
@@ -87,6 +89,7 @@ class PlayerOverlayTest {
     @Test
     fun readyStateHidesOverlayWhenVisibilityIsFalse() {
         val ready = PlayerUiState.Ready(
+            channel = TvChannel.JEDNOTKA,
             program = ProgramMetadata("Večerný program", null, null, true),
             playback = PlaybackSnapshot(90_000L, 100_000L, 10_000L, true, true),
         )

@@ -36,6 +36,7 @@ class MainActivity : ComponentActivity() {
         val overlayController = OverlayController(appScope)
         playerController = PlayerController(
             scope = appScope,
+            initialChannel = TvChannel.JEDNOTKA,
             resolve = { resolver.resolve(TvChannel.JEDNOTKA) },
             playerPort = playerPort,
             diagnostics = { message, cause ->

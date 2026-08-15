@@ -8,17 +8,21 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import sk.ziacik.androidtvplayer.channel.TvChannel
 import sk.ziacik.androidtvplayer.resolver.ProgramMetadata
 import sk.ziacik.androidtvplayer.resolver.StreamResolution
 
 class PlayerController(
     private val scope: CoroutineScope,
+    private val initialChannel: TvChannel,
     private val resolve: suspend () -> StreamResolution,
     private val playerPort: PlayerPort,
     private val nowMs: () -> Long = System::currentTimeMillis,
     private val diagnostics: (message: String, cause: Throwable?) -> Unit = { _, _ -> },
 ) {
-    private val mutableState = MutableStateFlow<PlayerUiState>(PlayerUiState.Resolving)
+    private val mutableState = MutableStateFlow<PlayerUiState>(
+        PlayerUiState.Resolving(initialChannel),
+    )
     val state: StateFlow<PlayerUiState> = mutableState.asStateFlow()
 
     private var activeProgram: ProgramMetadata? = null
@@ -40,7 +44,7 @@ class PlayerController(
 
                 override fun onError(message: String) {
                     diagnostics("Media3 playback failed: $message", null)
-                    mutableState.value = PlayerUiState.Error(ERROR_MESSAGE)
+                    mutableState.value = PlayerUiState.Error(initialChannel, ERROR_MESSAGE)
                 }
             },
         )
@@ -53,14 +57,14 @@ class PlayerController(
         restrictedRetryJob?.cancel()
         restrictedRetryJob = null
         resolveJob = scope.launch {
-            mutableState.value = PlayerUiState.Resolving
+            mutableState.value = PlayerUiState.Resolving(initialChannel)
             try {
                 applyResolution(resolve())
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
                 diagnostics("STVR resolve failed", error)
-                mutableState.value = PlayerUiState.Error(ERROR_MESSAGE)
+                mutableState.value = PlayerUiState.Error(initialChannel, ERROR_MESSAGE)
             }
         }
     }
@@ -108,12 +112,15 @@ class PlayerController(
         when (resolution) {
             is StreamResolution.Playable -> {
                 activeProgram = resolution.program
-                mutableState.value = PlayerUiState.Preparing
+                mutableState.value = PlayerUiState.Preparing(initialChannel)
                 playerPort.load(resolution.source)
             }
             is StreamResolution.Unavailable -> {
                 activeProgram = null
-                mutableState.value = PlayerUiState.Unavailable(resolution.program)
+                mutableState.value = PlayerUiState.Unavailable(
+                    channel = initialChannel,
+                    program = resolution.program,
+                )
                 scheduleRestrictedRetry(resolution.program.endsAtMs)
             }
         }
@@ -136,6 +143,7 @@ class PlayerController(
     private fun updateReadyState(isPlaying: Boolean) {
         val program = activeProgram ?: return
         mutableState.value = PlayerUiState.Ready(
+            channel = initialChannel,
             program = program,
             playback = playerPort.snapshot().copy(isPlaying = isPlaying),
         )

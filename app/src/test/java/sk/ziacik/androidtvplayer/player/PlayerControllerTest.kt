@@ -11,12 +11,36 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import sk.ziacik.androidtvplayer.channel.TvChannel
 import sk.ziacik.androidtvplayer.resolver.ProgramMetadata
 import sk.ziacik.androidtvplayer.resolver.StreamResolution
 import sk.ziacik.androidtvplayer.resolver.StreamSource
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PlayerControllerTest {
+    @Test
+    fun `initial channel is retained from resolving through ready`() = runTest {
+        val player = FakePlayerPort()
+        val controller = PlayerController(
+            scope = this,
+            initialChannel = TvChannel.DVOJKA,
+            resolve = { playableResolution() },
+            playerPort = player,
+        )
+
+        assertEquals(
+            PlayerUiState.Resolving(TvChannel.DVOJKA),
+            controller.state.value,
+        )
+
+        controller.start()
+        advanceUntilIdle()
+        player.registeredListener.onReady(isPlaying = true)
+
+        val ready = controller.state.value as PlayerUiState.Ready
+        assertEquals(TvChannel.DVOJKA, ready.channel)
+    }
+
     @Test
     fun `seek back is exactly ten seconds and clamps to zero`() = runTest {
         val player = FakePlayerPort(
@@ -71,6 +95,7 @@ class PlayerControllerTest {
         val player = FakePlayerPort()
         val controller = PlayerController(
             scope = this,
+            initialChannel = TvChannel.JEDNOTKA,
             resolve = {
                 resolveCalls += 1
                 StreamResolution.Playable(
@@ -103,6 +128,7 @@ class PlayerControllerTest {
     fun `resolve failure exposes error state`() = runTest {
         val controller = PlayerController(
             scope = this,
+            initialChannel = TvChannel.JEDNOTKA,
             resolve = { throw IOException("offline") },
             playerPort = FakePlayerPort(),
         )
@@ -111,7 +137,10 @@ class PlayerControllerTest {
         advanceUntilIdle()
 
         assertEquals(
-            PlayerUiState.Error("Stream sa nepodarilo načítať"),
+            PlayerUiState.Error(
+                TvChannel.JEDNOTKA,
+                "Stream sa nepodarilo načítať",
+            ),
             controller.state.value,
         )
     }
@@ -122,6 +151,7 @@ class PlayerControllerTest {
         val diagnostics = mutableListOf<Pair<String, Throwable?>>()
         val controller = PlayerController(
             scope = this,
+            initialChannel = TvChannel.JEDNOTKA,
             resolve = { throw failure },
             playerPort = FakePlayerPort(),
             diagnostics = { message, cause -> diagnostics += message to cause },
@@ -140,6 +170,7 @@ class PlayerControllerTest {
         val player = FakePlayerPort()
         PlayerController(
             scope = this,
+            initialChannel = TvChannel.JEDNOTKA,
             resolve = { playableResolution() },
             playerPort = player,
             diagnostics = { message, cause -> diagnostics += message to cause },
@@ -195,6 +226,7 @@ class PlayerControllerTest {
         var resolveCalls = 0
         val controller = PlayerController(
             scope = this,
+            initialChannel = TvChannel.JEDNOTKA,
             resolve = {
                 resolveCalls += 1
                 if (resolveCalls == 1) {
@@ -223,6 +255,7 @@ class PlayerControllerTest {
         var resolveCalls = 0
         val controller = PlayerController(
             scope = this,
+            initialChannel = TvChannel.JEDNOTKA,
             resolve = {
                 resolveCalls += 1
                 StreamResolution.Unavailable(PROGRAM.copy(endsAtMs = null))
@@ -247,6 +280,7 @@ class PlayerControllerTest {
         var resolveCalls = 0
         val controller = PlayerController(
             scope = this,
+            initialChannel = TvChannel.JEDNOTKA,
             resolve = {
                 resolveCalls += 1
                 if (resolveCalls == 1) {
@@ -275,6 +309,7 @@ class PlayerControllerTest {
         val player = FakePlayerPort()
         val controller = PlayerController(
             scope = this,
+            initialChannel = TvChannel.JEDNOTKA,
             resolve = {
                 resolveCalls += 1
                 StreamResolution.Unavailable(PROGRAM.copy(endsAtMs = null))
@@ -295,8 +330,10 @@ class PlayerControllerTest {
     private fun controller(
         player: FakePlayerPort,
         scope: CoroutineScope,
+        initialChannel: TvChannel = TvChannel.JEDNOTKA,
     ) = PlayerController(
         scope = scope,
+        initialChannel = initialChannel,
         resolve = { playableResolution() },
         playerPort = player,
     )

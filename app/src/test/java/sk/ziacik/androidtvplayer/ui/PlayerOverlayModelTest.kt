@@ -5,6 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import sk.ziacik.androidtvplayer.channel.TvChannel
 import sk.ziacik.androidtvplayer.player.PlaybackSnapshot
 import sk.ziacik.androidtvplayer.player.PlayerUiState
 import sk.ziacik.androidtvplayer.resolver.ProgramMetadata
@@ -16,6 +17,25 @@ class PlayerOverlayModelTest {
         endsAtMs = null,
         internetAllowed = true,
     )
+
+    @Test
+    fun `ready Dvojka uses its channel in the live label`() {
+        val model = PlayerOverlayModel.from(
+            PlayerUiState.Ready(
+                channel = TvChannel.DVOJKA,
+                program = program,
+                playback = PlaybackSnapshot(
+                    currentPositionMs = 100_000L,
+                    durationMs = 100_000L,
+                    liveOffsetMs = 0L,
+                    isSeekable = true,
+                    isPlaying = true,
+                ),
+            ),
+        )
+
+        assertEquals("DVOJKA · NAŽIVO", model.channelLabel)
+    }
 
     @Test
     fun `uses real progress and live offset`() {
@@ -100,6 +120,7 @@ class PlayerOverlayModelTest {
         offset: Long?,
         seekable: Boolean = true,
     ) = PlayerUiState.Ready(
+        channel = TvChannel.JEDNOTKA,
         program = program,
         playback = PlaybackSnapshot(
             currentPositionMs = position,

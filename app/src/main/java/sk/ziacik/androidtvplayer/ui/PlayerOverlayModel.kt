@@ -32,7 +32,7 @@ data class PlayerOverlayModel(
             val isLive = offset != null && offset <= LIVE_THRESHOLD_MS
 
             return PlayerOverlayModel(
-                channelLabel = "JEDNOTKA · NAŽIVO",
+                channelLabel = "${state.channel.displayName} · NAŽIVO",
                 programTitle = state.program.title,
                 progress = progress,
                 delayText = offset

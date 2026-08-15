@@ -166,8 +166,8 @@ internal fun PlayerStateLayer(
     modifier: Modifier = Modifier,
 ) {
     when (val current = state) {
-        PlayerUiState.Resolving,
-        PlayerUiState.Preparing,
+        is PlayerUiState.Resolving,
+        is PlayerUiState.Preparing,
         -> CircularProgressIndicator(
             modifier = modifier,
             color = MaterialTheme.colorScheme.primary,
