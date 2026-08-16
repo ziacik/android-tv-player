@@ -53,6 +53,9 @@ enum class TvChannel(
     fun previous(): TvChannel = entries[(ordinal - 1 + entries.size) % entries.size]
 
     companion object {
+        fun fromChannelNumber(number: Int): TvChannel? =
+            entries.getOrNull(number - 1)
+
         fun fromStorageKey(key: String?): TvChannel =
             entries.firstOrNull { it.storageKey == key } ?: JEDNOTKA
     }

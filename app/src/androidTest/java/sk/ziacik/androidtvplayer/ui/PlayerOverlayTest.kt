@@ -16,6 +16,18 @@ class PlayerOverlayTest {
     val compose = createComposeRule()
 
     @Test
+    fun numericChannelIndicatorShowsPendingDigits() {
+        compose.setContent {
+            AndroidTvPlayerTheme {
+                NumericChannelIndicator(digits = "12")
+            }
+        }
+
+        compose.onNodeWithText("12").assertIsDisplayed()
+        compose.onNodeWithTag("numeric-channel-indicator").assertIsDisplayed()
+    }
+
+    @Test
     fun cinematicOverlayExposesProgramTimelineAndActions() {
         compose.setContent {
             AndroidTvPlayerTheme {

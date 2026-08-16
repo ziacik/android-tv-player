@@ -8,6 +8,20 @@ class RemoteCommandMapperTest {
     private val mapper = RemoteCommandMapper()
 
     @Test
+    fun `numeric keys map to their decimal digit`() {
+        (0..9).forEach { digit ->
+            assertEquals(
+                RemoteCommand.NumericDigit(digit),
+                mapper.map(KeyEvent.KEYCODE_0 + digit, false, FocusedControl.PLAY_PAUSE),
+            )
+            assertEquals(
+                RemoteCommand.NumericDigit(digit),
+                mapper.map(KeyEvent.KEYCODE_NUMPAD_0 + digit, true, FocusedControl.LIVE),
+            )
+        }
+    }
+
+    @Test
     fun `channel keys switch independently of overlay visibility and focus`() {
         assertEquals(
             RemoteCommand.ChannelUp,

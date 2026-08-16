@@ -8,6 +8,7 @@ enum class FocusedControl {
 }
 
 sealed interface RemoteCommand {
+    data class NumericDigit(val digit: Int) : RemoteCommand
     data object ChannelUp : RemoteCommand
     data object ChannelDown : RemoteCommand
     data object ShowOverlay : RemoteCommand
@@ -27,26 +28,36 @@ class RemoteCommandMapper {
         keyCode: Int,
         overlayVisible: Boolean,
         focusedControl: FocusedControl,
-    ): RemoteCommand = when (keyCode) {
-        KeyEvent.KEYCODE_CHANNEL_UP -> RemoteCommand.ChannelUp
-        KeyEvent.KEYCODE_CHANNEL_DOWN -> RemoteCommand.ChannelDown
-        KeyEvent.KEYCODE_DPAD_LEFT -> RemoteCommand.SeekBack
-        KeyEvent.KEYCODE_DPAD_RIGHT -> RemoteCommand.SeekForward
-        KeyEvent.KEYCODE_DPAD_UP -> RemoteCommand.FocusPlayPause
-        KeyEvent.KEYCODE_DPAD_DOWN -> RemoteCommand.FocusLive
-        KeyEvent.KEYCODE_DPAD_CENTER,
-        KeyEvent.KEYCODE_ENTER,
-        KeyEvent.KEYCODE_NUMPAD_ENTER,
-        -> when {
-            !overlayVisible -> RemoteCommand.ShowOverlay
-            focusedControl == FocusedControl.LIVE -> RemoteCommand.GoLive
-            else -> RemoteCommand.TogglePlayback
+    ): RemoteCommand {
+        keyCode.toNumericDigit()?.let(RemoteCommand::NumericDigit)?.let { return it }
+
+        return when (keyCode) {
+            KeyEvent.KEYCODE_CHANNEL_UP -> RemoteCommand.ChannelUp
+            KeyEvent.KEYCODE_CHANNEL_DOWN -> RemoteCommand.ChannelDown
+            KeyEvent.KEYCODE_DPAD_LEFT -> RemoteCommand.SeekBack
+            KeyEvent.KEYCODE_DPAD_RIGHT -> RemoteCommand.SeekForward
+            KeyEvent.KEYCODE_DPAD_UP -> RemoteCommand.FocusPlayPause
+            KeyEvent.KEYCODE_DPAD_DOWN -> RemoteCommand.FocusLive
+            KeyEvent.KEYCODE_DPAD_CENTER,
+            KeyEvent.KEYCODE_ENTER,
+            KeyEvent.KEYCODE_NUMPAD_ENTER,
+            -> when {
+                !overlayVisible -> RemoteCommand.ShowOverlay
+                focusedControl == FocusedControl.LIVE -> RemoteCommand.GoLive
+                else -> RemoteCommand.TogglePlayback
+            }
+            KeyEvent.KEYCODE_BACK -> if (overlayVisible) {
+                RemoteCommand.HideOverlay
+            } else {
+                RemoteCommand.Exit
+            }
+            else -> RemoteCommand.Ignore
         }
-        KeyEvent.KEYCODE_BACK -> if (overlayVisible) {
-            RemoteCommand.HideOverlay
-        } else {
-            RemoteCommand.Exit
-        }
-        else -> RemoteCommand.Ignore
     }
+}
+
+private fun Int.toNumericDigit(): Int? = when (this) {
+    in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9 -> this - KeyEvent.KEYCODE_0
+    in KeyEvent.KEYCODE_NUMPAD_0..KeyEvent.KEYCODE_NUMPAD_9 -> this - KeyEvent.KEYCODE_NUMPAD_0
+    else -> null
 }

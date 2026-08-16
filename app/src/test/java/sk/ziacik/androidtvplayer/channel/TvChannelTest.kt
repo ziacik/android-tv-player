@@ -5,6 +5,15 @@ import org.junit.Test
 
 class TvChannelTest {
     @Test
+    fun `catalogue position is one based and rejects unavailable positions`() {
+        assertEquals(TvChannel.JEDNOTKA, TvChannel.fromChannelNumber(1))
+        assertEquals(TvChannel.DVOJKA, TvChannel.fromChannelNumber(2))
+        assertEquals(TvChannel.entries[11], TvChannel.fromChannelNumber(12))
+        assertEquals(null, TvChannel.fromChannelNumber(0))
+        assertEquals(null, TvChannel.fromChannelNumber(TvChannel.entries.size + 1))
+    }
+
+    @Test
     fun `catalogue retains base channels and includes the Freeview additions`() {
         assertEquals(
             listOf(TvChannel.JEDNOTKA, TvChannel.DVOJKA, TvChannel.MARKIZA),

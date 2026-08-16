@@ -18,11 +18,13 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,6 +35,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -62,11 +65,23 @@ fun PlayerScreen(
     var focusedControl by remember { mutableStateOf(FocusedControl.PLAY_PAUSE) }
     val focusRequester = remember { FocusRequester() }
     val commandMapper = remember { RemoteCommandMapper() }
+    val numericInputScope = rememberCoroutineScope()
+    val numericInput = remember(controller, numericInputScope) {
+        NumericChannelInput(
+            scope = numericInputScope,
+            onChannelSelected = controller::selectChannel,
+        )
+    }
+    val numericDigits by numericInput.digits.collectAsState()
     val context = LocalContext.current
     val timeFormat = remember(context) { DateFormat.getTimeFormat(context) }
 
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
+    }
+
+    DisposableEffect(numericInput) {
+        onDispose { numericInput.cancel() }
     }
 
     LaunchedEffect(overlayVisible, state is PlayerUiState.Ready) {
@@ -101,13 +116,12 @@ fun PlayerScreen(
                     return@onPreviewKeyEvent true
                 }
 
-                when (
-                    commandMapper.map(
-                        keyCode = keyCode,
-                        overlayVisible = overlayVisible,
-                        focusedControl = focusedControl,
-                    )
-                ) {
+                when (val command = commandMapper.map(
+                    keyCode = keyCode,
+                    overlayVisible = overlayVisible,
+                    focusedControl = focusedControl,
+                )) {
+                    is RemoteCommand.NumericDigit -> numericInput.append(command.digit)
                     RemoteCommand.ChannelUp -> {
                         controller.channelUp()
                         overlayController.show()
@@ -172,7 +186,33 @@ fun PlayerScreen(
             onSaveMarkizaCredentials = onSaveMarkizaCredentials,
             modifier = Modifier.align(Alignment.Center),
         )
+
+        numericDigits?.let { digits ->
+            NumericChannelIndicator(
+                digits = digits,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(36.dp),
+            )
+        }
     }
+}
+
+@Composable
+internal fun NumericChannelIndicator(
+    digits: String,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text = digits,
+        modifier = modifier
+            .testTag("numeric-channel-indicator")
+            .background(Color.Black.copy(alpha = 0.72f), RoundedCornerShape(12.dp))
+            .padding(horizontal = 18.dp, vertical = 9.dp),
+        color = Color.White,
+        fontSize = 24.sp,
+        fontWeight = FontWeight.Bold,
+    )
 }
 
 @Composable
@@ -181,7 +221,7 @@ internal fun PlayerStateLayer(
     overlayVisible: Boolean,
     focusedControl: FocusedControl,
     formatTime: (Long) -> String,
-    onSaveMarkizaCredentials: (String, String) -> Unit,
+    onSaveMarkizaCredentials: (String, String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
 ) {
     when (val current = state) {

@@ -412,6 +412,33 @@ class PlayerControllerTest {
     }
 
     @Test
+    fun `direct selection stops old source loads requested channel and persists it`() = runTest {
+        val resolvedChannels = mutableListOf<TvChannel>()
+        val savedChannels = mutableListOf<TvChannel>()
+        val player = FakePlayerPort()
+        val controller = PlayerController(
+            scope = this,
+            initialChannel = TvChannel.JEDNOTKA,
+            resolve = { channel ->
+                resolvedChannels += channel
+                playableResolution(channel.storageKey)
+            },
+            playerPort = player,
+            onChannelSelected = savedChannels::add,
+        )
+
+        controller.start()
+        advanceUntilIdle()
+        controller.selectChannel(TvChannel.entries[11])
+        advanceUntilIdle()
+
+        assertEquals(listOf(TvChannel.JEDNOTKA, TvChannel.entries[11]), resolvedChannels)
+        assertEquals(listOf(TvChannel.entries[11]), savedChannels)
+        assertEquals(1, player.stopCalls)
+        assertEquals(TvChannel.entries[11], controller.state.value.channel)
+    }
+
+    @Test
     fun `channel down wraps from Jednotka to the last channel`() = runTest {
         val controller = controller(FakePlayerPort(), this)
 

@@ -79,6 +79,8 @@ class PlayerController(
 
     fun channelDown() = switchTo(currentChannel.previous())
 
+    fun selectChannel(channel: TvChannel) = switchTo(channel)
+
     private fun switchTo(channel: TvChannel) {
         if (released) return
         if (channel == currentChannel) return
