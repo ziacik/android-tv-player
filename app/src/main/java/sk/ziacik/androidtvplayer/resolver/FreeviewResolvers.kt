@@ -10,10 +10,15 @@ private const val FREEVIEW_USER_AGENT =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
         "Chrome/143.0.0.0 Safari/537.36"
 
-private fun playable(channel: TvChannel, url: String, headers: Map<String, String> = emptyMap()) =
+private fun playable(
+    channel: TvChannel,
+    url: String,
+    headers: Map<String, String> = emptyMap(),
+    manifest: StreamManifest = StreamManifest.HLS,
+) =
     StreamResolution.Playable(
         ProgramMetadata(channel.displayName, null, null, true),
-        StreamSource(url, FREEVIEW_USER_AGENT, headers),
+        StreamSource(url, FREEVIEW_USER_AGENT, headers, manifest),
     )
 
 class JojResolver(private val http: FreeviewHttpClient) {
@@ -28,7 +33,12 @@ class JojResolver(private val http: FreeviewHttpClient) {
                 null
             }
         } ?: definition.fallbackUrl
-        playable(channel, source, JOJ_HEADERS)
+        playable(
+            channel = channel,
+            url = source,
+            headers = JOJ_HEADERS,
+            manifest = if (source.endsWith(".mpd")) StreamManifest.DASH else StreamManifest.HLS,
+        )
     }
 
     private suspend fun sourceUrl(id: String): String {

@@ -28,5 +28,6 @@ sealed interface PlayerUiState {
     data class Error(
         override val channel: TvChannel,
         val message: String,
+        val reason: String,
     ) : PlayerUiState
 }

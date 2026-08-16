@@ -215,6 +215,7 @@ internal fun PlayerStateLayer(
         is PlayerUiState.Error -> ErrorPanel(
             channelLabel = current.channel.displayName,
             message = current.message,
+            reason = current.reason,
             actionText = "Skúsiť znova",
             modifier = modifier,
         )
@@ -285,6 +286,7 @@ private fun LoadingChannelPanel(
 private fun ErrorPanel(
     channelLabel: String,
     message: String,
+    reason: String,
     actionText: String,
     modifier: Modifier = Modifier,
 ) {
@@ -301,6 +303,11 @@ private fun ErrorPanel(
             letterSpacing = 1.4.sp,
         )
         Text(text = message, color = Color.White, fontSize = 24.sp)
+        Text(
+            text = reason,
+            color = Color.White.copy(alpha = 0.72f),
+            fontSize = 16.sp,
+        )
         Text(
             text = actionText,
             modifier = Modifier

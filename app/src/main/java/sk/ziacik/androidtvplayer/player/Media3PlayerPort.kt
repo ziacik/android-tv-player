@@ -8,9 +8,11 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.HttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import sk.ziacik.androidtvplayer.resolver.StreamSource
+import sk.ziacik.androidtvplayer.resolver.StreamManifest
 
 @androidx.annotation.OptIn(UnstableApi::class)
 class Media3PlayerPort(context: Context) : PlayerPort {
@@ -50,7 +52,7 @@ class Media3PlayerPort(context: Context) : PlayerPort {
             }
 
             override fun onPlayerError(error: PlaybackException) {
-                listener?.onError(loadId, error.errorCodeName)
+                listener?.onError(loadId, playbackFailureCode(error))
             }
         }
         val dataSourceFactory = DefaultHttpDataSource.Factory()
@@ -59,7 +61,7 @@ class Media3PlayerPort(context: Context) : PlayerPort {
         val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
         val mediaItem = MediaItem.Builder()
             .setUri(source.url)
-            .setMimeType(MimeTypes.APPLICATION_M3U8)
+            .setMimeType(source.manifest.mediaMimeType())
             .build()
 
         detachActivePlayerListener()
@@ -105,4 +107,14 @@ class Media3PlayerPort(context: Context) : PlayerPort {
         activePlayerListener?.let(player::removeListener)
         activePlayerListener = null
     }
+
+    private fun playbackFailureCode(error: PlaybackException): String =
+        (error.cause as? HttpDataSource.InvalidResponseCodeException)
+            ?.let { "HTTP ${it.responseCode}" }
+            ?: error.errorCodeName
+}
+
+internal fun StreamManifest.mediaMimeType(): String = when (this) {
+    StreamManifest.HLS -> MimeTypes.APPLICATION_M3U8
+    StreamManifest.DASH -> MimeTypes.APPLICATION_MPD
 }

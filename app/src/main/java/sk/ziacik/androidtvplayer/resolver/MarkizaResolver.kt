@@ -28,6 +28,8 @@ class MarkizaResolver(
     private val httpClient: MarkizaHttpClient,
     private val credentials: () -> MarkizaCredentials?,
 ) {
+    private var authenticated = false
+
     suspend fun resolve(channel: TvChannel): StreamResolution {
         val liveUrl = requireNotNull(channel.providerValue)
         val account = credentials()?.takeIf {
@@ -36,18 +38,9 @@ class MarkizaResolver(
         val headers = mapOf("User-Agent" to MARKIZA_USER_AGENT)
 
         return try {
-            val loginPage = httpClient.get(MARKIZA_LOGIN_URL, headers)
-            requireSuccess(loginPage, "Markíza login page")
-            val login = httpClient.postForm(
-                url = MARKIZA_LOGIN_URL,
-                form = mapOf(
-                    "email" to account.email,
-                    "password" to account.password,
-                    "_do" to loginToken(loginPage.body),
-                ),
-                headers = headers + ("Referer" to MARKIZA_LOGIN_URL),
-            )
-            if (login.code != 302) return StreamResolution.RequiresCredentials(channel)
+            if (!authenticated && !authenticate(account, headers)) {
+                return StreamResolution.RequiresCredentials(channel)
+            }
 
             val livePage = httpClient.get(
                 liveUrl,
@@ -81,8 +74,30 @@ class MarkizaResolver(
         }
     }
 
+    private suspend fun authenticate(
+        account: MarkizaCredentials,
+        headers: Map<String, String>,
+    ): Boolean {
+        val loginPage = httpClient.get(MARKIZA_LOGIN_URL, headers)
+        requireSuccess(loginPage, "Markíza login page")
+        val login = httpClient.postForm(
+            url = MARKIZA_LOGIN_URL,
+            form = mapOf(
+                "email" to account.email,
+                "password" to account.password,
+                "_do" to loginToken(loginPage.body),
+            ),
+            headers = headers + ("Referer" to MARKIZA_LOGIN_URL),
+        )
+        if (login.code != 302) return false
+        authenticated = true
+        return true
+    }
+
     private fun requireSuccess(response: MarkizaHttpResponse, page: String) {
-        if (response.code !in 200..299) throw StreamResolveException("$page request failed")
+        if (response.code !in 200..299) {
+            throw StreamResolveException("$page request failed (HTTP ${response.code})")
+        }
     }
 
     private fun loginToken(body: String): String =

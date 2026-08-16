@@ -141,8 +141,28 @@ class PlayerControllerTest {
             PlayerUiState.Error(
                 TvChannel.JEDNOTKA,
                 "Stream sa nepodarilo načítať",
+                "Sieťové pripojenie nie je dostupné",
             ),
             controller.state.value,
+        )
+    }
+
+    @Test
+    fun `resolve failure exposes a safe network reason`() = runTest {
+        val controller = PlayerController(
+            scope = this,
+            initialChannel = TvChannel.JEDNOTKA,
+            resolve = { throw IOException("https://cdn.example/private-token.m3u8") },
+            playerPort = FakePlayerPort(),
+        )
+
+        controller.start()
+        advanceUntilIdle()
+
+        assertTrue(
+            controller.state.value.toString().contains(
+                "reason=Sieťové pripojenie nie je dostupné",
+            ),
         )
     }
 
@@ -161,7 +181,7 @@ class PlayerControllerTest {
         controller.start()
         advanceUntilIdle()
 
-        assertEquals("STVR resolve failed", diagnostics.single().first)
+        assertEquals("Stream resolve failed for JEDNOTKA", diagnostics.single().first)
         assertSame(failure, diagnostics.single().second)
     }
 
@@ -189,6 +209,36 @@ class PlayerControllerTest {
             diagnostics.single().first,
         )
         assertEquals(null, diagnostics.single().second)
+    }
+
+    @Test
+    fun `playback HTTP failure exposes its response code without a stream URL`() = runTest {
+        val player = FakePlayerPort()
+        val controller = controller(player, this)
+
+        controller.start()
+        advanceUntilIdle()
+        player.registeredListener.onError(player.latestLoadId, "HTTP 403")
+
+        val error = controller.state.value as PlayerUiState.Error
+        assertTrue(error.toString().contains("reason=Server stream odmietol (HTTP 403)"))
+        assertTrue(!error.toString().contains("cdn.example"))
+    }
+
+    @Test
+    fun `malformed HLS manifest explains that the source is not a playlist`() = runTest {
+        val player = FakePlayerPort()
+        val controller = controller(player, this)
+
+        controller.start()
+        advanceUntilIdle()
+        player.registeredListener.onError(
+            player.latestLoadId,
+            "ERROR_CODE_PARSING_MANIFEST_MALFORMED",
+        )
+
+        val error = controller.state.value as PlayerUiState.Error
+        assertTrue(error.toString().contains("reason=Zdroj neposlal platný HLS playlist"))
     }
 
     @Test
@@ -590,7 +640,11 @@ class PlayerControllerTest {
         val failedLoadId = player.latestLoadId
 
         assertEquals(
-            PlayerUiState.Error(TvChannel.DVOJKA, "Stream sa nepodarilo načítať"),
+            PlayerUiState.Error(
+                TvChannel.DVOJKA,
+                "Stream sa nepodarilo načítať",
+                "Prehrávač nedokázal pripraviť stream",
+            ),
             controller.state.value,
         )
         assertEquals("Media3 load failed", diagnostics.single().first)
@@ -601,7 +655,11 @@ class PlayerControllerTest {
         player.registeredListener.onError(failedLoadId, "LATE_LOAD_CALLBACK")
 
         assertEquals(
-            PlayerUiState.Error(TvChannel.DVOJKA, "Stream sa nepodarilo načítať"),
+            PlayerUiState.Error(
+                TvChannel.DVOJKA,
+                "Stream sa nepodarilo načítať",
+                "Prehrávač nedokázal pripraviť stream",
+            ),
             controller.state.value,
         )
         assertEquals(1, diagnostics.size)

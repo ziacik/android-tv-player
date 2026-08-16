@@ -1,5 +1,6 @@
 package sk.ziacik.androidtvplayer.player
 
+import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -11,6 +12,7 @@ import kotlinx.coroutines.launch
 import sk.ziacik.androidtvplayer.channel.TvChannel
 import sk.ziacik.androidtvplayer.resolver.ProgramMetadata
 import sk.ziacik.androidtvplayer.resolver.StreamResolution
+import sk.ziacik.androidtvplayer.resolver.StreamResolveException
 
 class PlayerController(
     private val scope: CoroutineScope,
@@ -59,7 +61,11 @@ class PlayerController(
                     activeProgram = null
                     activePlaybackChannel = null
                     activeLoadId = null
-                    mutableState.value = PlayerUiState.Error(currentChannel, ERROR_MESSAGE)
+                    mutableState.value = PlayerUiState.Error(
+                        channel = currentChannel,
+                        message = ERROR_MESSAGE,
+                        reason = playbackFailureReason(message),
+                    )
                 }
             },
         )
@@ -117,8 +123,12 @@ class PlayerController(
                 ) {
                     return@launch
                 }
-                diagnostics("STVR resolve failed", error)
-                mutableState.value = PlayerUiState.Error(channel, ERROR_MESSAGE)
+                diagnostics("Stream resolve failed for ${channel.displayName}", error)
+                mutableState.value = PlayerUiState.Error(
+                    channel = channel,
+                    message = ERROR_MESSAGE,
+                    reason = resolverFailureReason(error),
+                )
             }
         }
     }
@@ -191,7 +201,11 @@ class PlayerController(
                     activePlaybackChannel = null
                     activeLoadId = null
                     diagnostics("Media3 load failed", null)
-                    mutableState.value = PlayerUiState.Error(channel, ERROR_MESSAGE)
+                    mutableState.value = PlayerUiState.Error(
+                        channel = channel,
+                        message = ERROR_MESSAGE,
+                        reason = "Prehrávač nedokázal pripraviť stream",
+                    )
                 }
             }
             is StreamResolution.Unavailable -> {
@@ -239,6 +253,22 @@ class PlayerController(
             program = program,
             playback = playerPort.snapshot().copy(isPlaying = isPlaying),
         )
+    }
+
+    private fun resolverFailureReason(error: Exception): String = when (error) {
+        is StreamResolveException -> error.message ?: "Zdroj vysielania neodpovedal"
+        is IOException -> "Sieťové pripojenie nie je dostupné"
+        else -> "Zdroj vysielania neodpovedal"
+    }
+
+    private fun playbackFailureReason(message: String): String = when {
+        message.startsWith("HTTP ") -> "Server stream odmietol ($message)"
+        message == "ERROR_CODE_IO_CLEARTEXT_NOT_PERMITTED" ->
+            "Stream používa nepovolené HTTP spojenie"
+        message == "ERROR_CODE_IO_BAD_HTTP_STATUS" -> "Server stream odpovedal chybou"
+        message == "ERROR_CODE_PARSING_MANIFEST_MALFORMED" ->
+            "Zdroj neposlal platný HLS playlist"
+        else -> "Prehrávač stream odmietol"
     }
 
     private companion object {

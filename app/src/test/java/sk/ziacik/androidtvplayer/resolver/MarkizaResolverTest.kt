@@ -63,6 +63,56 @@ class MarkizaResolverTest {
     }
 
     @Test
+    fun `reuses the authenticated session when Markiza is selected again`() = runTest {
+        val http = RecordingHttpClient(
+            ArrayDeque(
+                listOf(
+                    MarkizaHttpResponse(
+                        code = 200,
+                        body = """<input type="hidden" name="_do" value="sign-loginForm-submit">""",
+                    ),
+                    MarkizaHttpResponse(code = 302, body = ""),
+                    MarkizaHttpResponse(
+                        code = 200,
+                        body = """<iframe data-src="https://media.cms.markiza.sk/embed/markiza-live"></iframe>""",
+                    ),
+                    MarkizaHttpResponse(
+                        code = 200,
+                        body = """"source":{"sources":[{"src":"https://cdn.example/first.m3u8","type":"application/x-mpegurl"}]}""",
+                    ),
+                    MarkizaHttpResponse(
+                        code = 200,
+                        body = """<iframe data-src="https://media.cms.markiza.sk/embed/markiza-live"></iframe>""",
+                    ),
+                    MarkizaHttpResponse(
+                        code = 200,
+                        body = """"source":{"sources":[{"src":"https://cdn.example/second.m3u8","type":"application/x-mpegurl"}]}""",
+                    ),
+                ),
+            ),
+        )
+        val resolver = MarkizaResolver(http) {
+            MarkizaCredentials("user@example.com", "secret")
+        }
+
+        resolver.resolve(TvChannel.MARKIZA)
+        val result = resolver.resolve(TvChannel.MARKIZA)
+
+        assertTrue(result is StreamResolution.Playable)
+        assertEquals(6, http.calls.size)
+        assertEquals(
+            HttpCall.Get(
+                MARKIZA_LIVE_URL,
+                mapOf(
+                    "User-Agent" to MARKIZA_USER_AGENT,
+                    "Referer" to MARKIZA_LOGIN_URL,
+                ),
+            ),
+            http.calls[4],
+        )
+    }
+
+    @Test
     fun `requires credentials without making a network request`() = runTest {
         val http = RecordingHttpClient(ArrayDeque())
 
