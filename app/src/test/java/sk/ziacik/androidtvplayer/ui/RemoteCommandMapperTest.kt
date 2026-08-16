@@ -2,6 +2,8 @@ package sk.ziacik.androidtvplayer.ui
 
 import android.view.KeyEvent
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RemoteCommandMapperTest {
@@ -39,6 +41,15 @@ class RemoteCommandMapperTest {
             RemoteCommand.ChannelDown,
             mapper.map(KeyEvent.KEYCODE_CHANNEL_DOWN, true, FocusedControl.PLAY_PAUSE),
         )
+    }
+
+    @Test
+    fun `only channel selection commands are enabled while credentials are required`() {
+        assertTrue(RemoteCommand.ChannelUp.isChannelSelection())
+        assertTrue(RemoteCommand.ChannelDown.isChannelSelection())
+        assertTrue(RemoteCommand.NumericDigit(2).isChannelSelection())
+        assertFalse(RemoteCommand.TogglePlayback.isChannelSelection())
+        assertFalse(RemoteCommand.Exit.isChannelSelection())
     }
 
     @Test

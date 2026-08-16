@@ -23,6 +23,11 @@ sealed interface RemoteCommand {
     data object Ignore : RemoteCommand
 }
 
+fun RemoteCommand.isChannelSelection(): Boolean =
+    this is RemoteCommand.NumericDigit ||
+        this == RemoteCommand.ChannelUp ||
+        this == RemoteCommand.ChannelDown
+
 class RemoteCommandMapper {
     fun map(
         keyCode: Int,

@@ -107,7 +107,12 @@ fun PlayerScreen(
                 }
 
                 val keyCode = event.nativeKeyEvent.keyCode
-                if (state is PlayerUiState.CredentialsRequired) {
+                val command = commandMapper.map(
+                    keyCode = keyCode,
+                    overlayVisible = overlayVisible,
+                    focusedControl = focusedControl,
+                )
+                if (state is PlayerUiState.CredentialsRequired && !command.isChannelSelection()) {
                     return@onPreviewKeyEvent false
                 }
                 val retryable = state is PlayerUiState.Unavailable || state is PlayerUiState.Error
@@ -116,11 +121,7 @@ fun PlayerScreen(
                     return@onPreviewKeyEvent true
                 }
 
-                when (val command = commandMapper.map(
-                    keyCode = keyCode,
-                    overlayVisible = overlayVisible,
-                    focusedControl = focusedControl,
-                )) {
+                when (command) {
                     is RemoteCommand.NumericDigit -> numericInput.append(command.digit)
                     RemoteCommand.ChannelUp -> {
                         controller.channelUp()
