@@ -9,7 +9,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import sk.ziacik.androidtvplayer.channel.ChannelProvider
 import sk.ziacik.androidtvplayer.channel.TvChannel
+import sk.ziacik.androidtvplayer.epg.EpgRepository
 import sk.ziacik.androidtvplayer.resolver.ProgramMetadata
 import sk.ziacik.androidtvplayer.resolver.StreamResolution
 import sk.ziacik.androidtvplayer.resolver.StreamResolveException
@@ -20,6 +22,7 @@ class PlayerController(
     private val resolve: suspend (TvChannel) -> StreamResolution,
     private val playerPort: PlayerPort,
     private val nowMs: () -> Long = System::currentTimeMillis,
+    private val epgRepository: EpgRepository = EpgRepository { _, _ -> null },
     private val onChannelSelected: (TvChannel) -> Unit = {},
     private val diagnostics: (message: String, cause: Throwable?) -> Unit = { _, _ -> },
 ) {
@@ -34,6 +37,9 @@ class PlayerController(
     private var activeLoadId: Long? = null
     private var resolveJob: Job? = null
     private var restrictedRetryJob: Job? = null
+    private var epgJob: Job? = null
+    private var epgLoadId: Long? = null
+    private var refreshedProgrammeEndMs: Long? = null
     private var resolveGeneration = 0L
     private var nextLoadId = 0L
     private var released = false
@@ -57,6 +63,7 @@ class PlayerController(
 
                 override fun onError(loadId: Long, message: String) {
                     if (!acceptsPlaybackCallback(loadId)) return
+                    cancelEpgLookup()
                     diagnostics("Media3 playback failed: $message", null)
                     activeProgram = null
                     activePlaybackChannel = null
@@ -89,6 +96,7 @@ class PlayerController(
         activeProgram = null
         activePlaybackChannel = null
         activeLoadId = null
+        cancelEpgLookup()
         playerPort.stop()
         resolveCurrentChannel()
     }
@@ -98,6 +106,7 @@ class PlayerController(
         resolveJob?.cancel()
         restrictedRetryJob?.cancel()
         restrictedRetryJob = null
+        cancelEpgLookup()
         val channel = currentChannel
         val generation = ++resolveGeneration
         resolveJob = scope.launch {
@@ -140,7 +149,26 @@ class PlayerController(
         val current = mutableState.value
         if (current is PlayerUiState.Ready) {
             mutableState.value = current.copy(playback = playerPort.snapshot())
+            activeProgram?.endsAtMs
+                ?.takeIf { nowMs() >= it && refreshedProgrammeEndMs != it }
+                ?.let { endedAtMs ->
+                    refreshedProgrammeEndMs = endedAtMs
+                    if (current.channel.provider == ChannelProvider.STVR) {
+                        refreshStvrProgramme()
+                    } else {
+                        epgLoadId = null
+                        requestEpgProgrammeIfNeeded(current.program, force = true)
+                    }
+                }
         }
+    }
+
+    private fun refreshStvrProgramme() {
+        activeProgram = null
+        activePlaybackChannel = null
+        activeLoadId = null
+        playerPort.stop()
+        resolveCurrentChannel()
     }
 
     fun seekBack() {
@@ -181,6 +209,7 @@ class PlayerController(
         resolveJob = null
         restrictedRetryJob?.cancel()
         restrictedRetryJob = null
+        cancelEpgLookup()
         activeProgram = null
         activePlaybackChannel = null
         activeLoadId = null
@@ -255,7 +284,44 @@ class PlayerController(
             program = program,
             playback = playerPort.snapshot().copy(isPlaying = isPlaying),
         )
+        requestEpgProgrammeIfNeeded(program)
     }
+
+    private fun requestEpgProgrammeIfNeeded(
+        program: ProgramMetadata,
+        force: Boolean = false,
+    ) {
+        if (!force && program.hasProgrammeInterval()) return
+        val channel = activePlaybackChannel ?: return
+        val loadId = activeLoadId ?: return
+        if (epgLoadId == loadId) return
+        epgLoadId = loadId
+        epgJob = scope.launch {
+            val epgProgramme = try {
+                epgRepository.currentProgram(channel, nowMs())
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                diagnostics("EPG lookup failed for ${channel.displayName}", error)
+                null
+            } ?: return@launch
+            if (!acceptsPlaybackCallback(loadId)) return@launch
+            val ready = mutableState.value as? PlayerUiState.Ready ?: return@launch
+            if (ready.channel != channel) return@launch
+            activeProgram = epgProgramme
+            mutableState.value = ready.copy(program = epgProgramme)
+        }
+    }
+
+    private fun cancelEpgLookup() {
+        epgJob?.cancel()
+        epgJob = null
+        epgLoadId = null
+        refreshedProgrammeEndMs = null
+    }
+
+    private fun ProgramMetadata.hasProgrammeInterval(): Boolean =
+        startsAtMs != null && endsAtMs != null && endsAtMs > startsAtMs
 
     private fun resolverFailureReason(error: Exception): String = when (error) {
         is StreamResolveException -> error.message ?: "Zdroj vysielania neodpovedal"

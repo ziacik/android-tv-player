@@ -28,6 +28,20 @@ fun RemoteCommand.isChannelSelection(): Boolean =
         this == RemoteCommand.ChannelUp ||
         this == RemoteCommand.ChannelDown
 
+fun RemoteCommand.overlayTimeoutMs(): Long? = when (this) {
+    RemoteCommand.ShowOverlay -> OverlayController.OK_TIMEOUT_MS
+    RemoteCommand.ChannelUp,
+    RemoteCommand.ChannelDown,
+    RemoteCommand.SeekBack,
+    RemoteCommand.SeekForward,
+    RemoteCommand.TogglePlayback,
+    RemoteCommand.GoLive,
+    RemoteCommand.FocusPlayPause,
+    RemoteCommand.FocusLive,
+    -> OverlayController.NORMAL_TIMEOUT_MS
+    else -> null
+}
+
 class RemoteCommandMapper {
     fun map(
         keyCode: Int,

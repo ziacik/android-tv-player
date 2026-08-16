@@ -5,6 +5,17 @@ import org.junit.Test
 
 class TvChannelTest {
     @Test
+    fun `covered channels expose their XMLTV identifiers and uncovered streams stay null`() {
+        assertEquals("JEDNOTKA.cz", TvChannel.JEDNOTKA.epgId)
+        assertEquals("MARKÍZA.cz", TvChannel.MARKIZA.epgId)
+        assertEquals("ČT:D/ČTart.cz", TvChannel.CT_D_ART.epgId)
+        assertEquals("LoveNature.cz", TvChannel.LOVE_NATURE.epgId)
+        assertEquals(null, TvChannel.BBC_FOOD.epgId)
+        assertEquals(null, TvChannel.WATERBEAR.epgId)
+        assertEquals(null, TvChannel.STVR_LIVE.epgId)
+    }
+
+    @Test
     fun `catalogue position is one based and rejects unavailable positions`() {
         assertEquals(TvChannel.JEDNOTKA, TvChannel.fromChannelNumber(1))
         assertEquals(TvChannel.DVOJKA, TvChannel.fromChannelNumber(2))

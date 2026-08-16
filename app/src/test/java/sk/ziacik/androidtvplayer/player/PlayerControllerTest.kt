@@ -13,12 +13,230 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import sk.ziacik.androidtvplayer.channel.TvChannel
+import sk.ziacik.androidtvplayer.epg.EpgRepository
 import sk.ziacik.androidtvplayer.resolver.ProgramMetadata
 import sk.ziacik.androidtvplayer.resolver.StreamResolution
 import sk.ziacik.androidtvplayer.resolver.StreamSource
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PlayerControllerTest {
+    @Test
+    fun `ready playback is not delayed and receives EPG metadata when it arrives`() = runTest {
+        val player = FakePlayerPort()
+        val epgResult = CompletableDeferred<ProgramMetadata?>()
+        val controller = PlayerController(
+            scope = this,
+            initialChannel = TvChannel.JEDNOTKA,
+            resolve = { fallbackResolution() },
+            playerPort = player,
+            epgRepository = EpgRepository { _, _ -> epgResult.await() },
+        )
+
+        controller.start()
+        advanceUntilIdle()
+        player.registeredListener.onReady(player.latestLoadId, isPlaying = true)
+        runCurrent()
+
+        assertEquals("JEDNOTKA", (controller.state.value as PlayerUiState.Ready).program.title)
+
+        epgResult.complete(ProgramMetadata("EPG relácia", 1_000L, 2_000L, true))
+        advanceUntilIdle()
+
+        assertEquals("EPG relácia", (controller.state.value as PlayerUiState.Ready).program.title)
+    }
+
+    @Test
+    fun `late EPG result cannot replace metadata after a channel switch`() = runTest {
+        val player = FakePlayerPort()
+        val firstResult = CompletableDeferred<ProgramMetadata?>()
+        val controller = PlayerController(
+            scope = this,
+            initialChannel = TvChannel.JEDNOTKA,
+            resolve = { channel -> fallbackResolution(channel) },
+            playerPort = player,
+            epgRepository = EpgRepository { channel, _ ->
+                if (channel == TvChannel.JEDNOTKA) firstResult.await() else null
+            },
+        )
+
+        controller.start()
+        advanceUntilIdle()
+        player.registeredListener.onReady(player.latestLoadId, isPlaying = true)
+        runCurrent()
+        controller.selectChannel(TvChannel.DVOJKA)
+        advanceUntilIdle()
+        player.registeredListener.onReady(player.latestLoadId, isPlaying = true)
+        firstResult.complete(ProgramMetadata("Stará relácia", 1_000L, 2_000L, true))
+        advanceUntilIdle()
+
+        val ready = controller.state.value as PlayerUiState.Ready
+        assertEquals(TvChannel.DVOJKA, ready.channel)
+        assertEquals("DVOJKA", ready.program.title)
+    }
+
+    @Test
+    fun `native programme interval does not request EPG`() = runTest {
+        var requests = 0
+        val player = FakePlayerPort()
+        val controller = PlayerController(
+            scope = this,
+            initialChannel = TvChannel.JEDNOTKA,
+            resolve = { playableResolution() },
+            playerPort = player,
+            epgRepository = EpgRepository { _, _ ->
+                requests += 1
+                null
+            },
+        )
+
+        controller.start()
+        advanceUntilIdle()
+        player.registeredListener.onReady(player.latestLoadId, isPlaying = true)
+        runCurrent()
+
+        assertEquals(0, requests)
+    }
+
+    @Test
+    fun `missing EPG is requested once per media load`() = runTest {
+        var requests = 0
+        val player = FakePlayerPort()
+        val controller = PlayerController(
+            scope = this,
+            initialChannel = TvChannel.MARKIZA,
+            resolve = { fallbackResolution(TvChannel.MARKIZA) },
+            playerPort = player,
+            epgRepository = EpgRepository { _, _ ->
+                requests += 1
+                null
+            },
+        )
+
+        controller.start()
+        advanceUntilIdle()
+        player.registeredListener.onReady(player.latestLoadId, isPlaying = true)
+        advanceUntilIdle()
+        player.registeredListener.onPlayingChanged(player.latestLoadId, isPlaying = true)
+        advanceUntilIdle()
+
+        assertEquals(1, requests)
+    }
+
+    @Test
+    fun `refreshing playback after an EPG programme ends loads the next programme`() = runTest {
+        var nowMs = 1_500L
+        val player = FakePlayerPort()
+        val controller = PlayerController(
+            scope = this,
+            initialChannel = TvChannel.MARKIZA,
+            resolve = { fallbackResolution(TvChannel.MARKIZA) },
+            playerPort = player,
+            nowMs = { nowMs },
+            epgRepository = EpgRepository { _, currentMs ->
+                if (currentMs < 2_000L) {
+                    ProgramMetadata("Prvá relácia", 1_000L, 2_000L, true)
+                } else {
+                    ProgramMetadata("Druhá relácia", 2_000L, 3_000L, true)
+                }
+            },
+        )
+
+        controller.start()
+        advanceUntilIdle()
+        player.registeredListener.onReady(player.latestLoadId, isPlaying = true)
+        advanceUntilIdle()
+        assertEquals("Prvá relácia", (controller.state.value as PlayerUiState.Ready).program.title)
+
+        nowMs = 2_000L
+        controller.refreshPlaybackSnapshot()
+        advanceUntilIdle()
+
+        assertEquals("Druhá relácia", (controller.state.value as PlayerUiState.Ready).program.title)
+    }
+
+    @Test
+    fun `expired STVR metadata is refreshed through its native resolver`() = runTest {
+        var nowMs = 50_000L
+        var resolveCalls = 0
+        var epgRequests = 0
+        val player = FakePlayerPort()
+        val controller = PlayerController(
+            scope = this,
+            initialChannel = TvChannel.JEDNOTKA,
+            resolve = {
+                resolveCalls += 1
+                if (resolveCalls == 1) {
+                    playableResolution("first")
+                } else {
+                    StreamResolution.Playable(
+                        ProgramMetadata("Nová relácia", 100_000L, 200_000L, true),
+                        StreamSource("https://cdn.example/second.m3u8", "ua"),
+                    )
+                }
+            },
+            playerPort = player,
+            nowMs = { nowMs },
+            epgRepository = EpgRepository { _, _ ->
+                epgRequests += 1
+                ProgramMetadata("Nesprávny zdroj", 100_000L, 200_000L, true)
+            },
+        )
+
+        controller.start()
+        advanceUntilIdle()
+        player.registeredListener.onReady(player.latestLoadId, isPlaying = true)
+        nowMs = 100_000L
+        controller.refreshPlaybackSnapshot()
+        runCurrent()
+        player.registeredListener.onReady(player.latestLoadId, isPlaying = true)
+        advanceUntilIdle()
+
+        assertEquals(2, resolveCalls)
+        assertEquals(0, epgRequests)
+        assertEquals("Nová relácia", (controller.state.value as PlayerUiState.Ready).program.title)
+    }
+
+    @Test
+    fun `expired STVR programme stops the old stream when the next programme is unavailable`() = runTest {
+        var nowMs = 50_000L
+        var resolveCalls = 0
+        val player = FakePlayerPort()
+        val controller = PlayerController(
+            scope = this,
+            initialChannel = TvChannel.JEDNOTKA,
+            resolve = {
+                resolveCalls += 1
+                if (resolveCalls == 1) {
+                    playableResolution("first")
+                } else {
+                    StreamResolution.Unavailable(
+                        ProgramMetadata("Obmedzená relácia", 100_000L, 200_000L, false),
+                    )
+                }
+            },
+            playerPort = player,
+            nowMs = { nowMs },
+        )
+
+        controller.start()
+        advanceUntilIdle()
+        player.registeredListener.onReady(player.latestLoadId, isPlaying = true)
+        nowMs = 100_000L
+        controller.refreshPlaybackSnapshot()
+        runCurrent()
+
+        assertEquals(1, player.stopCalls)
+        assertEquals(2, resolveCalls)
+        assertEquals(
+            PlayerUiState.Unavailable(
+                TvChannel.JEDNOTKA,
+                ProgramMetadata("Obmedzená relácia", 100_000L, 200_000L, false),
+            ),
+            controller.state.value,
+        )
+        controller.release()
+    }
+
     @Test
     fun `initial channel is retained from resolving through ready`() = runTest {
         val player = FakePlayerPort()
@@ -706,6 +924,11 @@ class PlayerControllerTest {
     private fun playableResolution(suffix: String = "live") = StreamResolution.Playable(
         program = PROGRAM,
         source = StreamSource("https://cdn.example/$suffix.m3u8", "ua"),
+    )
+
+    private fun fallbackResolution(channel: TvChannel = TvChannel.JEDNOTKA) = StreamResolution.Playable(
+        program = ProgramMetadata(channel.displayName, null, null, true),
+        source = StreamSource("https://cdn.example/${channel.storageKey}.m3u8", "ua"),
     )
 
     private fun playback(

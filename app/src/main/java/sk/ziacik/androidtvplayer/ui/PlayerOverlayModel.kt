@@ -14,12 +14,21 @@ data class PlayerOverlayModel(
     val liveActionText: String,
 ) {
     companion object {
-        fun from(state: PlayerUiState.Ready): PlayerOverlayModel {
+        fun from(
+            state: PlayerUiState.Ready,
+            nowMs: Long,
+        ): PlayerOverlayModel {
             val playback = state.playback
             val duration = playback.durationMs
             val validWindow = playback.isSeekable && duration != null && duration > 0L
-            val progress = if (validWindow) {
-                (playback.currentPositionMs.toDouble() / duration.toDouble())
+            val startsAtMs = state.program.startsAtMs
+            val endsAtMs = state.program.endsAtMs
+            val progress = if (
+                startsAtMs != null &&
+                endsAtMs != null &&
+                endsAtMs > startsAtMs
+            ) {
+                ((nowMs - startsAtMs).toDouble() / (endsAtMs - startsAtMs).toDouble())
                     .coerceIn(0.0, 1.0)
                     .toFloat()
             } else {

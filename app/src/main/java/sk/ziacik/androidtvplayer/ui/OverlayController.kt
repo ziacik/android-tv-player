@@ -10,18 +10,17 @@ import kotlinx.coroutines.launch
 
 class OverlayController(
     private val scope: CoroutineScope,
-    private val autoHideMs: Long = 4_000L,
 ) {
     private val mutableVisible = MutableStateFlow(false)
     val visible: StateFlow<Boolean> = mutableVisible.asStateFlow()
 
     private var hideJob: Job? = null
 
-    fun show() {
+    fun show(durationMs: Long = NORMAL_TIMEOUT_MS) {
         mutableVisible.value = true
         hideJob?.cancel()
         hideJob = scope.launch {
-            delay(autoHideMs)
+            delay(durationMs)
             mutableVisible.value = false
         }
     }
@@ -30,5 +29,9 @@ class OverlayController(
         hideJob?.cancel()
         mutableVisible.value = false
     }
-}
 
+    companion object {
+        const val NORMAL_TIMEOUT_MS = 6_000L
+        const val OK_TIMEOUT_MS = 60_000L
+    }
+}

@@ -125,41 +125,34 @@ fun PlayerScreen(
                     is RemoteCommand.NumericDigit -> numericInput.append(command.digit)
                     RemoteCommand.ChannelUp -> {
                         controller.channelUp()
-                        overlayController.show()
                     }
                     RemoteCommand.ChannelDown -> {
                         controller.channelDown()
-                        overlayController.show()
                     }
-                    RemoteCommand.ShowOverlay -> overlayController.show()
+                    RemoteCommand.ShowOverlay -> Unit
                     RemoteCommand.SeekBack -> {
                         controller.seekBack()
-                        overlayController.show()
                     }
                     RemoteCommand.SeekForward -> {
                         controller.seekForward()
-                        overlayController.show()
                     }
                     RemoteCommand.TogglePlayback -> {
                         controller.togglePlayback()
-                        overlayController.show()
                     }
                     RemoteCommand.GoLive -> {
                         controller.goLive()
-                        overlayController.show()
                     }
                     RemoteCommand.FocusPlayPause -> {
                         focusedControl = FocusedControl.PLAY_PAUSE
-                        overlayController.show()
                     }
                     RemoteCommand.FocusLive -> {
                         focusedControl = FocusedControl.LIVE
-                        overlayController.show()
                     }
                     RemoteCommand.HideOverlay -> overlayController.hide()
                     RemoteCommand.Exit -> onExit()
                     RemoteCommand.Ignore -> return@onPreviewKeyEvent false
                 }
+                command.overlayTimeoutMs()?.let(overlayController::show)
                 true
             }
             .focusable(),
@@ -235,7 +228,7 @@ internal fun PlayerStateLayer(
 
         is PlayerUiState.Ready -> if (overlayVisible) {
             PlayerOverlay(
-                model = PlayerOverlayModel.from(current),
+                model = PlayerOverlayModel.from(current, System.currentTimeMillis()),
                 focusedControl = focusedControl,
                 modifier = modifier,
             )

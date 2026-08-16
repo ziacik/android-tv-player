@@ -5,11 +5,14 @@ import android.util.Log
 import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import sk.ziacik.androidtvplayer.channel.SharedPreferencesChannelStore
+import sk.ziacik.androidtvplayer.epg.CachedXmltvEpgRepository
+import sk.ziacik.androidtvplayer.epg.OkHttpEpgDownloader
 import sk.ziacik.androidtvplayer.player.Media3PlayerPort
 import sk.ziacik.androidtvplayer.player.PlayerController
 import sk.ziacik.androidtvplayer.resolver.ChannelResolver
@@ -62,12 +65,17 @@ class MainActivity : ComponentActivity() {
             resolveDirect = DirectResolver()::resolve,
         )
         val channelStore = SharedPreferencesChannelStore(this)
+        val epgRepository = CachedXmltvEpgRepository(
+            cacheFile = File(filesDir, "epg/epg-cz.xml.gz"),
+            download = OkHttpEpgDownloader()::download,
+        )
         val overlayController = OverlayController(appScope)
         playerController = PlayerController(
             scope = appScope,
             initialChannel = channelStore.load(),
             resolve = resolver::resolve,
             playerPort = playerPort,
+            epgRepository = epgRepository,
             onChannelSelected = channelStore::save,
             diagnostics = { message, cause ->
                 Log.e("AndroidTvPlayer", message, cause)

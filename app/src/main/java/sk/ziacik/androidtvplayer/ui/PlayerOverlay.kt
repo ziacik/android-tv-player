@@ -77,12 +77,14 @@ fun PlayerOverlay(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Spacer(Modifier.height(3.dp))
-            LiveTimeline(
-                progress = model.progress,
-                delayText = model.delayText,
-            )
-            Spacer(Modifier.height(4.dp))
+            if (shouldShowProgramTimeline(model.progress)) {
+                Spacer(Modifier.height(3.dp))
+                LiveTimeline(
+                    progress = model.progress,
+                    delayText = model.delayText,
+                )
+                Spacer(Modifier.height(4.dp))
+            }
             TransportControls(
                 model = model,
                 focusedControl = focusedControl,
@@ -90,6 +92,8 @@ fun PlayerOverlay(
         }
     }
 }
+
+internal fun shouldShowProgramTimeline(progress: Float?): Boolean = progress != null
 
 @Composable
 private fun LiveTimeline(

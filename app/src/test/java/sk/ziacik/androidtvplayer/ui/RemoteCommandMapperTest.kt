@@ -3,6 +3,7 @@ package sk.ziacik.androidtvplayer.ui
 import android.view.KeyEvent
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -114,5 +115,16 @@ class RemoteCommandMapperTest {
             RemoteCommand.Ignore,
             mapper.map(KeyEvent.KEYCODE_VOLUME_UP, true, FocusedControl.PLAY_PAUSE),
         )
+    }
+
+    @Test
+    fun `hidden OSD command uses one minute while ordinary commands use six seconds`() {
+        assertEquals(OverlayController.OK_TIMEOUT_MS, RemoteCommand.ShowOverlay.overlayTimeoutMs())
+        assertEquals(OverlayController.NORMAL_TIMEOUT_MS, RemoteCommand.ChannelUp.overlayTimeoutMs())
+        assertEquals(OverlayController.NORMAL_TIMEOUT_MS, RemoteCommand.SeekBack.overlayTimeoutMs())
+        assertEquals(OverlayController.NORMAL_TIMEOUT_MS, RemoteCommand.TogglePlayback.overlayTimeoutMs())
+        assertEquals(OverlayController.NORMAL_TIMEOUT_MS, RemoteCommand.FocusLive.overlayTimeoutMs())
+        assertNull(RemoteCommand.HideOverlay.overlayTimeoutMs())
+        assertNull(RemoteCommand.NumericDigit(1).overlayTimeoutMs())
     }
 }

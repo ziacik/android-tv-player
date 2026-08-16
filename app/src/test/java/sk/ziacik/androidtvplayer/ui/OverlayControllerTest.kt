@@ -11,13 +11,13 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class OverlayControllerTest {
     @Test
-    fun `hides four seconds after show`() = runTest {
+    fun `hides six seconds after normal show`() = runTest {
         val controller = OverlayController(this)
 
-        controller.show()
+        controller.show(OverlayController.NORMAL_TIMEOUT_MS)
         assertTrue(controller.visible.value)
 
-        advanceTimeBy(3_999L)
+        advanceTimeBy(5_999L)
         runCurrent()
         assertTrue(controller.visible.value)
 
@@ -27,13 +27,27 @@ class OverlayControllerTest {
     }
 
     @Test
-    fun `interaction restarts full timeout`() = runTest {
+    fun `hides one minute after hidden OSD is opened with OK`() = runTest {
         val controller = OverlayController(this)
 
-        controller.show()
-        advanceTimeBy(3_000L)
-        controller.show()
-        advanceTimeBy(3_999L)
+        controller.show(OverlayController.OK_TIMEOUT_MS)
+        advanceTimeBy(59_999L)
+        runCurrent()
+        assertTrue(controller.visible.value)
+
+        advanceTimeBy(1L)
+        runCurrent()
+        assertFalse(controller.visible.value)
+    }
+
+    @Test
+    fun `ordinary action replaces a one minute timeout with six seconds`() = runTest {
+        val controller = OverlayController(this)
+
+        controller.show(OverlayController.OK_TIMEOUT_MS)
+        advanceTimeBy(20_000L)
+        controller.show(OverlayController.NORMAL_TIMEOUT_MS)
+        advanceTimeBy(5_999L)
         runCurrent()
 
         assertTrue(controller.visible.value)
@@ -43,4 +57,3 @@ class OverlayControllerTest {
         assertFalse(controller.visible.value)
     }
 }
-
