@@ -3,7 +3,6 @@ package sk.ziacik.androidtvplayer.epg
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
-import org.xml.sax.SAXException
 
 class XmltvEpgParserTest {
     @Test
@@ -53,12 +52,29 @@ class XmltvEpgParserTest {
         assertEquals("Prvý názov", programmes["JEDNOTKA.cz"]!!.single().title)
     }
 
-    @Test(expected = SAXException::class)
-    fun `rejects XML documents with a doctype`() {
-        XmltvEpgParser().parse(
-            xml = """<!DOCTYPE tv [<!ENTITY title "Nechcené">]>
-                <tv><programme channel="JEDNOTKA.cz" start="20260816180000 +0200" stop="20260816190000 +0200"><title>&title;</title></programme></tv>""".byteInputStream(),
+    @Test
+    fun `parses XMLTV feed with an external doctype without loading it`() {
+        val programmes = XmltvEpgParser().parse(
+            xml = """<!DOCTYPE tv SYSTEM "https://example.invalid/xmltv.dtd">
+                <tv><programme channel="JEDNOTKA.cz" start="20260816180000 +0200" stop="20260816190000 +0200"><title>Správy</title></programme></tv>""".byteInputStream(),
             channelIds = setOf("JEDNOTKA.cz"),
         )
+
+        assertEquals("Správy", programmes["JEDNOTKA.cz"]!!.single().title)
+    }
+
+    @Test
+    fun `finds only the programme covering the requested instant`() {
+        val programme = XmltvEpgParser().currentProgram(
+            xml = """<tv>
+                <programme channel="OTHER" start="20260816180000 +0200" stop="20260816190000 +0200"><title>Ignorovať</title></programme>
+                <programme channel="MARKIZA" start="20260816170000 +0200" stop="20260816180000 +0200"><title>Staršia</title></programme>
+                <programme channel="MARKIZA" start="20260816180000 +0200" stop="20260816190000 +0200"><title>Aktuálna &amp; relácia</title></programme>
+            </tv>""".byteInputStream(),
+            channelId = "MARKIZA",
+            nowMs = 1_786_896_300_000L,
+        )
+
+        assertEquals("Aktuálna & relácia", programme?.title)
     }
 }

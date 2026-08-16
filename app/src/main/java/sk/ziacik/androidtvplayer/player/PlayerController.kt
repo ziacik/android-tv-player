@@ -291,7 +291,9 @@ class PlayerController(
         program: ProgramMetadata,
         force: Boolean = false,
     ) {
-        if (!force && program.hasProgrammeInterval()) return
+        if (!force && program.hasProgrammeInterval()) {
+            return
+        }
         val channel = activePlaybackChannel ?: return
         val loadId = activeLoadId ?: return
         if (epgLoadId == loadId) return
@@ -304,7 +306,10 @@ class PlayerController(
             } catch (error: Exception) {
                 diagnostics("EPG lookup failed for ${channel.displayName}", error)
                 null
-            } ?: return@launch
+            }
+            if (epgProgramme == null) {
+                return@launch
+            }
             if (!acceptsPlaybackCallback(loadId)) return@launch
             val ready = mutableState.value as? PlayerUiState.Ready ?: return@launch
             if (ready.channel != channel) return@launch

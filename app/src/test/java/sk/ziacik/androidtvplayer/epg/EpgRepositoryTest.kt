@@ -10,6 +10,7 @@ import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import sk.ziacik.androidtvplayer.channel.EpgSourceId
 import sk.ziacik.androidtvplayer.channel.TvChannel
 
 class EpgRepositoryTest {
@@ -85,14 +86,78 @@ class EpgRepositoryTest {
         assertEquals("Druhý", repository.currentProgram(TvChannel.JEDNOTKA, 1_786_899_600_000L)?.title)
     }
 
+    @Test
+    fun `prefers current programme from the first configured source`() = runTest {
+        val repository = repository(
+            sources = listOf(
+                source(EpgSourceId.SKYLINK) {
+                    xml("336e46bf4276e77a716e494c6285d5db", "180000 +0200", "190000 +0200", "Skylink").encodeToByteArray()
+                },
+                source(EpgSourceId.IPTV_ORG) {
+                    gzip(xml("MARKÍZA.cz", "180000 +0200", "190000 +0200", "Iptv"))
+                },
+            ),
+        )
+
+        assertEquals("Skylink", repository.currentProgram(TvChannel.MARKIZA, NOW_MS)?.title)
+    }
+
+    @Test
+    fun `falls back when the first source has no current programme`() = runTest {
+        val repository = repository(
+            sources = listOf(
+                source(EpgSourceId.SKYLINK) {
+                    xml("336e46bf4276e77a716e494c6285d5db", "160000 +0200", "170000 +0200", "Stará relácia").encodeToByteArray()
+                },
+                source(EpgSourceId.IPTV_ORG) {
+                    gzip(xml("MARKÍZA.cz", "180000 +0200", "190000 +0200", "Iptv"))
+                },
+            ),
+        )
+
+        assertEquals("Iptv", repository.currentProgram(TvChannel.MARKIZA, NOW_MS)?.title)
+    }
+
+    @Test
+    fun `falls back when the first source cannot be downloaded`() = runTest {
+        val repository = repository(
+            sources = listOf(
+                source(EpgSourceId.SKYLINK) { throw IOException("offline") },
+                source(EpgSourceId.IPTV_ORG) {
+                    gzip(xml("MARKÍZA.cz", "180000 +0200", "190000 +0200", "Iptv"))
+                },
+            ),
+        )
+
+        assertEquals("Iptv", repository.currentProgram(TvChannel.MARKIZA, NOW_MS)?.title)
+    }
+
     private fun repository(
         cacheFile: File = cacheFile(),
         downloader: suspend () -> ByteArray,
     ) = CachedXmltvEpgRepository(
-        cacheFile = cacheFile,
-        download = downloader,
+        sources = listOf(
+            XmltvEpgSource(EpgSourceId.IPTV_ORG, cacheFile, downloader),
+        ),
         clockMs = { NOW_MS },
         parser = XmltvEpgParser(),
+    )
+
+    private fun repository(
+        sources: List<XmltvEpgSource>,
+    ) = CachedXmltvEpgRepository(
+        sources = sources,
+        clockMs = { NOW_MS },
+        parser = XmltvEpgParser(),
+    )
+
+    private fun source(
+        id: EpgSourceId,
+        downloader: suspend () -> ByteArray,
+    ) = XmltvEpgSource(
+        id = id,
+        cacheFile = File(temporaryFolder.root, "${id.name.lowercase()}.xml"),
+        download = downloader,
     )
 
     private fun cacheFile() = File(temporaryFolder.root, "epg-cz.xml.gz")

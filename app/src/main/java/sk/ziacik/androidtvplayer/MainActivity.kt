@@ -11,8 +11,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import sk.ziacik.androidtvplayer.channel.SharedPreferencesChannelStore
+import sk.ziacik.androidtvplayer.channel.EpgSourceId
 import sk.ziacik.androidtvplayer.epg.CachedXmltvEpgRepository
 import sk.ziacik.androidtvplayer.epg.OkHttpEpgDownloader
+import sk.ziacik.androidtvplayer.epg.XmltvEpgSource
 import sk.ziacik.androidtvplayer.player.Media3PlayerPort
 import sk.ziacik.androidtvplayer.player.PlayerController
 import sk.ziacik.androidtvplayer.resolver.ChannelResolver
@@ -65,9 +67,23 @@ class MainActivity : ComponentActivity() {
             resolveDirect = DirectResolver()::resolve,
         )
         val channelStore = SharedPreferencesChannelStore(this)
+        val epgDirectory = File(filesDir, "epg")
         val epgRepository = CachedXmltvEpgRepository(
-            cacheFile = File(filesDir, "epg/epg-cz.xml.gz"),
-            download = OkHttpEpgDownloader()::download,
+            sources = listOf(
+                XmltvEpgSource(
+                    id = EpgSourceId.SKYLINK,
+                    cacheFile = File(epgDirectory, "skylink-a3b-a1.xml"),
+                    download = OkHttpEpgDownloader(SKYLINK_EPG_URL)::download,
+                ),
+                XmltvEpgSource(
+                    id = EpgSourceId.IPTV_ORG,
+                    cacheFile = File(epgDirectory, "iptv-org-cz.xml.gz"),
+                    download = OkHttpEpgDownloader(IPTV_ORG_EPG_URL)::download,
+                ),
+            ),
+            diagnostics = { message, cause ->
+                Log.e("AndroidTvPlayer", message, cause)
+            },
         )
         val overlayController = OverlayController(appScope)
         playerController = PlayerController(
@@ -104,5 +120,11 @@ class MainActivity : ComponentActivity() {
         playerController.release()
         appScope.cancel()
         super.onDestroy()
+    }
+
+    private companion object {
+        const val SKYLINK_EPG_URL =
+            "https://raw.githubusercontent.com/370network/skylink-xmltv/refs/heads/main/a3b_a1.xml"
+        const val IPTV_ORG_EPG_URL = "https://iptv-epg.org/files/epg-cz.xml.gz"
     }
 }

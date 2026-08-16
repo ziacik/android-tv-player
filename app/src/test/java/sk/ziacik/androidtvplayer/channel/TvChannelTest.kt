@@ -6,13 +6,14 @@ import org.junit.Test
 class TvChannelTest {
     @Test
     fun `covered channels expose their XMLTV identifiers and uncovered streams stay null`() {
-        assertEquals("JEDNOTKA.cz", TvChannel.JEDNOTKA.epgId)
-        assertEquals("MARKÍZA.cz", TvChannel.MARKIZA.epgId)
-        assertEquals("ČT:D/ČTart.cz", TvChannel.CT_D_ART.epgId)
-        assertEquals("LoveNature.cz", TvChannel.LOVE_NATURE.epgId)
-        assertEquals(null, TvChannel.BBC_FOOD.epgId)
-        assertEquals(null, TvChannel.WATERBEAR.epgId)
-        assertEquals(null, TvChannel.STVR_LIVE.epgId)
+        assertEquals("336e46bf4276e77a716e494c6285d5db", TvChannel.MARKIZA.epgIds[EpgSourceId.SKYLINK])
+        assertEquals("84a2364ade7443e6d6afe03f9aa2361a", TvChannel.JOJ.epgIds[EpgSourceId.SKYLINK])
+        assertEquals("MARKÍZA.cz", TvChannel.MARKIZA.epgIds[EpgSourceId.IPTV_ORG])
+        assertEquals("ČT:D/ČTart.cz", TvChannel.CT_D_ART.epgIds[EpgSourceId.IPTV_ORG])
+        assertEquals("87a9a0429e3edc255adbb8601cfddc0a", TvChannel.LOVE_NATURE.epgIds[EpgSourceId.SKYLINK])
+        assertEquals(null, TvChannel.BBC_FOOD.epgIds[EpgSourceId.SKYLINK])
+        assertEquals(null, TvChannel.WATERBEAR.epgIds[EpgSourceId.SKYLINK])
+        assertEquals(null, TvChannel.STVR_LIVE.epgIds[EpgSourceId.SKYLINK])
     }
 
     @Test
