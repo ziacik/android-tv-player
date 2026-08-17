@@ -45,6 +45,18 @@ class RemoteCommandMapperTest {
     }
 
     @Test
+    fun `page keys from DQ10 switch channels`() {
+        assertEquals(
+            RemoteCommand.ChannelUp,
+            mapper.map(KeyEvent.KEYCODE_PAGE_UP, false, FocusedControl.PLAY_PAUSE),
+        )
+        assertEquals(
+            RemoteCommand.ChannelDown,
+            mapper.map(KeyEvent.KEYCODE_PAGE_DOWN, true, FocusedControl.LIVE),
+        )
+    }
+
+    @Test
     fun `only channel selection commands are enabled while credentials are required`() {
         assertTrue(RemoteCommand.ChannelUp.isChannelSelection())
         assertTrue(RemoteCommand.ChannelDown.isChannelSelection())

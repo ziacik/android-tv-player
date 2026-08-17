@@ -51,8 +51,12 @@ class RemoteCommandMapper {
         keyCode.toNumericDigit()?.let(RemoteCommand::NumericDigit)?.let { return it }
 
         return when (keyCode) {
-            KeyEvent.KEYCODE_CHANNEL_UP -> RemoteCommand.ChannelUp
-            KeyEvent.KEYCODE_CHANNEL_DOWN -> RemoteCommand.ChannelDown
+            KeyEvent.KEYCODE_CHANNEL_UP,
+            KeyEvent.KEYCODE_PAGE_UP,
+            -> RemoteCommand.ChannelUp
+            KeyEvent.KEYCODE_CHANNEL_DOWN,
+            KeyEvent.KEYCODE_PAGE_DOWN,
+            -> RemoteCommand.ChannelDown
             KeyEvent.KEYCODE_DPAD_LEFT -> RemoteCommand.SeekBack
             KeyEvent.KEYCODE_DPAD_RIGHT -> RemoteCommand.SeekForward
             KeyEvent.KEYCODE_DPAD_UP -> RemoteCommand.FocusPlayPause
