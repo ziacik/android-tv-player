@@ -344,6 +344,36 @@ class PlayerControllerTest {
     }
 
     @Test
+    fun `SWEET TV playback failure resolves and loads a fresh stream`() = runTest {
+        var resolveCalls = 0
+        val player = FakePlayerPort()
+        val controller = PlayerController(
+            scope = this,
+            initialChannel = TvChannel.SVET_NARUBY,
+            resolve = { _ ->
+                resolveCalls += 1
+                playableResolution("sweet-$resolveCalls")
+            },
+            playerPort = player,
+        )
+
+        controller.start()
+        advanceUntilIdle()
+        player.registeredListener.onError(player.latestLoadId, "HTTP 403")
+        advanceUntilIdle()
+
+        assertEquals(2, resolveCalls)
+        assertEquals(
+            listOf(
+                "https://cdn.example/sweet-1.m3u8",
+                "https://cdn.example/sweet-2.m3u8",
+            ),
+            player.loadedSources.map(StreamSource::url),
+        )
+        assertEquals(PlayerUiState.Preparing(TvChannel.SVET_NARUBY), controller.state.value)
+    }
+
+    @Test
     fun `resolve failure exposes error state`() = runTest {
         val controller = PlayerController(
             scope = this,
@@ -663,7 +693,7 @@ class PlayerControllerTest {
         controller.channelDown()
         advanceUntilIdle()
 
-        assertEquals(TvChannel.BBC_FOOD, controller.state.value.channel)
+        assertEquals(TvChannel.SVET_NARUBY, controller.state.value.channel)
     }
 
     @Test

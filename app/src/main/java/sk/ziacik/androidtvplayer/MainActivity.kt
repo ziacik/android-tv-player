@@ -31,6 +31,7 @@ import sk.ziacik.androidtvplayer.resolver.OkHttpStvrClient
 import sk.ziacik.androidtvplayer.resolver.NovaResolver
 import sk.ziacik.androidtvplayer.resolver.SharedPreferencesMarkizaCredentialsStore
 import sk.ziacik.androidtvplayer.resolver.StvrResolver
+import sk.ziacik.androidtvplayer.resolver.SweetTvResolver
 import sk.ziacik.androidtvplayer.resolver.Ta3Resolver
 import sk.ziacik.androidtvplayer.ui.AndroidTvPlayerTheme
 import sk.ziacik.androidtvplayer.ui.OverlayController
@@ -64,6 +65,7 @@ class MainActivity : ComponentActivity() {
             resolveTa3 = Ta3Resolver(freeviewHttpClient)::resolve,
             resolveNova = NovaResolver(freeviewHttpClient)::resolve,
             resolveCnnPrimaNews = CnnPrimaNewsResolver(freeviewHttpClient)::resolve,
+            resolveSweetTv = SweetTvResolver(freeviewHttpClient)::resolve,
             resolveDirect = DirectResolver()::resolve,
         )
         val channelStore = SharedPreferencesChannelStore(this)

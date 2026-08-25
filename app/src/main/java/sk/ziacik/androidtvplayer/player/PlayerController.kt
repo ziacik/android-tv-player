@@ -68,6 +68,10 @@ class PlayerController(
                     activeProgram = null
                     activePlaybackChannel = null
                     activeLoadId = null
+                    if (currentChannel.provider == ChannelProvider.SWEET_TV) {
+                        resolveCurrentChannel()
+                        return
+                    }
                     mutableState.value = PlayerUiState.Error(
                         channel = currentChannel,
                         message = ERROR_MESSAGE,
