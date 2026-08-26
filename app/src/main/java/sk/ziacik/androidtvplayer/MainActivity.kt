@@ -10,7 +10,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import sk.ziacik.androidtvplayer.channel.SharedPreferencesChannelStore
+import sk.ziacik.androidtvplayer.channel.ChannelCatalogRepository
+import sk.ziacik.androidtvplayer.channel.ChannelCatalog
+import sk.ziacik.androidtvplayer.channel.OkHttpChannelCatalogDownloader
+import sk.ziacik.androidtvplayer.channel.TvChannel
 import sk.ziacik.androidtvplayer.channel.EpgSourceId
 import sk.ziacik.androidtvplayer.epg.CachedXmltvEpgRepository
 import sk.ziacik.androidtvplayer.epg.OkHttpEpgDownloader
@@ -22,14 +27,9 @@ import sk.ziacik.androidtvplayer.resolver.CnnPrimaNewsResolver
 import sk.ziacik.androidtvplayer.resolver.CtResolver
 import sk.ziacik.androidtvplayer.resolver.DirectResolver
 import sk.ziacik.androidtvplayer.resolver.JojResolver
-import sk.ziacik.androidtvplayer.resolver.MarkizaCredentials
-import sk.ziacik.androidtvplayer.resolver.MarkizaCredentialsProvider
-import sk.ziacik.androidtvplayer.resolver.MarkizaResolver
-import sk.ziacik.androidtvplayer.resolver.OkHttpMarkizaClient
 import sk.ziacik.androidtvplayer.resolver.OkHttpFreeviewClient
 import sk.ziacik.androidtvplayer.resolver.OkHttpStvrClient
 import sk.ziacik.androidtvplayer.resolver.NovaResolver
-import sk.ziacik.androidtvplayer.resolver.SharedPreferencesMarkizaCredentialsStore
 import sk.ziacik.androidtvplayer.resolver.StvrResolver
 import sk.ziacik.androidtvplayer.resolver.SweetTvResolver
 import sk.ziacik.androidtvplayer.resolver.Ta3Resolver
@@ -51,15 +51,9 @@ class MainActivity : ComponentActivity() {
                 View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
 
         val playerPort = Media3PlayerPort(this)
-        val markizaCredentials = SharedPreferencesMarkizaCredentialsStore(this)
-        val markizaCredentialsProvider = MarkizaCredentialsProvider(markizaCredentials::load)
         val freeviewHttpClient = OkHttpFreeviewClient()
         val resolver = ChannelResolver(
             resolveStvr = StvrResolver(OkHttpStvrClient())::resolve,
-            resolveMarkiza = MarkizaResolver(
-                httpClient = OkHttpMarkizaClient(),
-                credentials = markizaCredentialsProvider::load,
-            )::resolve,
             resolveJoj = JojResolver(freeviewHttpClient)::resolve,
             resolveCt = CtResolver(freeviewHttpClient)::resolve,
             resolveTa3 = Ta3Resolver(freeviewHttpClient)::resolve,
@@ -68,6 +62,19 @@ class MainActivity : ComponentActivity() {
             resolveSweetTv = SweetTvResolver(freeviewHttpClient)::resolve,
             resolveDirect = DirectResolver()::resolve,
         )
+        val catalogRepository = ChannelCatalogRepository(
+            seed = { assets.open("channels.json").bufferedReader().use { it.readText() } },
+            cacheFile = File(filesDir, "channels.json"),
+            download = OkHttpChannelCatalogDownloader(CHANNELS_URL)::download,
+        )
+        val catalog = ChannelCatalog(
+            catalogRepository.load().channels + TvChannel.SVET_NARUBY,
+        )
+        TvChannel.setRuntimeEntries(catalog.channels)
+        appScope.launch {
+            runCatching { catalogRepository.refresh() }
+                .onFailure { Log.w("AndroidTvPlayer", "Channel catalog refresh failed") }
+        }
         val channelStore = SharedPreferencesChannelStore(this)
         val epgDirectory = File(filesDir, "epg")
         val epgRepository = CachedXmltvEpgRepository(
@@ -90,7 +97,7 @@ class MainActivity : ComponentActivity() {
         val overlayController = OverlayController(appScope)
         playerController = PlayerController(
             scope = appScope,
-            initialChannel = channelStore.load(),
+            initialChannel = channelStore.load(catalog),
             resolve = resolver::resolve,
             playerPort = playerPort,
             epgRepository = epgRepository,
@@ -106,10 +113,6 @@ class MainActivity : ComponentActivity() {
                     controller = playerController,
                     player = playerPort.player,
                     overlayController = overlayController,
-                    onSaveMarkizaCredentials = { email, password ->
-                        markizaCredentials.save(MarkizaCredentials(email, password))
-                        playerController.retry()
-                    },
                     onExit = ::finish,
                 )
             }
@@ -128,5 +131,6 @@ class MainActivity : ComponentActivity() {
         const val SKYLINK_EPG_URL =
             "https://raw.githubusercontent.com/370network/skylink-xmltv/refs/heads/main/a3b_a1.xml"
         const val IPTV_ORG_EPG_URL = "https://iptv-epg.org/files/epg-cz.xml.gz"
+        const val CHANNELS_URL = "https://raw.githubusercontent.com/ziacik/android-tv-player/master/channels.json"
     }
 }

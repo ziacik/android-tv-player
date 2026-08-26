@@ -14,10 +14,6 @@ class ChannelResolverTest {
                 calls += channel
                 StreamResolution.Unavailable(ProgramMetadata("STVR", null, null, false))
             },
-            resolveMarkiza = { channel ->
-                calls += channel
-                StreamResolution.RequiresCredentials(channel)
-            },
             resolveJoj = { channel -> calls += channel; playable(channel) },
             resolveCt = { channel -> calls += channel; playable(channel) },
             resolveTa3 = { channel -> calls += channel; playable(channel) },
@@ -28,7 +24,6 @@ class ChannelResolverTest {
         )
 
         resolver.resolve(TvChannel.JEDNOTKA)
-        val markiza = resolver.resolve(TvChannel.MARKIZA)
         resolver.resolve(TvChannel.JOJ)
         resolver.resolve(TvChannel.CT_1)
         resolver.resolve(TvChannel.NOVA_CINEMA)
@@ -39,7 +34,6 @@ class ChannelResolverTest {
         assertEquals(
             listOf(
                 TvChannel.JEDNOTKA,
-                TvChannel.MARKIZA,
                 TvChannel.JOJ,
                 TvChannel.CT_1,
                 TvChannel.NOVA_CINEMA,
@@ -49,7 +43,6 @@ class ChannelResolverTest {
             ),
             calls,
         )
-        assertEquals(StreamResolution.RequiresCredentials(TvChannel.MARKIZA), markiza)
     }
 
     private fun playable(channel: TvChannel) = StreamResolution.Playable(

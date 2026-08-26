@@ -20,10 +20,23 @@ android {
         compose = true
     }
 
+    sourceSets.named("main") {
+        assets.srcDir(layout.buildDirectory.dir("generated/assets/channels").get().asFile)
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+}
+
+val copyChannelCatalog by tasks.registering(Copy::class) {
+    from(rootProject.layout.projectDirectory.file("channels.json"))
+    into(layout.buildDirectory.dir("generated/assets/channels"))
+}
+
+tasks.named("preBuild") {
+    dependsOn(copyChannelCatalog)
 }
 
 dependencies {

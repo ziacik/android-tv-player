@@ -56,7 +56,7 @@ fun PlayerScreen(
     controller: PlayerController,
     player: Player,
     overlayController: OverlayController,
-    onSaveMarkizaCredentials: (String, String) -> Unit,
+    onSaveMarkizaCredentials: (String, String) -> Unit = { _, _ -> },
     onExit: () -> Unit,
     modifier: Modifier = Modifier,
 ) {

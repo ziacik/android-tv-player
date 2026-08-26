@@ -5,7 +5,6 @@ import sk.ziacik.androidtvplayer.channel.ChannelProvider
 
 class ChannelResolver(
     private val resolveStvr: suspend (TvChannel) -> StreamResolution,
-    private val resolveMarkiza: suspend (TvChannel) -> StreamResolution,
     private val resolveJoj: suspend (TvChannel) -> StreamResolution,
     private val resolveCt: suspend (TvChannel) -> StreamResolution,
     private val resolveTa3: suspend (TvChannel) -> StreamResolution,
@@ -16,7 +15,7 @@ class ChannelResolver(
 ) {
     suspend fun resolve(channel: TvChannel): StreamResolution = when (channel.provider) {
         ChannelProvider.STVR -> resolveStvr(channel)
-        ChannelProvider.MARKIZA -> resolveMarkiza(channel)
+        ChannelProvider.MARKIZA -> error("Markiza is no longer a bundled provider")
         ChannelProvider.JOJ -> resolveJoj(channel)
         ChannelProvider.CT -> resolveCt(channel)
         ChannelProvider.TA3 -> resolveTa3(channel)
