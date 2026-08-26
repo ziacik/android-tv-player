@@ -5,15 +5,13 @@ import org.junit.Test
 
 class TvChannelTest {
     @Test
-    fun `covered channels expose their XMLTV identifiers and uncovered streams stay null`() {
+    fun `covered channels expose their XMLTV identifiers and remaining direct streams stay null`() {
         assertEquals("336e46bf4276e77a716e494c6285d5db", TvChannel.MARKIZA.epgIds[EpgSourceId.SKYLINK])
         assertEquals("84a2364ade7443e6d6afe03f9aa2361a", TvChannel.JOJ.epgIds[EpgSourceId.SKYLINK])
         assertEquals("MARKÍZA.cz", TvChannel.MARKIZA.epgIds[EpgSourceId.IPTV_ORG])
         assertEquals("ČT:D/ČTart.cz", TvChannel.CT_D_ART.epgIds[EpgSourceId.IPTV_ORG])
         assertEquals("87a9a0429e3edc255adbb8601cfddc0a", TvChannel.LOVE_NATURE.epgIds[EpgSourceId.SKYLINK])
-        assertEquals(null, TvChannel.BBC_FOOD.epgIds[EpgSourceId.SKYLINK])
         assertEquals(null, TvChannel.WATERBEAR.epgIds[EpgSourceId.SKYLINK])
-        assertEquals(null, TvChannel.STVR_LIVE.epgIds[EpgSourceId.SKYLINK])
     }
 
     @Test
@@ -26,12 +24,18 @@ class TvChannelTest {
     }
 
     @Test
-    fun `catalogue retains base channels and includes the Freeview additions`() {
+    fun `catalogue retains base channels and omits removed live and direct streams`() {
         assertEquals(
             listOf(TvChannel.JEDNOTKA, TvChannel.DVOJKA, TvChannel.MARKIZA),
             TvChannel.entries.take(3),
         )
-        assertEquals(41, TvChannel.entries.size)
+        assertEquals(34, TvChannel.entries.size)
+        assertEquals(
+            emptySet<String>(),
+            TvChannel.entries
+                .map(TvChannel::storageKey)
+                .intersect(setOf("stvr-live-o", "stvr-live", "nrsr", "ta3", "szts", "wild-earth", "bbc-food")),
+        )
         assertEquals("1", TvChannel.JEDNOTKA.stvrId)
         assertEquals("2", TvChannel.DVOJKA.stvrId)
         assertEquals("JEDNOTKA", TvChannel.JEDNOTKA.displayName)
@@ -46,7 +50,7 @@ class TvChannelTest {
         assertEquals(TvChannel.DVOJKA, TvChannel.JEDNOTKA.next())
         assertEquals(TvChannel.MARKIZA, TvChannel.DVOJKA.next())
         assertEquals(TvChannel.STVR_24, TvChannel.MARKIZA.next())
-        assertEquals(TvChannel.SVET_NARUBY, TvChannel.BBC_FOOD.next())
+        assertEquals(TvChannel.TV5MONDE_CHEFS, TvChannel.TASTEMADE.next())
         assertEquals(TvChannel.JEDNOTKA, TvChannel.SVET_NARUBY.next())
         assertEquals(TvChannel.SVET_NARUBY, TvChannel.JEDNOTKA.previous())
         assertEquals(TvChannel.MARKIZA, TvChannel.STVR_24.previous())

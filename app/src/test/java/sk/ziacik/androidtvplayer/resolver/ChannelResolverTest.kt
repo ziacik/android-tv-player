@@ -31,11 +31,10 @@ class ChannelResolverTest {
         val markiza = resolver.resolve(TvChannel.MARKIZA)
         resolver.resolve(TvChannel.JOJ)
         resolver.resolve(TvChannel.CT_1)
-        resolver.resolve(TvChannel.TA3)
         resolver.resolve(TvChannel.NOVA_CINEMA)
         resolver.resolve(TvChannel.CNN_PRIMA_NEWS)
         resolver.resolve(TvChannel.SVET_NARUBY)
-        resolver.resolve(TvChannel.SZTS)
+        resolver.resolve(TvChannel.WATERBEAR)
 
         assertEquals(
             listOf(
@@ -43,11 +42,10 @@ class ChannelResolverTest {
                 TvChannel.MARKIZA,
                 TvChannel.JOJ,
                 TvChannel.CT_1,
-                TvChannel.TA3,
                 TvChannel.NOVA_CINEMA,
                 TvChannel.CNN_PRIMA_NEWS,
                 TvChannel.SVET_NARUBY,
-                TvChannel.SZTS,
+                TvChannel.WATERBEAR,
             ),
             calls,
         )

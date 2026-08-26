@@ -25,9 +25,6 @@ enum class TvChannel(
     ),
     STVR_24("stvr-24", "3", "STVR :24", ChannelProvider.STVR, epgIds = mapOf(EpgSourceId.SKYLINK to "6a5461ba82cabcb95db5b344e6440e15", EpgSourceId.IPTV_ORG to "STV_24.cz")),
     STVR_SPORT("stvr-sport", "15", "STVR ŠPORT", ChannelProvider.STVR, epgIds = mapOf(EpgSourceId.SKYLINK to "09fc492d319c8813389e11c167b3a053", EpgSourceId.IPTV_ORG to "RTVSSPORT.cz")),
-    STVR_LIVE_O("stvr-live-o", "4", "LIVE :O", ChannelProvider.STVR),
-    STVR_LIVE("stvr-live", "6", "LIVE STVR", ChannelProvider.STVR),
-    NRSR("nrsr", "5", "LIVE NRSR", ChannelProvider.STVR),
     JOJ("joj", null, "JOJ", ChannelProvider.JOJ, "joj", mapOf(EpgSourceId.SKYLINK to "84a2364ade7443e6d6afe03f9aa2361a", EpgSourceId.IPTV_ORG to "JOJ.cz")),
     JOJ_PLUS("joj-plus", null, "JOJ PLUS", ChannelProvider.JOJ, "plus", mapOf(EpgSourceId.SKYLINK to "2aa59e1b0cb34399f6ffc387e52a437b", EpgSourceId.IPTV_ORG to "JOJPLUS.cz")),
     JOJ_KRIMI("joj-krimi", null, "JOJ KRIMI", ChannelProvider.JOJ, "wau", mapOf(EpgSourceId.SKYLINK to "d4bf459e0c7e39dff6a5dbf3c7c76432", EpgSourceId.IPTV_ORG to "WAU.cz")),
@@ -49,17 +46,13 @@ enum class TvChannel(
     CT_24("ct-24", null, "ČT24", ChannelProvider.CT, "CH_24", mapOf(EpgSourceId.SKYLINK to "d8372cf312342c51a7e7e4506192b1b2", EpgSourceId.IPTV_ORG to "ČT24.cz")),
     CT_SPORT("ct-sport", null, "ČT SPORT", ChannelProvider.CT, "CH_4", mapOf(EpgSourceId.SKYLINK to "1bc1f61784f6d0048e7d53cdb3d257ca", EpgSourceId.IPTV_ORG to "ČTsport.cz")),
     CT_D_ART("ct-d-art", null, "ČT :D/ART", ChannelProvider.CT, epgIds = mapOf(EpgSourceId.SKYLINK to "24cbbb52506f29852ba10e724d82e8d4", EpgSourceId.IPTV_ORG to "ČT:D/ČTart.cz")),
-    TA3("ta3", null, "TA3", ChannelProvider.TA3, epgIds = mapOf(EpgSourceId.SKYLINK to "76ec128b489da6c0e8b34681cba69914", EpgSourceId.IPTV_ORG to "TA3.cz")),
     NOVA_CINEMA("nova-cinema", null, "NOVA CINEMA", ChannelProvider.NOVA, epgIds = mapOf(EpgSourceId.SKYLINK to "67ec56c6158e47151726a025a62a1a29", EpgSourceId.IPTV_ORG to "NOVACINEMA.cz")),
     CNN_PRIMA_NEWS("cnn-prima-news", null, "CNN PRIMA NEWS", ChannelProvider.CNN_PRIMA_NEWS, epgIds = mapOf(EpgSourceId.SKYLINK to "0e08d2e2bbfc45c17e13f8be100c2118", EpgSourceId.IPTV_ORG to "CNNPRIMANEWS.cz")),
-    SZTS("szts", null, "SZTŠ", ChannelProvider.DIRECT, "https://dash2.antik.sk/live/tanecnesutaze/index.m3u8"),
-    WILD_EARTH("wild-earth", null, "WILD EARTH", ChannelProvider.DIRECT, "https://dqga3jatxofgx.cloudfront.net/WildEarth.m3u8"),
     WATERBEAR("waterbear", null, "WATERBEAR", ChannelProvider.DIRECT, "https://waterbear-waterbear-rakuten.amagi.tv/playlist.m3u8"),
     LOVE_NATURE("love-nature", null, "LOVE NATURE", ChannelProvider.DIRECT, "https://aegis-cloudfront-1.tubi.video/6d6d0f24-8445-4b4c-bdf6-44f9e38beaa4/playlist.m3u8", mapOf(EpgSourceId.SKYLINK to "87a9a0429e3edc255adbb8601cfddc0a", EpgSourceId.IPTV_ORG to "LoveNature.cz")),
     GUSTO_TV("gusto-tv", null, "GUSTO TV", ChannelProvider.DIRECT, "https://563f72af.wurl.com/master/f36d25e7e52f1ba8d7e56eb859c636563214f541/UmFrdXRlblRWLWV1X0d1c3RvVFZfSExT/playlist.m3u8"),
     TASTEMADE("tastemade", null, "TASTEMADE", ChannelProvider.DIRECT, "https://tastemade-tdint-rakuten.amagi.tv/playlist.m3u8"),
     TV5MONDE_CHEFS("tv5monde-chefs", null, "TV5MONDE CHEFS", ChannelProvider.DIRECT, "https://tvf-tv5ch.otteravision.com/tvf/tv5ch/tv5ch.m3u8"),
-    BBC_FOOD("bbc-food", null, "BBC FOOD", ChannelProvider.DIRECT, "https://d1e9r0b71zfwk7.cloudfront.net/playlist.m3u8"),
     SVET_NARUBY("svet-naruby", null, "SVET NARUBY", ChannelProvider.SWEET_TV, "3257");
 
     fun next(): TvChannel = entries[(ordinal + 1) % entries.size]
