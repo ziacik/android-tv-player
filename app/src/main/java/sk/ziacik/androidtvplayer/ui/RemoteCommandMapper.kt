@@ -3,6 +3,7 @@ package sk.ziacik.androidtvplayer.ui
 import android.view.KeyEvent
 
 enum class FocusedControl {
+    TIMELINE,
     PLAY_PAUSE,
     LIVE,
 }
@@ -18,6 +19,7 @@ sealed interface RemoteCommand {
     data object GoLive : RemoteCommand
     data object FocusPlayPause : RemoteCommand
     data object FocusLive : RemoteCommand
+    data object FocusTimeline : RemoteCommand
     data object HideOverlay : RemoteCommand
     data object Exit : RemoteCommand
     data object Ignore : RemoteCommand
@@ -38,6 +40,7 @@ fun RemoteCommand.overlayTimeoutMs(): Long? = when (this) {
     RemoteCommand.GoLive,
     RemoteCommand.FocusPlayPause,
     RemoteCommand.FocusLive,
+    RemoteCommand.FocusTimeline,
     -> OverlayController.NORMAL_TIMEOUT_MS
     else -> null
 }
@@ -57,15 +60,34 @@ class RemoteCommandMapper {
             KeyEvent.KEYCODE_CHANNEL_DOWN,
             KeyEvent.KEYCODE_PAGE_DOWN,
             -> RemoteCommand.ChannelDown
-            KeyEvent.KEYCODE_DPAD_LEFT -> RemoteCommand.SeekBack
-            KeyEvent.KEYCODE_DPAD_RIGHT -> RemoteCommand.SeekForward
-            KeyEvent.KEYCODE_DPAD_UP -> RemoteCommand.FocusPlayPause
-            KeyEvent.KEYCODE_DPAD_DOWN -> RemoteCommand.FocusLive
+            KeyEvent.KEYCODE_DPAD_LEFT -> when (focusedControl) {
+                FocusedControl.TIMELINE -> RemoteCommand.SeekBack
+                FocusedControl.LIVE -> RemoteCommand.FocusPlayPause
+                FocusedControl.PLAY_PAUSE -> RemoteCommand.FocusPlayPause
+            }
+            KeyEvent.KEYCODE_DPAD_RIGHT -> when (focusedControl) {
+                FocusedControl.TIMELINE -> RemoteCommand.SeekForward
+                FocusedControl.PLAY_PAUSE -> RemoteCommand.FocusLive
+                FocusedControl.LIVE -> RemoteCommand.FocusLive
+            }
+            KeyEvent.KEYCODE_DPAD_UP -> when (focusedControl) {
+                FocusedControl.TIMELINE -> RemoteCommand.FocusTimeline
+                FocusedControl.PLAY_PAUSE,
+                FocusedControl.LIVE,
+                -> RemoteCommand.FocusTimeline
+            }
+            KeyEvent.KEYCODE_DPAD_DOWN -> when (focusedControl) {
+                FocusedControl.TIMELINE -> RemoteCommand.FocusPlayPause
+                FocusedControl.PLAY_PAUSE,
+                FocusedControl.LIVE,
+                -> RemoteCommand.FocusLive
+            }
             KeyEvent.KEYCODE_DPAD_CENTER,
             KeyEvent.KEYCODE_ENTER,
             KeyEvent.KEYCODE_NUMPAD_ENTER,
             -> when {
                 !overlayVisible -> RemoteCommand.ShowOverlay
+                focusedControl == FocusedControl.TIMELINE -> RemoteCommand.HideOverlay
                 focusedControl == FocusedControl.LIVE -> RemoteCommand.GoLive
                 else -> RemoteCommand.TogglePlayback
             }

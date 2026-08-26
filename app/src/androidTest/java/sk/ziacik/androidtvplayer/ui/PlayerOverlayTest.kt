@@ -65,6 +65,10 @@ class PlayerOverlayTest {
         compose.onNodeWithText("10 ↷").assertIsDisplayed()
         compose.onNodeWithText("NAŽIVO").assertIsDisplayed()
         compose.onNodeWithTag("live-window-progress").assertIsDisplayed()
+        compose.onNodeWithTag("current-programme-time").assertIsDisplayed()
+        compose.onNodeWithTag("programme-progress-marker").assertIsDisplayed()
+        compose.onNodeWithTag("programme-start-boundary").assertIsDisplayed()
+        compose.onNodeWithTag("programme-end-boundary").assertIsDisplayed()
     }
 
     @Test

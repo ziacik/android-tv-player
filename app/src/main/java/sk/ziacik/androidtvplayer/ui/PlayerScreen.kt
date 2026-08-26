@@ -62,7 +62,7 @@ fun PlayerScreen(
 ) {
     val state by controller.state.collectAsState()
     val overlayVisible by overlayController.visible.collectAsState()
-    var focusedControl by remember { mutableStateOf(FocusedControl.PLAY_PAUSE) }
+    var focusedControl by remember { mutableStateOf(FocusedControl.TIMELINE) }
     val focusRequester = remember { FocusRequester() }
     val commandMapper = remember { RemoteCommandMapper() }
     val numericInputScope = rememberCoroutineScope()
@@ -129,7 +129,9 @@ fun PlayerScreen(
                     RemoteCommand.ChannelDown -> {
                         controller.channelDown()
                     }
-                    RemoteCommand.ShowOverlay -> Unit
+                    RemoteCommand.ShowOverlay -> {
+                        focusedControl = FocusedControl.TIMELINE
+                    }
                     RemoteCommand.SeekBack -> {
                         controller.seekBack()
                     }
@@ -147,6 +149,9 @@ fun PlayerScreen(
                     }
                     RemoteCommand.FocusLive -> {
                         focusedControl = FocusedControl.LIVE
+                    }
+                    RemoteCommand.FocusTimeline -> {
+                        focusedControl = FocusedControl.TIMELINE
                     }
                     RemoteCommand.HideOverlay -> overlayController.hide()
                     RemoteCommand.Exit -> onExit()
@@ -230,6 +235,7 @@ internal fun PlayerStateLayer(
             PlayerOverlay(
                 model = PlayerOverlayModel.from(current, System.currentTimeMillis()),
                 focusedControl = focusedControl,
+                timelineFocused = focusedControl == FocusedControl.TIMELINE,
                 formatTime = formatTime,
                 modifier = modifier,
             )

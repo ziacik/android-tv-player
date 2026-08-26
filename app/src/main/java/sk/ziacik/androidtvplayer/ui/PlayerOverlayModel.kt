@@ -27,8 +27,9 @@ data class PlayerOverlayModel(
                 startsAtMs != null &&
                 endsAtMs != null &&
                 endsAtMs > startsAtMs
+            val timelineStartMs = startsAtMs?.coerceAtMost(nowMs)
             val progress = if (hasProgrammeInterval) {
-                ((nowMs - startsAtMs).toDouble() / (endsAtMs - startsAtMs).toDouble())
+                ((nowMs - timelineStartMs!!).toDouble() / (endsAtMs - timelineStartMs).toDouble())
                     .coerceIn(0.0, 1.0)
                     .toFloat()
             } else {
@@ -44,7 +45,7 @@ data class PlayerOverlayModel(
                 channelLabel = "${state.channel.ordinal + 1} · ${state.channel.displayName} · NAŽIVO",
                 programTitle = state.program.title,
                 progress = progress,
-                programmeStartMs = startsAtMs.takeIf { hasProgrammeInterval },
+                programmeStartMs = timelineStartMs.takeIf { hasProgrammeInterval },
                 programmeNowMs = nowMs.takeIf { hasProgrammeInterval },
                 programmeEndMs = endsAtMs.takeIf { hasProgrammeInterval },
                 isLive = isLive,

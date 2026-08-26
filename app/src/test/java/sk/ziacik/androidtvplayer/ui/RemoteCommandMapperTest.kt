@@ -66,14 +66,22 @@ class RemoteCommandMapperTest {
     }
 
     @Test
-    fun `left and right always seek directly`() {
+    fun `timeline uses left and right to seek while controls navigate horizontally`() {
         assertEquals(
             RemoteCommand.SeekBack,
-            mapper.map(KeyEvent.KEYCODE_DPAD_LEFT, false, FocusedControl.PLAY_PAUSE),
+            mapper.map(KeyEvent.KEYCODE_DPAD_LEFT, true, FocusedControl.TIMELINE),
         )
         assertEquals(
             RemoteCommand.SeekForward,
-            mapper.map(KeyEvent.KEYCODE_DPAD_RIGHT, true, FocusedControl.LIVE),
+            mapper.map(KeyEvent.KEYCODE_DPAD_RIGHT, true, FocusedControl.TIMELINE),
+        )
+        assertEquals(
+            RemoteCommand.FocusLive,
+            mapper.map(KeyEvent.KEYCODE_DPAD_RIGHT, true, FocusedControl.PLAY_PAUSE),
+        )
+        assertEquals(
+            RemoteCommand.FocusPlayPause,
+            mapper.map(KeyEvent.KEYCODE_DPAD_LEFT, true, FocusedControl.LIVE),
         )
     }
 
@@ -88,6 +96,10 @@ class RemoteCommandMapperTest {
     @Test
     fun `center activates focused visible control`() {
         assertEquals(
+            RemoteCommand.HideOverlay,
+            mapper.map(KeyEvent.KEYCODE_DPAD_CENTER, true, FocusedControl.TIMELINE),
+        )
+        assertEquals(
             RemoteCommand.TogglePlayback,
             mapper.map(KeyEvent.KEYCODE_DPAD_CENTER, true, FocusedControl.PLAY_PAUSE),
         )
@@ -98,14 +110,18 @@ class RemoteCommandMapperTest {
     }
 
     @Test
-    fun `up and down select play pause and live`() {
+    fun `up and down move between the timeline and playback controls`() {
         assertEquals(
-            RemoteCommand.FocusPlayPause,
+            RemoteCommand.FocusTimeline,
             mapper.map(KeyEvent.KEYCODE_DPAD_UP, true, FocusedControl.LIVE),
         )
         assertEquals(
-            RemoteCommand.FocusLive,
-            mapper.map(KeyEvent.KEYCODE_DPAD_DOWN, true, FocusedControl.PLAY_PAUSE),
+            RemoteCommand.FocusPlayPause,
+            mapper.map(KeyEvent.KEYCODE_DPAD_DOWN, true, FocusedControl.TIMELINE),
+        )
+        assertEquals(
+            RemoteCommand.FocusTimeline,
+            mapper.map(KeyEvent.KEYCODE_DPAD_UP, true, FocusedControl.PLAY_PAUSE),
         )
     }
 

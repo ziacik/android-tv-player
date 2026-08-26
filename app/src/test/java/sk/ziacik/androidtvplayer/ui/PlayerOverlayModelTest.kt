@@ -83,6 +83,21 @@ class PlayerOverlayModelTest {
     }
 
     @Test
+    fun `future programme starts its timeline at the current time`() {
+        val model = PlayerOverlayModel.from(
+            ready(position = 0L, duration = null, offset = null).copy(
+                program = ProgramMetadata("Nasledujúci program", 100_000L, 160_000L, true),
+            ),
+            nowMs = 40_000L,
+        )
+
+        assertEquals(0f, model.progress!!, 0.0001f)
+        assertEquals(40_000L, model.programmeStartMs)
+        assertEquals(40_000L, model.programmeNowMs)
+        assertEquals(160_000L, model.programmeEndMs)
+    }
+
+    @Test
     fun `programme timeline stays active for a non-seekable stream`() {
         val model = PlayerOverlayModel.from(
             ready(

@@ -1,6 +1,7 @@
 package sk.ziacik.androidtvplayer.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -18,10 +19,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,7 +27,6 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -47,6 +43,7 @@ private val LiveRed = Color(0xFFFF3347)
 fun PlayerOverlay(
     model: PlayerOverlayModel,
     focusedControl: FocusedControl,
+    timelineFocused: Boolean = false,
     formatTime: (Long) -> String,
     modifier: Modifier = Modifier,
 ) {
@@ -91,6 +88,7 @@ fun PlayerOverlay(
                     programmeNowMs = model.programmeNowMs,
                     programmeEndMs = model.programmeEndMs,
                     formatTime = formatTime,
+                    focused = timelineFocused,
                 )
                 Spacer(Modifier.height(4.dp))
             }
@@ -111,6 +109,7 @@ private fun LiveTimeline(
     programmeNowMs: Long?,
     programmeEndMs: Long?,
     formatTime: (Long) -> String,
+    focused: Boolean,
 ) {
     val clampedProgress = progress?.coerceIn(0f, 1f) ?: return
     val startMs = programmeStartMs ?: return
@@ -121,51 +120,70 @@ private fun LiveTimeline(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("live-window-progress"),
-        verticalArrangement = Arrangement.spacedBy(3.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(30.dp),
+                .height(50.dp),
             contentAlignment = Alignment.CenterStart,
         ) {
-            val density = LocalDensity.current
-            var currentTimeWidthPx by remember(nowMs) { mutableStateOf(0) }
-            val markerSize = 8.dp
+            val currentTimePillWidth = 52.dp
+            val markerSize = if (focused) 10.dp else 8.dp
+            val trackHeight = if (focused) 6.dp else 4.dp
             val markerOffset = (maxWidth - markerSize) * clampedProgress
-            val markerCenterPx = with(density) {
-                markerOffset.toPx() + markerSize.toPx() / 2f
-            }
-            val labelOffsetPx = (markerCenterPx - currentTimeWidthPx / 2f)
-                .coerceIn(
-                    minimumValue = 0f,
-                    maximumValue = with(density) {
-                        (maxWidth.toPx() - currentTimeWidthPx).coerceAtLeast(0f)
-                    },
-                )
+            val currentTimeOffset = (markerOffset + markerSize / 2 - currentTimePillWidth / 2)
+                .coerceIn(0.dp, (maxWidth - currentTimePillWidth).coerceAtLeast(0.dp))
 
             Text(
-                text = formatTime(nowMs),
-                modifier = Modifier.offset(x = with(density) { labelOffsetPx.toDp() })
-                    .align(Alignment.TopStart),
-                color = Color.White,
+                text = formatTime(startMs),
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .testTag("programme-start-boundary"),
+                color = MutedWhite,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
-                onTextLayout = { currentTimeWidthPx = it.size.width },
             )
+            Text(
+                text = formatTime(endMs),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .testTag("programme-end-boundary"),
+                color = MutedWhite,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+            )
+            Box(
+                modifier = Modifier
+                    .offset(x = currentTimeOffset, y = (-4).dp)
+                    .align(Alignment.TopStart)
+                    .width(currentTimePillWidth)
+                    .height(24.dp)
+                    .background(Color.Black.copy(alpha = 0.56f), RoundedCornerShape(7.dp))
+                    .border(1.dp, Color.White.copy(alpha = 0.20f), RoundedCornerShape(7.dp))
+                    .testTag("current-programme-time"),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = formatTime(nowMs),
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
                     .fillMaxWidth()
-                    .height(3.dp)
+                    .height(trackHeight)
                     .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.26f)),
+                    .background(Color.White.copy(alpha = 0.30f)),
             )
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
                     .fillMaxWidth(clampedProgress)
-                    .height(3.dp)
+                    .height(trackHeight)
                     .clip(CircleShape)
                     .background(Color.White.copy(alpha = 0.92f)),
             )
@@ -174,24 +192,9 @@ private fun LiveTimeline(
                     .align(Alignment.CenterStart)
                     .offset(x = markerOffset)
                     .size(markerSize)
-                    .shadow(5.dp, CircleShape)
-                    .background(Color.White, CircleShape),
-            )
-        }
-
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Text(
-                text = formatTime(startMs),
-                color = MutedWhite,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-            )
-            Spacer(Modifier.weight(1f))
-            Text(
-                text = formatTime(endMs),
-                color = MutedWhite,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
+                    .shadow(if (focused) 6.dp else 4.dp, CircleShape)
+                    .background(Color.White, CircleShape)
+                    .testTag("programme-progress-marker"),
             )
         }
     }
