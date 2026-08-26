@@ -59,7 +59,8 @@ enum class TvChannel(
     GUSTO_TV("gusto-tv", null, "GUSTO TV", ChannelProvider.DIRECT, "https://563f72af.wurl.com/master/f36d25e7e52f1ba8d7e56eb859c636563214f541/UmFrdXRlblRWLWV1X0d1c3RvVFZfSExT/playlist.m3u8"),
     TASTEMADE("tastemade", null, "TASTEMADE", ChannelProvider.DIRECT, "https://tastemade-tdint-rakuten.amagi.tv/playlist.m3u8"),
     TV5MONDE_CHEFS("tv5monde-chefs", null, "TV5MONDE CHEFS", ChannelProvider.DIRECT, "https://tvf-tv5ch.otteravision.com/tvf/tv5ch/tv5ch.m3u8"),
-    BBC_FOOD("bbc-food", null, "BBC FOOD", ChannelProvider.DIRECT, "https://d1e9r0b71zfwk7.cloudfront.net/playlist.m3u8");
+    BBC_FOOD("bbc-food", null, "BBC FOOD", ChannelProvider.DIRECT, "https://d1e9r0b71zfwk7.cloudfront.net/playlist.m3u8"),
+    SVET_NARUBY("svet-naruby", null, "SVET NARUBY", ChannelProvider.SWEET_TV, "3257");
 
     fun next(): TvChannel = entries[(ordinal + 1) % entries.size]
 
@@ -82,5 +83,6 @@ enum class ChannelProvider {
     TA3,
     NOVA,
     CNN_PRIMA_NEWS,
+    SWEET_TV,
     DIRECT,
 }

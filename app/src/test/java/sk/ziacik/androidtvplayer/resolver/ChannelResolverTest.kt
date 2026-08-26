@@ -23,6 +23,7 @@ class ChannelResolverTest {
             resolveTa3 = { channel -> calls += channel; playable(channel) },
             resolveNova = { channel -> calls += channel; playable(channel) },
             resolveCnnPrimaNews = { channel -> calls += channel; playable(channel) },
+            resolveSweetTv = { channel -> calls += channel; playable(channel) },
             resolveDirect = { channel -> calls += channel; playable(channel) },
         )
 
@@ -33,6 +34,7 @@ class ChannelResolverTest {
         resolver.resolve(TvChannel.TA3)
         resolver.resolve(TvChannel.NOVA_CINEMA)
         resolver.resolve(TvChannel.CNN_PRIMA_NEWS)
+        resolver.resolve(TvChannel.SVET_NARUBY)
         resolver.resolve(TvChannel.SZTS)
 
         assertEquals(
@@ -44,6 +46,7 @@ class ChannelResolverTest {
                 TvChannel.TA3,
                 TvChannel.NOVA_CINEMA,
                 TvChannel.CNN_PRIMA_NEWS,
+                TvChannel.SVET_NARUBY,
                 TvChannel.SZTS,
             ),
             calls,

@@ -31,7 +31,7 @@ class TvChannelTest {
             listOf(TvChannel.JEDNOTKA, TvChannel.DVOJKA, TvChannel.MARKIZA),
             TvChannel.entries.take(3),
         )
-        assertEquals(40, TvChannel.entries.size)
+        assertEquals(41, TvChannel.entries.size)
         assertEquals("1", TvChannel.JEDNOTKA.stvrId)
         assertEquals("2", TvChannel.DVOJKA.stvrId)
         assertEquals("JEDNOTKA", TvChannel.JEDNOTKA.displayName)
@@ -46,8 +46,9 @@ class TvChannelTest {
         assertEquals(TvChannel.DVOJKA, TvChannel.JEDNOTKA.next())
         assertEquals(TvChannel.MARKIZA, TvChannel.DVOJKA.next())
         assertEquals(TvChannel.STVR_24, TvChannel.MARKIZA.next())
-        assertEquals(TvChannel.JEDNOTKA, TvChannel.BBC_FOOD.next())
-        assertEquals(TvChannel.BBC_FOOD, TvChannel.JEDNOTKA.previous())
+        assertEquals(TvChannel.SVET_NARUBY, TvChannel.BBC_FOOD.next())
+        assertEquals(TvChannel.JEDNOTKA, TvChannel.SVET_NARUBY.next())
+        assertEquals(TvChannel.SVET_NARUBY, TvChannel.JEDNOTKA.previous())
         assertEquals(TvChannel.MARKIZA, TvChannel.STVR_24.previous())
     }
 

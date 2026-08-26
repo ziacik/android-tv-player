@@ -11,6 +11,7 @@ class ChannelResolver(
     private val resolveTa3: suspend (TvChannel) -> StreamResolution,
     private val resolveNova: suspend (TvChannel) -> StreamResolution,
     private val resolveCnnPrimaNews: suspend (TvChannel) -> StreamResolution,
+    private val resolveSweetTv: suspend (TvChannel) -> StreamResolution,
     private val resolveDirect: suspend (TvChannel) -> StreamResolution,
 ) {
     suspend fun resolve(channel: TvChannel): StreamResolution = when (channel.provider) {
@@ -21,6 +22,7 @@ class ChannelResolver(
         ChannelProvider.TA3 -> resolveTa3(channel)
         ChannelProvider.NOVA -> resolveNova(channel)
         ChannelProvider.CNN_PRIMA_NEWS -> resolveCnnPrimaNews(channel)
+        ChannelProvider.SWEET_TV -> resolveSweetTv(channel)
         ChannelProvider.DIRECT -> resolveDirect(channel)
     }
 }
