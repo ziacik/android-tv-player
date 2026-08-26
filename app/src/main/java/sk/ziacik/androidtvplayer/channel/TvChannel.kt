@@ -53,6 +53,7 @@ enum class TvChannel(
     GUSTO_TV("gusto-tv", null, "GUSTO TV", ChannelProvider.DIRECT, "https://563f72af.wurl.com/master/f36d25e7e52f1ba8d7e56eb859c636563214f541/UmFrdXRlblRWLWV1X0d1c3RvVFZfSExT/playlist.m3u8"),
     TASTEMADE("tastemade", null, "TASTEMADE", ChannelProvider.DIRECT, "https://tastemade-tdint-rakuten.amagi.tv/playlist.m3u8"),
     TV5MONDE_CHEFS("tv5monde-chefs", null, "TV5MONDE CHEFS", ChannelProvider.DIRECT, "https://tvf-tv5ch.otteravision.com/tvf/tv5ch/tv5ch.m3u8"),
+    PAPRIKA_TV("paprika-tv", null, "PAPRIKA TV", ChannelProvider.DIRECT, "http://185.188.188.237:5000/live/paprika/playlist.m3u8"),
     SVET_NARUBY("svet-naruby", null, "SVET NARUBY", ChannelProvider.SWEET_TV, "3257");
 
     fun next(): TvChannel = entries[(ordinal + 1) % entries.size]
