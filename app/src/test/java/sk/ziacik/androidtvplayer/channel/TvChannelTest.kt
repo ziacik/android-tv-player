@@ -29,7 +29,7 @@ class TvChannelTest {
             listOf(TvChannel.JEDNOTKA, TvChannel.DVOJKA, TvChannel.MARKIZA),
             TvChannel.entries.take(3),
         )
-        assertEquals(34, TvChannel.entries.size)
+        assertEquals(35, TvChannel.entries.size)
         assertEquals(
             emptySet<String>(),
             TvChannel.entries
@@ -46,13 +46,24 @@ class TvChannelTest {
     }
 
     @Test
+    fun `Paprika TV uses the supplied direct HLS stream`() {
+        assertEquals("paprika-tv", TvChannel.PAPRIKA_TV.storageKey)
+        assertEquals("PAPRIKA TV", TvChannel.PAPRIKA_TV.displayName)
+        assertEquals(ChannelProvider.DIRECT, TvChannel.PAPRIKA_TV.provider)
+        assertEquals("http://185.188.188.237:5000/live/paprika/playlist.m3u8", TvChannel.PAPRIKA_TV.providerValue)
+    }
+
+    @Test
     fun `next and previous wrap around the channel catalogue`() {
         assertEquals(TvChannel.DVOJKA, TvChannel.JEDNOTKA.next())
         assertEquals(TvChannel.MARKIZA, TvChannel.DVOJKA.next())
         assertEquals(TvChannel.STVR_24, TvChannel.MARKIZA.next())
         assertEquals(TvChannel.TV5MONDE_CHEFS, TvChannel.TASTEMADE.next())
+        assertEquals(TvChannel.PAPRIKA_TV, TvChannel.TV5MONDE_CHEFS.next())
+        assertEquals(TvChannel.SVET_NARUBY, TvChannel.PAPRIKA_TV.next())
         assertEquals(TvChannel.JEDNOTKA, TvChannel.SVET_NARUBY.next())
         assertEquals(TvChannel.SVET_NARUBY, TvChannel.JEDNOTKA.previous())
+        assertEquals(TvChannel.PAPRIKA_TV, TvChannel.SVET_NARUBY.previous())
         assertEquals(TvChannel.MARKIZA, TvChannel.STVR_24.previous())
     }
 
@@ -63,6 +74,7 @@ class TvChannelTest {
         assertEquals(TvChannel.JEDNOTKA, TvChannel.fromStorageKey("jednotka"))
         assertEquals(TvChannel.DVOJKA, TvChannel.fromStorageKey("dvojka"))
         assertEquals(TvChannel.MARKIZA, TvChannel.fromStorageKey("markiza"))
+        assertEquals(TvChannel.PAPRIKA_TV, TvChannel.fromStorageKey("paprika-tv"))
         assertEquals(TvChannel.JEDNOTKA, TvChannel.fromStorageKey("invalid"))
         assertEquals(TvChannel.JEDNOTKA, TvChannel.fromStorageKey(null))
     }
