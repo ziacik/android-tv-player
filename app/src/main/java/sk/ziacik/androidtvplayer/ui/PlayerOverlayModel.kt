@@ -1,13 +1,14 @@
 package sk.ziacik.androidtvplayer.ui
 
-import java.util.Locale
 import sk.ziacik.androidtvplayer.player.PlayerUiState
 
 data class PlayerOverlayModel(
     val channelLabel: String,
     val programTitle: String,
     val progress: Float?,
-    val delayText: String?,
+    val programmeStartMs: Long?,
+    val programmeNowMs: Long?,
+    val programmeEndMs: Long?,
     val isLive: Boolean,
     val isPlaying: Boolean,
     val isSeekable: Boolean,
@@ -20,14 +21,13 @@ data class PlayerOverlayModel(
         ): PlayerOverlayModel {
             val playback = state.playback
             val duration = playback.durationMs
-            val validWindow = playback.isSeekable && duration != null && duration > 0L
             val startsAtMs = state.program.startsAtMs
             val endsAtMs = state.program.endsAtMs
-            val progress = if (
+            val hasProgrammeInterval =
                 startsAtMs != null &&
                 endsAtMs != null &&
                 endsAtMs > startsAtMs
-            ) {
+            val progress = if (hasProgrammeInterval) {
                 ((nowMs - startsAtMs).toDouble() / (endsAtMs - startsAtMs).toDouble())
                     .coerceIn(0.0, 1.0)
                     .toFloat()
@@ -41,35 +41,17 @@ data class PlayerOverlayModel(
             val isLive = offset != null && offset <= LIVE_THRESHOLD_MS
 
             return PlayerOverlayModel(
-                channelLabel = "${state.channel.displayName} · NAŽIVO",
+                channelLabel = "${state.channel.ordinal + 1} · ${state.channel.displayName} · NAŽIVO",
                 programTitle = state.program.title,
                 progress = progress,
-                delayText = offset
-                    ?.takeUnless { isLive || !validWindow }
-                    ?.let(::formatDelay),
+                programmeStartMs = startsAtMs.takeIf { hasProgrammeInterval },
+                programmeNowMs = nowMs.takeIf { hasProgrammeInterval },
+                programmeEndMs = endsAtMs.takeIf { hasProgrammeInterval },
                 isLive = isLive,
                 isPlaying = playback.isPlaying,
                 isSeekable = playback.isSeekable,
-                liveActionText = if (isLive) "NAŽIVO" else "NA LIVE",
+                liveActionText = "NAŽIVO",
             )
-        }
-
-        private fun formatDelay(offsetMs: Long): String {
-            val totalSeconds = offsetMs / 1_000L
-            val hours = totalSeconds / 3_600L
-            val minutes = (totalSeconds % 3_600L) / 60L
-            val seconds = totalSeconds % 60L
-            return if (hours > 0L) {
-                String.format(
-                    Locale.ROOT,
-                    "−%d:%02d:%02d",
-                    hours,
-                    minutes,
-                    seconds,
-                )
-            } else {
-                String.format(Locale.ROOT, "−%d:%02d", minutes, seconds)
-            }
         }
 
         private const val LIVE_THRESHOLD_MS = 10_000L

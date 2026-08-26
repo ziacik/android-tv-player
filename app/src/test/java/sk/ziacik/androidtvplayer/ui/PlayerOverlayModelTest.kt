@@ -35,20 +35,22 @@ class PlayerOverlayModelTest {
             nowMs = 40_000L,
         )
 
-        assertEquals("DVOJKA · NAŽIVO", model.channelLabel)
+        assertEquals("2 · DVOJKA · NAŽIVO", model.channelLabel)
     }
 
     @Test
-    fun `uses programme progress and live offset`() {
+    fun `uses programme progress and exposes its EPG times`() {
         val model = PlayerOverlayModel.from(
             ready(position = 40_000L, duration = 100_000L, offset = 60_000L),
             nowMs = 40_000L,
         )
 
         assertEquals(0.4f, model.progress!!, 0.0001f)
-        assertEquals("−1:00", model.delayText)
+        assertEquals(0L, model.programmeStartMs)
+        assertEquals(40_000L, model.programmeNowMs)
+        assertEquals(100_000L, model.programmeEndMs)
         assertFalse(model.isLive)
-        assertEquals("NA LIVE", model.liveActionText)
+        assertEquals("NAŽIVO", model.liveActionText)
     }
 
     @Test
@@ -59,18 +61,7 @@ class PlayerOverlayModelTest {
         )
 
         assertTrue(model.isLive)
-        assertNull(model.delayText)
         assertEquals("NAŽIVO", model.liveActionText)
-    }
-
-    @Test
-    fun `falls back to duration minus position`() {
-        val model = PlayerOverlayModel.from(
-            ready(position = 3_661_000L, duration = 7_200_000L, offset = null),
-            nowMs = 40_000L,
-        )
-
-        assertEquals("−58:59", model.delayText)
     }
 
     @Test
@@ -104,22 +95,8 @@ class PlayerOverlayModelTest {
         )
 
         assertEquals(0.4f, model.progress!!, 0.0001f)
-        assertNull(model.delayText)
+        assertEquals(0L, model.programmeStartMs)
         assertFalse(model.isSeekable)
-    }
-
-    @Test
-    fun `hour delay uses hour minute second format`() {
-        val model = PlayerOverlayModel.from(
-            ready(
-                position = 1_000L,
-                duration = 3_662_000L,
-                offset = 3_661_000L,
-            ),
-            nowMs = 40_000L,
-        )
-
-        assertEquals("−1:01:01", model.delayText)
     }
 
     @Test
@@ -152,7 +129,12 @@ class PlayerOverlayModelTest {
 
         assertNull(missing.progress)
         assertNull(reversed.progress)
-        assertEquals("−1:00", missing.delayText)
+        assertNull(missing.programmeStartMs)
+        assertNull(missing.programmeNowMs)
+        assertNull(missing.programmeEndMs)
+        assertNull(reversed.programmeStartMs)
+        assertNull(reversed.programmeNowMs)
+        assertNull(reversed.programmeEndMs)
     }
 
     private fun ready(

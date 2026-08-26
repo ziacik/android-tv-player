@@ -18,6 +18,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,6 +30,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -42,6 +47,7 @@ private val LiveRed = Color(0xFFFF3347)
 fun PlayerOverlay(
     model: PlayerOverlayModel,
     focusedControl: FocusedControl,
+    formatTime: (Long) -> String,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -81,7 +87,10 @@ fun PlayerOverlay(
                 Spacer(Modifier.height(3.dp))
                 LiveTimeline(
                     progress = model.progress,
-                    delayText = model.delayText,
+                    programmeStartMs = model.programmeStartMs,
+                    programmeNowMs = model.programmeNowMs,
+                    programmeEndMs = model.programmeEndMs,
+                    formatTime = formatTime,
                 )
                 Spacer(Modifier.height(4.dp))
             }
@@ -98,60 +107,91 @@ internal fun shouldShowProgramTimeline(progress: Float?): Boolean = progress != 
 @Composable
 private fun LiveTimeline(
     progress: Float?,
-    delayText: String?,
+    programmeStartMs: Long?,
+    programmeNowMs: Long?,
+    programmeEndMs: Long?,
+    formatTime: (Long) -> String,
 ) {
+    val clampedProgress = progress?.coerceIn(0f, 1f) ?: return
+    val startMs = programmeStartMs ?: return
+    val nowMs = programmeNowMs ?: return
+    val endMs = programmeEndMs ?: return
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("live-window-progress"),
-        verticalArrangement = Arrangement.spacedBy(7.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(8.dp),
+                .height(30.dp),
             contentAlignment = Alignment.CenterStart,
         ) {
+            val density = LocalDensity.current
+            var currentTimeWidthPx by remember(nowMs) { mutableStateOf(0) }
+            val markerSize = 8.dp
+            val markerOffset = (maxWidth - markerSize) * clampedProgress
+            val markerCenterPx = with(density) {
+                markerOffset.toPx() + markerSize.toPx() / 2f
+            }
+            val labelOffsetPx = (markerCenterPx - currentTimeWidthPx / 2f)
+                .coerceIn(
+                    minimumValue = 0f,
+                    maximumValue = with(density) {
+                        (maxWidth.toPx() - currentTimeWidthPx).coerceAtLeast(0f)
+                    },
+                )
+
+            Text(
+                text = formatTime(nowMs),
+                modifier = Modifier.offset(x = with(density) { labelOffsetPx.toDp() })
+                    .align(Alignment.TopStart),
+                color = Color.White,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                onTextLayout = { currentTimeWidthPx = it.size.width },
+            )
             Box(
                 modifier = Modifier
+                    .align(Alignment.CenterStart)
                     .fillMaxWidth()
                     .height(3.dp)
                     .clip(CircleShape)
                     .background(Color.White.copy(alpha = 0.26f)),
             )
-            if (progress != null) {
-                val clampedProgress = progress.coerceIn(0f, 1f)
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(clampedProgress)
-                        .height(3.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.92f)),
-                )
-                Box(
-                    modifier = Modifier
-                        .offset(x = (maxWidth - 8.dp) * clampedProgress)
-                        .size(8.dp)
-                        .shadow(5.dp, CircleShape)
-                        .background(Color.White, CircleShape),
-                )
-            }
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .fillMaxWidth(clampedProgress)
+                    .height(3.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.92f)),
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .offset(x = markerOffset)
+                    .size(markerSize)
+                    .shadow(5.dp, CircleShape)
+                    .background(Color.White, CircleShape),
+            )
         }
 
         Row(modifier = Modifier.fillMaxWidth()) {
             Text(
-                text = delayText.orEmpty(),
+                text = formatTime(startMs),
                 color = MutedWhite,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
             )
             Spacer(Modifier.weight(1f))
             Text(
-                text = "LIVE",
+                text = formatTime(endMs),
                 color = MutedWhite,
                 fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.8.sp,
+                fontWeight = FontWeight.Medium,
             )
         }
     }

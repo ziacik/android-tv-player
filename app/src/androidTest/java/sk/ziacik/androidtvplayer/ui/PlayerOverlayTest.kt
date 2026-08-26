@@ -33,26 +33,37 @@ class PlayerOverlayTest {
             AndroidTvPlayerTheme {
                 PlayerOverlay(
                     model = PlayerOverlayModel(
-                        channelLabel = "JEDNOTKA · NAŽIVO",
+                        channelLabel = "1 · JEDNOTKA · NAŽIVO",
                         programTitle = "Večerný program",
                         progress = 0.4f,
-                        delayText = "−1:00",
+                        programmeStartMs = 1_000L,
+                        programmeNowMs = 2_000L,
+                        programmeEndMs = 3_000L,
                         isLive = false,
                         isPlaying = true,
                         isSeekable = true,
-                        liveActionText = "NA LIVE",
+                        liveActionText = "NAŽIVO",
                     ),
                     focusedControl = FocusedControl.PLAY_PAUSE,
+                    formatTime = { milliseconds ->
+                        mapOf(
+                            1_000L to "20:15",
+                            2_000L to "20:42",
+                            3_000L to "21:20",
+                        ).getValue(milliseconds)
+                    },
                 )
             }
         }
 
-        compose.onNodeWithText("JEDNOTKA · NAŽIVO").assertIsDisplayed()
+        compose.onNodeWithText("1 · JEDNOTKA · NAŽIVO").assertIsDisplayed()
         compose.onNodeWithText("Večerný program").assertIsDisplayed()
-        compose.onNodeWithText("−1:00").assertIsDisplayed()
+        compose.onNodeWithText("20:15").assertIsDisplayed()
+        compose.onNodeWithText("20:42").assertIsDisplayed()
+        compose.onNodeWithText("21:20").assertIsDisplayed()
         compose.onNodeWithText("↶ 10").assertIsDisplayed()
         compose.onNodeWithText("10 ↷").assertIsDisplayed()
-        compose.onNodeWithText("NA LIVE").assertIsDisplayed()
+        compose.onNodeWithText("NAŽIVO").assertIsDisplayed()
         compose.onNodeWithTag("live-window-progress").assertIsDisplayed()
     }
 
@@ -102,7 +113,7 @@ class PlayerOverlayTest {
             }
         }
 
-        compose.onNodeWithText("DVOJKA · NAŽIVO").assertIsDisplayed()
+        compose.onNodeWithText("2 · DVOJKA · NAŽIVO").assertIsDisplayed()
         compose.onNodeWithText("Večerný program").assertIsDisplayed()
     }
 

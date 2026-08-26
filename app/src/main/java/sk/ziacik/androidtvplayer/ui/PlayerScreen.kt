@@ -230,6 +230,7 @@ internal fun PlayerStateLayer(
             PlayerOverlay(
                 model = PlayerOverlayModel.from(current, System.currentTimeMillis()),
                 focusedControl = focusedControl,
+                formatTime = formatTime,
                 modifier = modifier,
             )
         }
