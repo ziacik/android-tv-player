@@ -9,6 +9,7 @@ class TvChannelTest {
         assertEquals("336e46bf4276e77a716e494c6285d5db", TvChannel.MARKIZA.epgIds[EpgSourceId.SKYLINK])
         assertEquals("84a2364ade7443e6d6afe03f9aa2361a", TvChannel.JOJ.epgIds[EpgSourceId.SKYLINK])
         assertEquals("MARKÍZA.cz", TvChannel.MARKIZA.epgIds[EpgSourceId.IPTV_ORG])
+        assertEquals("ČT:D/ČTart.cz", TvChannel.CT_D_ART.epgIds[EpgSourceId.IPTV_ORG])
         assertEquals("87a9a0429e3edc255adbb8601cfddc0a", TvChannel.LOVE_NATURE.epgIds[EpgSourceId.SKYLINK])
         assertEquals(null, TvChannel.WATERBEAR.epgIds[EpgSourceId.SKYLINK])
     }
@@ -28,12 +29,12 @@ class TvChannelTest {
             listOf(TvChannel.JEDNOTKA, TvChannel.DVOJKA, TvChannel.MARKIZA),
             TvChannel.entries.take(3),
         )
-        assertEquals(34, TvChannel.entries.size)
+        assertEquals(35, TvChannel.entries.size)
         assertEquals(
             emptySet<String>(),
             TvChannel.entries
                 .map(TvChannel::storageKey)
-                .intersect(setOf("stvr-live-o", "stvr-live", "nrsr", "ta3", "szts", "wild-earth", "bbc-food", "ct-d-art")),
+                .intersect(setOf("stvr-live-o", "stvr-live", "nrsr", "ta3", "szts", "wild-earth", "bbc-food")),
         )
         assertEquals("1", TvChannel.JEDNOTKA.stvrId)
         assertEquals("2", TvChannel.DVOJKA.stvrId)
