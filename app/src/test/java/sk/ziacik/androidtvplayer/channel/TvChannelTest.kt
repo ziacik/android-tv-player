@@ -28,7 +28,7 @@ class TvChannelTest {
             listOf(TvChannel.JEDNOTKA, TvChannel.DVOJKA, TvChannel.MARKIZA),
             TvChannel.entries.take(3),
         )
-        assertEquals(35, TvChannel.entries.size)
+        assertEquals(36, TvChannel.entries.size)
         assertEquals(
             emptySet<String>(),
             TvChannel.entries
@@ -42,6 +42,17 @@ class TvChannelTest {
         assertEquals("markiza", TvChannel.MARKIZA.storageKey)
         assertEquals(null, TvChannel.MARKIZA.stvrId)
         assertEquals("MARKÍZA", TvChannel.MARKIZA.displayName)
+    }
+
+    @Test
+    fun `sweet tv channels expose their anonymous channel ids`() {
+        assertEquals(
+            listOf(TvChannel.SVET_NARUBY, TvChannel.MEN_WITH_THE_POT),
+            TvChannel.sweetTvChannels,
+        )
+        assertEquals(ChannelProvider.SWEET_TV, TvChannel.MEN_WITH_THE_POT.provider)
+        assertEquals("2648", TvChannel.MEN_WITH_THE_POT.providerValue)
+        assertEquals("MEN WITH THE POT", TvChannel.MEN_WITH_THE_POT.displayName)
     }
 
     @Test
@@ -65,8 +76,10 @@ class TvChannelTest {
         assertEquals(TvChannel.TV5MONDE_CHEFS, TvChannel.TASTEMADE.next())
         assertEquals(TvChannel.PAPRIKA_TV, TvChannel.TV5MONDE_CHEFS.next())
         assertEquals(TvChannel.SVET_NARUBY, TvChannel.PAPRIKA_TV.next())
-        assertEquals(TvChannel.JEDNOTKA, TvChannel.SVET_NARUBY.next())
-        assertEquals(TvChannel.SVET_NARUBY, TvChannel.JEDNOTKA.previous())
+        assertEquals(TvChannel.MEN_WITH_THE_POT, TvChannel.SVET_NARUBY.next())
+        assertEquals(TvChannel.JEDNOTKA, TvChannel.MEN_WITH_THE_POT.next())
+        assertEquals(TvChannel.MEN_WITH_THE_POT, TvChannel.JEDNOTKA.previous())
+        assertEquals(TvChannel.SVET_NARUBY, TvChannel.MEN_WITH_THE_POT.previous())
         assertEquals(TvChannel.PAPRIKA_TV, TvChannel.SVET_NARUBY.previous())
         assertEquals(TvChannel.MARKIZA, TvChannel.STVR_24.previous())
     }
@@ -79,6 +92,7 @@ class TvChannelTest {
         assertEquals(TvChannel.DVOJKA, TvChannel.fromStorageKey("dvojka"))
         assertEquals(TvChannel.MARKIZA, TvChannel.fromStorageKey("markiza"))
         assertEquals(TvChannel.PAPRIKA_TV, TvChannel.fromStorageKey("paprika-tv"))
+        assertEquals(TvChannel.MEN_WITH_THE_POT, TvChannel.fromStorageKey("men-with-the-pot"))
         assertEquals(TvChannel.JEDNOTKA, TvChannel.fromStorageKey("invalid"))
         assertEquals(TvChannel.JEDNOTKA, TvChannel.fromStorageKey(null))
     }
