@@ -19,9 +19,19 @@ class ChannelCatalog(val channels: List<TvChannel>) {
 
     fun fromStorageKey(key: String?): TvChannel = channels.firstOrNull { it.storageKey == key } ?: channels.first()
     fun fromChannelNumber(number: Int): TvChannel? = channels.getOrNull(number - 1)
-    fun next(channel: TvChannel): TvChannel = channels[(channels.indexOf(channel).takeIf { it >= 0 } ?: -1).let { (it + 1) % channels.size }]
-    fun previous(channel: TvChannel): TvChannel = channels[(channels.indexOf(channel).takeIf { it >= 0 } ?: 0).let { (it - 1 + channels.size) % channels.size }]
-    fun numberOf(channel: TvChannel): Int = channels.indexOf(channel) + 1
+
+    fun next(channel: TvChannel): TvChannel {
+        val index = channels.indexOfFirst { it.storageKey == channel.storageKey }
+        return channels[if (index >= 0) (index + 1) % channels.size else 0]
+    }
+
+    fun previous(channel: TvChannel): TvChannel {
+        val index = channels.indexOfFirst { it.storageKey == channel.storageKey }
+        return channels[if (index >= 0) (index - 1 + channels.size) % channels.size else channels.lastIndex]
+    }
+
+    fun numberOf(channel: TvChannel): Int =
+        channels.indexOfFirst { it.storageKey == channel.storageKey } + 1
 }
 
 object ChannelCatalogJsonParser {
