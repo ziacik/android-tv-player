@@ -110,7 +110,7 @@ class Ta3Resolver(private val http: FreeviewHttpClient) {
     private companion object {
         const val SOURCE_URL = "https://embed.livebox.cz/ta3_v2/live-source.js"
         val HEADERS = mapOf("User-Agent" to FREEVIEW_USER_AGENT)
-        val SOURCE = Regex("""\"src\"\s*:\s*\"([^\"]+)""")
+        val SOURCE = Regex("""\"src\"\\s*:\\s*\"([^\"]+)""")
     }
 }
 
