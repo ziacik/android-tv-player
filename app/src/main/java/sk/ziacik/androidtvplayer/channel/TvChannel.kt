@@ -59,7 +59,9 @@ data class TvChannel(
         val TV5MONDE_CHEFS = TvChannel("tv5monde-chefs", displayName = "TV5MONDE CHEFS", provider = ChannelProvider.DIRECT)
         val PAPRIKA_TV = TvChannel("paprika-tv", displayName = "PAPRIKA TV", provider = ChannelProvider.DIRECT)
         val SVET_NARUBY = TvChannel("svet-naruby", displayName = "SVET NARUBY", provider = ChannelProvider.SWEET_TV, providerValue = "3257")
-        @Volatile var entries = listOf(JEDNOTKA, DVOJKA, MARKIZA, STVR_24, STVR_SPORT, JOJ, JOJ_PLUS, JOJ_KRIMI, JOJ_SPORT, JOJ_SPORT_2, JOJ_FAMILY, JOJKO, JOJ_24, JOJ_CINEMA, CS_FILM, CS_HISTORY, CS_MYSTERY, DOMA, DAJTO, MARKIZA_KRIMI, MARKIZA_KLASIK, CT_1, CT_2, CT_24, CT_SPORT, CT_D_ART, NOVA_CINEMA, CNN_PRIMA_NEWS, WATERBEAR, LOVE_NATURE, GUSTO_TV, TASTEMADE, TV5MONDE_CHEFS, PAPRIKA_TV, SVET_NARUBY)
+        val MEN_WITH_THE_POT = TvChannel("men-with-the-pot", displayName = "MEN WITH THE POT", provider = ChannelProvider.SWEET_TV, providerValue = "2648")
+        val sweetTvChannels = listOf(SVET_NARUBY, MEN_WITH_THE_POT)
+        @Volatile var entries = listOf(JEDNOTKA, DVOJKA, MARKIZA, STVR_24, STVR_SPORT, JOJ, JOJ_PLUS, JOJ_KRIMI, JOJ_SPORT, JOJ_SPORT_2, JOJ_FAMILY, JOJKO, JOJ_24, JOJ_CINEMA, CS_FILM, CS_HISTORY, CS_MYSTERY, DOMA, DAJTO, MARKIZA_KRIMI, MARKIZA_KLASIK, CT_1, CT_2, CT_24, CT_SPORT, CT_D_ART, NOVA_CINEMA, CNN_PRIMA_NEWS, WATERBEAR, LOVE_NATURE, GUSTO_TV, TASTEMADE, TV5MONDE_CHEFS, PAPRIKA_TV) + sweetTvChannels
             private set
         fun setRuntimeEntries(channels: List<TvChannel>) { entries = channels }
         fun fromChannelNumber(number: Int): TvChannel? = entries.getOrNull(number - 1)
