@@ -71,10 +71,6 @@ class MainActivity : ComponentActivity() {
             catalogRepository.load().channels + TvChannel.SVET_NARUBY,
         )
         TvChannel.setRuntimeEntries(catalog.channels)
-        appScope.launch {
-            runCatching { catalogRepository.refresh() }
-                .onFailure { Log.w("AndroidTvPlayer", "Channel catalog refresh failed") }
-        }
         val channelStore = SharedPreferencesChannelStore(this)
         val epgDirectory = File(filesDir, "epg")
         val epgRepository = CachedXmltvEpgRepository(
@@ -106,6 +102,17 @@ class MainActivity : ComponentActivity() {
                 Log.e("AndroidTvPlayer", message, cause)
             },
         )
+        appScope.launch {
+            runCatching {
+                ChannelCatalog(
+                    catalogRepository.refresh().channels + TvChannel.SVET_NARUBY,
+                )
+            }
+                .onSuccess { refreshedCatalog ->
+                    TvChannel.setRuntimeEntries(refreshedCatalog.channels)
+                }
+                .onFailure { Log.w("AndroidTvPlayer", "Channel catalog refresh failed") }
+        }
 
         setContent {
             AndroidTvPlayerTheme {
