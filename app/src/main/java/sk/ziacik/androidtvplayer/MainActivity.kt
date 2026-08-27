@@ -68,7 +68,7 @@ class MainActivity : ComponentActivity() {
             download = OkHttpChannelCatalogDownloader(CHANNELS_URL)::download,
         )
         val catalog = ChannelCatalog(
-            catalogRepository.load().channels + TvChannel.SVET_NARUBY,
+            catalogRepository.load().channels + TvChannel.sweetTvChannels,
         )
         TvChannel.setRuntimeEntries(catalog.channels)
         val channelStore = SharedPreferencesChannelStore(this)
@@ -106,7 +106,7 @@ class MainActivity : ComponentActivity() {
         appScope.launch {
             runCatching {
                 ChannelCatalog(
-                    catalogRepository.refresh().channels + TvChannel.SVET_NARUBY,
+                    catalogRepository.refresh().channels + TvChannel.sweetTvChannels,
                 )
             }
                 .onSuccess { refreshedCatalog ->
