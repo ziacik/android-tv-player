@@ -1,5 +1,6 @@
 package sk.ziacik.androidtvplayer.resolver
 
+import java.time.LocalTime
 import kotlinx.coroutines.CancellationException
 import org.json.JSONArray
 import org.json.JSONObject
@@ -22,16 +23,7 @@ private fun playable(
 
 class JojResolver(private val http: FreeviewHttpClient) {
     suspend fun resolve(channel: TvChannel): StreamResolution = protect("JOJ") {
-        val definition = requireNotNull(JOJ_CHANNELS[channel])
-        val source = definition.id?.let { id ->
-            try {
-                sourceUrl(id)
-            } catch (error: CancellationException) {
-                throw error
-            } catch (_: Exception) {
-                null
-            }
-        } ?: definition.fallbackUrl
+        val source = sourceUrl(requireNotNull(JOJ_CHANNEL_IDS[channel]))
         playable(
             channel = channel,
             url = source,
@@ -62,28 +54,25 @@ class JojResolver(private val http: FreeviewHttpClient) {
     private companion object {
         const val SOURCE_URL = "https://europe-west3-tivio-production.cloudfunctions.net/getSourceUrl"
         val JOJ_HEADERS = mapOf("User-Agent" to FREEVIEW_USER_AGENT, "Referer" to "https://www.joj.sk/")
-        val JOJ_CHANNELS = mapOf(
-            TvChannel.JOJ to JojChannel("LYyAwEjjqmj8kMY23Lqw", "https://live.cdn.joj.sk/live/joj.m3u8"),
-            TvChannel.JOJ_PLUS to JojChannel("60K9GwR6CLApIHVyNYOj", "https://live.cdn.joj.sk/live/plus.m3u8"),
-            TvChannel.JOJ_KRIMI to JojChannel("0D9v2CuujVAlLJJTyLWd", "https://live.cdn.joj.sk/live/wau.m3u8"),
-            TvChannel.JOJ_SPORT to JojChannel(null, "https://live.cdn.joj.sk/live/andromeda/joj_sport-1080.m3u8"),
-            TvChannel.JOJ_SPORT_2 to JojChannel(null, "https://live.cdn.joj.sk/live/joj_sport2.m3u8"),
-            TvChannel.JOJ_FAMILY to JojChannel(null, "https://live.cdn.joj.sk/live/family.m3u8"),
-            TvChannel.JOJKO to JojChannel(null, "https://live.cdn.joj.sk/live/jojko.m3u8"),
-            TvChannel.JOJ_24 to JojChannel("7tl6We5FhLyCfZcmSG6F", "https://live.cdn.joj.sk/live/joj_news.m3u8"),
-            TvChannel.JOJ_CINEMA to JojChannel(null, "https://live.cdn.joj.sk/live/cinema.m3u8"),
-            TvChannel.CS_FILM to JojChannel(null, "https://live.cdn.joj.sk/live/cs_film.m3u8"),
-            TvChannel.CS_HISTORY to JojChannel(null, "https://live.cdn.joj.sk/live/cs_history.m3u8"),
-            TvChannel.CS_MYSTERY to JojChannel(null, "https://live.cdn.joj.sk/live/cs_mystery.m3u8"),
+        val JOJ_CHANNEL_IDS = mapOf(
+            TvChannel.JOJ to "LYyAwEjjqmj8kMY23Lqw",
+            TvChannel.JOJ_PLUS to "60K9GwR6CLApIHVyNYOj",
+            TvChannel.JOJ_KRIMI to "0D9v2CuujVAlLJJTyLWd",
+            TvChannel.JOJ_24 to "7tl6We5FhLyCfZcmSG6F",
         )
     }
-
-    private data class JojChannel(val id: String?, val fallbackUrl: String)
 }
 
-class CtResolver(private val http: FreeviewHttpClient) {
+class CtResolver(
+    private val http: FreeviewHttpClient,
+    private val localTime: () -> LocalTime = LocalTime::now,
+) {
     suspend fun resolve(channel: TvChannel): StreamResolution = protect("ČT") {
-        val id = requireNotNull(channel.providerValue)
+        val id = if (channel == TvChannel.CT_D_ART) {
+            if (localTime().hour in 8 until 20) "CH_5" else "CH_6"
+        } else {
+            requireNotNull(channel.providerValue)
+        }
         val url = "$API$id?canPlayDrm=false&streamType=hls&quality=web&maxQualityCount=5"
         val body = JSONObject(http.get(url, HEADERS))
         playable(channel, body.getJSONObject("streamUrls").getString("main"))
