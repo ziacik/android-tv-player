@@ -13,7 +13,7 @@
     { "id": "joj", "name": "JOJ", "url": "https://sktv.mxnticek.eu/new/stream.php?ch=JOJ", "epg": { "openEpg": "JOJ HD.sk", "skylink": "84a2364ade7443e6d6afe03f9aa2361a" } },
     { "id": "joj-plus", "name": "JOJ PLUS", "url": "https://sktv.mxnticek.eu/new/stream.php?ch=JOJ%20Plus", "epg": { "openEpg": "Plus HD.sk", "skylink": "2aa59e1b0cb34399f6ffc387e52a437b" } },
     { "id": "joj-krimi", "name": "JOJ KRIMI", "url": "https://sktv.mxnticek.eu/new/stream.php?ch=Wau", "epg": { "openEpg": "JOJ KRIMI HD.sk", "skylink": "d4bf459e0c7e39dff6a5dbf3c7c76432" } },
-    { "id": "joj-sport", "name": "JOJ ŠPORT", "url": "https://live.cdn.joj.sk/live/andromeda/joj_sport-1080.m3u8", "epg": { "openEpg": "JOJ ŠPORT HD.sk", "skylink": "eacbd3c220de39cfa7e7e4506192b1b2" } },
+    { "id": "joj-sport", "name": "JOJ ŠPORT", "url": "http://185.188.188.237:5000/live/jojsport/playlist.m3u8", "epg": { "openEpg": "JOJ ŠPORT HD.sk", "skylink": "eacbd3c220de39cfa7e7e4506192b1b2" } },
     { "id": "joj-family", "name": "JOJ FAMILY", "url": "https://sktv.mxnticek.eu/new/stream.php?ch=JOJ%20Family", "epg": { "openEpg": "JOJ FAMILY.cz" } },
     { "id": "jojko", "name": "JOJKO", "url": "https://sktv.mxnticek.eu/new/stream.php?ch=Jojko", "epg": { "openEpg": "Jojko HD.sk", "skylink": "c562602b114a9614998fbb29142f4017" } },
     { "id": "joj-24", "name": "JOJ 24", "url": "https://sktv.mxnticek.eu/new/stream.php?ch=JOJ%2024", "epg": { "openEpg": "JOJ 24 HD.sk", "skylink": "ce6596c6d0663e92b84184a09fa033a0" } },
