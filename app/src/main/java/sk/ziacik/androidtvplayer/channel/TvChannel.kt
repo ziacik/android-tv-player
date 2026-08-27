@@ -60,7 +60,7 @@ data class TvChannel(
         val PAPRIKA_TV = TvChannel("paprika-tv", displayName = "PAPRIKA TV", provider = ChannelProvider.DIRECT)
         val SVET_NARUBY = TvChannel("svet-naruby", displayName = "SVET NARUBY", provider = ChannelProvider.SWEET_TV, providerValue = "3257")
         val MEN_WITH_THE_POT = TvChannel("men-with-the-pot", displayName = "MEN WITH THE POT", provider = ChannelProvider.SWEET_TV, providerValue = "2648")
-        val sweetTvChannels = listOf(SVET_NARUBY, MEN_WITH_THE_POT)
+        val sweetTvChannels = listOf(MEN_WITH_THE_POT, SVET_NARUBY)
         @Volatile var entries = listOf(JEDNOTKA, DVOJKA, MARKIZA, STVR_24, STVR_SPORT, JOJ, JOJ_PLUS, JOJ_KRIMI, JOJ_SPORT, JOJ_SPORT_2, JOJ_FAMILY, JOJKO, JOJ_24, JOJ_CINEMA, CS_FILM, CS_HISTORY, CS_MYSTERY, DOMA, DAJTO, MARKIZA_KRIMI, MARKIZA_KLASIK, CT_1, CT_2, CT_24, CT_SPORT, CT_D_ART, NOVA_CINEMA, CNN_PRIMA_NEWS, WATERBEAR, LOVE_NATURE, GUSTO_TV, TASTEMADE, TV5MONDE_CHEFS, PAPRIKA_TV) + sweetTvChannels
             private set
         fun setRuntimeEntries(channels: List<TvChannel>) { entries = channels }
