@@ -34,6 +34,7 @@
     { "id": "gusto-tv", "name": "GUSTO TV", "url": "https://563f72af.wurl.com/master/f36d25e7e52f1ba8d7e56eb859c636563214f541/UmFrdXRlblRWLWV1X0d1c3RvVFZfSExT/playlist.m3u8" },
     { "id": "tastemade", "name": "TASTEMADE", "url": "https://tastemade-tdint-rakuten.amagi.tv/playlist.m3u8" },
     { "id": "tv5monde-chefs", "name": "TV5MONDE CHEFS", "url": "https://tvf-tv5ch.otteravision.com/tvf/tv5ch/tv5ch.m3u8" },
+    { "id": "nhk-world-japan", "name": "NHK WORLD-JAPAN", "url": "https://media-tyo.hls.nhkworld.jp/hls/w/live/master.m3u8", "epg": { "iptvOrg": "NHKWorldJapan.jp" } },
     { "id": "paprika-tv", "name": "PAPRIKA TV", "url": "http://88.212.15.19/live/test_parpika_tv_sd_hevc/playlist.m3u8" }
   ]
 }
