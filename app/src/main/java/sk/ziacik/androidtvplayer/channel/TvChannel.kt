@@ -40,6 +40,7 @@ data class TvChannel(
         val CT_2 = TvChannel("ct-2", displayName = "ČT2", provider = ChannelProvider.CT, providerValue = "CH_2")
         val CT_24 = TvChannel("ct-24", displayName = "ČT24", provider = ChannelProvider.CT, providerValue = "CH_24")
         val CT_SPORT = TvChannel("ct-sport", displayName = "ČT SPORT", provider = ChannelProvider.CT, providerValue = "CH_4")
+        val CT_D_ART = TvChannel("ct-d-art", displayName = "ČT :D/ART", provider = ChannelProvider.CT, epgIds = mapOf(EpgSourceId.IPTV_ORG to "ČT:D/ČTart.cz"))
         val NOVA_CINEMA = TvChannel("nova-cinema", displayName = "NOVA CINEMA", provider = ChannelProvider.NOVA)
         val CNN_PRIMA_NEWS = TvChannel("cnn-prima-news", displayName = "CNN PRIMA NEWS", provider = ChannelProvider.CNN_PRIMA_NEWS)
         val WATERBEAR = TvChannel("waterbear", displayName = "WATERBEAR", provider = ChannelProvider.DIRECT, providerValue = "https://waterbear-waterbear-rakuten.amagi.tv/playlist.m3u8")
@@ -49,7 +50,7 @@ data class TvChannel(
         val TV5MONDE_CHEFS = TvChannel("tv5monde-chefs", displayName = "TV5MONDE CHEFS", provider = ChannelProvider.DIRECT, providerValue = "https://tvf-tv5ch.otteravision.com/tvf/tv5ch/tv5ch.m3u8")
         val PAPRIKA_TV = TvChannel("paprika-tv", displayName = "PAPRIKA TV", provider = ChannelProvider.DIRECT, providerValue = "http://185.188.188.237:5000/live/paprika/playlist.m3u8")
         val SVET_NARUBY = TvChannel("svet-naruby", displayName = "SVET NARUBY", provider = ChannelProvider.SWEET_TV, providerValue = "3257")
-        @Volatile var entries = listOf(JEDNOTKA, DVOJKA, MARKIZA, STVR_24, STVR_SPORT, JOJ, JOJ_PLUS, JOJ_KRIMI, JOJ_SPORT, JOJ_SPORT_2, JOJ_FAMILY, JOJKO, JOJ_24, JOJ_CINEMA, CS_FILM, CS_HISTORY, CS_MYSTERY, DOMA, DAJTO, MARKIZA_KRIMI, MARKIZA_KLASIK, CT_1, CT_2, CT_24, CT_SPORT, NOVA_CINEMA, CNN_PRIMA_NEWS, WATERBEAR, LOVE_NATURE, GUSTO_TV, TASTEMADE, TV5MONDE_CHEFS, PAPRIKA_TV, SVET_NARUBY)
+        @Volatile var entries = listOf(JEDNOTKA, DVOJKA, MARKIZA, STVR_24, STVR_SPORT, JOJ, JOJ_PLUS, JOJ_KRIMI, JOJ_SPORT, JOJ_SPORT_2, JOJ_FAMILY, JOJKO, JOJ_24, JOJ_CINEMA, CS_FILM, CS_HISTORY, CS_MYSTERY, DOMA, DAJTO, MARKIZA_KRIMI, MARKIZA_KLASIK, CT_1, CT_2, CT_24, CT_SPORT, CT_D_ART, NOVA_CINEMA, CNN_PRIMA_NEWS, WATERBEAR, LOVE_NATURE, GUSTO_TV, TASTEMADE, TV5MONDE_CHEFS, PAPRIKA_TV, SVET_NARUBY)
             private set
         fun setRuntimeEntries(channels: List<TvChannel>) { entries = channels }
         fun fromChannelNumber(number: Int): TvChannel? = entries.getOrNull(number - 1)
