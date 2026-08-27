@@ -10,6 +10,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.zip.GZIPInputStream
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import okhttp3.Call
@@ -38,22 +40,34 @@ class CachedXmltvEpgRepository(
     private val diagnostics: (String, Throwable?) -> Unit = { _, _ -> },
 ) : EpgRepository {
     private val cachedFeeds = mutableMapOf<EpgSourceId, CachedFeed>()
+    private val cachedProgrammes = mutableMapOf<ProgrammeKey, EpgProgramme>()
+    private val lookupMutex = Mutex()
 
     override suspend fun currentProgram(channel: TvChannel, nowMs: Long): ProgramMetadata? {
         return withContext(Dispatchers.IO) {
-            for (source in sources) {
-                val channelId = channel.epgIds[source.id] ?: continue
-                val programme = try {
-                    loadCurrentProgram(source, channelId, nowMs)
-                } catch (error: CancellationException) {
-                    throw error
-                } catch (error: Exception) {
-                    diagnostics("EPG feed failed for ${source.id}", error)
-                    null
+            lookupMutex.withLock {
+                val programmeKey = ProgrammeKey(channel.storageKey, channel.epgIds)
+                cachedProgrammes[programmeKey]
+                    ?.takeIf { it.startsAtMs <= nowMs && nowMs < it.endsAtMs }
+                    ?.let { return@withLock it.toProgramMetadata() }
+                cachedProgrammes.remove(programmeKey)
+                for (source in sources) {
+                    val channelId = channel.epgIds[source.id] ?: continue
+                    val programme = try {
+                        loadCurrentProgram(source, channelId, nowMs)
+                    } catch (error: CancellationException) {
+                        throw error
+                    } catch (error: Exception) {
+                        diagnostics("EPG feed failed for ${source.id}", error)
+                        null
+                    }
+                    if (programme != null) {
+                        cachedProgrammes[programmeKey] = programme
+                        return@withLock programme.toProgramMetadata()
+                    }
                 }
-                if (programme != null) return@withContext programme.toProgramMetadata()
+                null
             }
-            null
         }
     }
 
@@ -70,7 +84,7 @@ class CachedXmltvEpgRepository(
         if (source.cacheFile.isFile && now - source.cacheFile.lastModified() < CACHE_FRESHNESS_MS) {
             val cachedBytes = source.cacheFile.readBytes()
             return parseCurrentProgram(cachedBytes, source, channelId, nowMs)
-                .also { remember(source, cachedBytes, now) }
+                .also { remember(source, cachedBytes, source.cacheFile.lastModified()) }
         }
 
         val downloaded = try {
@@ -93,7 +107,7 @@ class CachedXmltvEpgRepository(
                 diagnostics("EPG feed failed for ${source.id}", error)
             }
         }
-        return parseCachedProgram(source, channelId, nowMs, now)
+        return parseCachedProgram(source, channelId, nowMs, source.cacheFile.lastModified())
     }
 
     private fun parseCachedProgram(
@@ -147,6 +161,11 @@ class CachedXmltvEpgRepository(
     private data class CachedFeed(
         val bytes: ByteArray,
         val loadedAtMs: Long,
+    )
+
+    private data class ProgrammeKey(
+        val channelStorageKey: String,
+        val epgIds: Map<EpgSourceId, String>,
     )
 
     private companion object {

@@ -1,6 +1,6 @@
 package sk.ziacik.androidtvplayer.channel
 
-enum class EpgSourceId { SKYLINK, IPTV_ORG }
+enum class EpgSourceId { OPEN_EPG, SKYLINK }
 
 data class TvChannel(
     val storageKey: String,
@@ -24,20 +24,20 @@ data class TvChannel(
         get() = entries.indexOfFirst { it.storageKey == storageKey }.takeIf { it >= 0 } ?: 0
 
     companion object {
-        val JEDNOTKA = TvChannel("jednotka", "1", "JEDNOTKA", ChannelProvider.STVR, epgIds = mapOf(EpgSourceId.SKYLINK to "7a55634018be710a62bbf1750443a199", EpgSourceId.IPTV_ORG to "JEDNOTKA.cz"))
-        val DVOJKA = TvChannel("dvojka", "2", "DVOJKA", ChannelProvider.STVR, epgIds = mapOf(EpgSourceId.SKYLINK to "584c86a108172efc9c27af06eb3d4652", EpgSourceId.IPTV_ORG to "DVOJKA.cz"))
-        val MARKIZA = TvChannel("markiza", displayName = "MARKÍZA", provider = ChannelProvider.MARKIZA, epgIds = mapOf(EpgSourceId.SKYLINK to "336e46bf4276e77a716e494c6285d5db", EpgSourceId.IPTV_ORG to "MARKÍZA.cz"))
-        val STVR_24 = TvChannel("stvr-24", "3", "STVR :24", ChannelProvider.STVR, epgIds = mapOf(EpgSourceId.SKYLINK to "6a5461ba82cabcb95db5b344e6440e15", EpgSourceId.IPTV_ORG to "STV_24.cz"))
-        val STVR_SPORT = TvChannel("stvr-sport", "15", "STVR ŠPORT", ChannelProvider.STVR, epgIds = mapOf(EpgSourceId.SKYLINK to "09fc492d319c8813389e11c167b3a053", EpgSourceId.IPTV_ORG to "RTVSSPORT.cz"))
-        val JOJ = TvChannel("joj", displayName = "JOJ", provider = ChannelProvider.JOJ, providerValue = "joj", epgIds = mapOf(EpgSourceId.SKYLINK to "84a2364ade7443e6d6afe03f9aa2361a", EpgSourceId.IPTV_ORG to "JOJ.cz"))
-        val JOJ_PLUS = TvChannel("joj-plus", displayName = "JOJ PLUS", provider = ChannelProvider.JOJ, providerValue = "plus", epgIds = mapOf(EpgSourceId.SKYLINK to "2aa59e1b0cb34399f6ffc387e52a437b", EpgSourceId.IPTV_ORG to "JOJPLUS.cz"))
-        val JOJ_KRIMI = TvChannel("joj-krimi", displayName = "JOJ KRIMI", provider = ChannelProvider.JOJ, providerValue = "wau", epgIds = mapOf(EpgSourceId.SKYLINK to "d4bf459e0c7e39dff6a5dbf3c7c76432", EpgSourceId.IPTV_ORG to "WAU.cz"))
-        val JOJ_SPORT = TvChannel("joj-sport", displayName = "JOJ ŠPORT", provider = ChannelProvider.JOJ, providerValue = "jojsport", epgIds = mapOf(EpgSourceId.SKYLINK to "eacbd3c220de39cfa7e7e4506192b1b2", EpgSourceId.IPTV_ORG to "JOJŠPORT.cz"))
-        val JOJ_SPORT_2 = TvChannel("joj-sport-2", displayName = "JOJ ŠPORT 2", provider = ChannelProvider.JOJ, providerValue = "jojsport2", epgIds = mapOf(EpgSourceId.SKYLINK to "755362842dc7526d01a6706c66dd1ec5", EpgSourceId.IPTV_ORG to "JOJŠPORT2.cz"))
-        val JOJ_FAMILY = TvChannel("joj-family", displayName = "JOJ FAMILY", provider = ChannelProvider.JOJ, providerValue = "family", epgIds = mapOf(EpgSourceId.IPTV_ORG to "JOJFAMILY.cz"))
-        val JOJKO = TvChannel("jojko", displayName = "JOJKO", provider = ChannelProvider.JOJ, providerValue = "jojko", epgIds = mapOf(EpgSourceId.SKYLINK to "c562602b114a9614998fbb29142f4017", EpgSourceId.IPTV_ORG to "JOJKO.cz"))
-        val JOJ_24 = TvChannel("joj-24", displayName = "JOJ 24", provider = ChannelProvider.JOJ, providerValue = "joj24", epgIds = mapOf(EpgSourceId.SKYLINK to "ce6596c6d0663e92b84184a09fa033a0", EpgSourceId.IPTV_ORG to "JOJ24.cz"))
-        val JOJ_CINEMA = TvChannel("joj-cinema", displayName = "JOJ CINEMA", provider = ChannelProvider.JOJ, providerValue = "jojsport", epgIds = mapOf(EpgSourceId.SKYLINK to "d214870fb6ac73b8b55d7767af74aef9", EpgSourceId.IPTV_ORG to "JOJCINEMA.cz"))
+        val JEDNOTKA = TvChannel("jednotka", "1", "JEDNOTKA", ChannelProvider.STVR, epgIds = mapOf(EpgSourceId.SKYLINK to "7a55634018be710a62bbf1750443a199"))
+        val DVOJKA = TvChannel("dvojka", "2", "DVOJKA", ChannelProvider.STVR, epgIds = mapOf(EpgSourceId.SKYLINK to "584c86a108172efc9c27af06eb3d4652"))
+        val MARKIZA = TvChannel("markiza", displayName = "MARKÍZA", provider = ChannelProvider.MARKIZA, epgIds = mapOf(EpgSourceId.SKYLINK to "336e46bf4276e77a716e494c6285d5db"))
+        val STVR_24 = TvChannel("stvr-24", "3", "STVR :24", ChannelProvider.STVR, epgIds = mapOf(EpgSourceId.SKYLINK to "6a5461ba82cabcb95db5b344e6440e15"))
+        val STVR_SPORT = TvChannel("stvr-sport", "15", "STVR ŠPORT", ChannelProvider.STVR, epgIds = mapOf(EpgSourceId.SKYLINK to "09fc492d319c8813389e11c167b3a053"))
+        val JOJ = TvChannel("joj", displayName = "JOJ", provider = ChannelProvider.JOJ, providerValue = "joj", epgIds = mapOf(EpgSourceId.SKYLINK to "84a2364ade7443e6d6afe03f9aa2361a"))
+        val JOJ_PLUS = TvChannel("joj-plus", displayName = "JOJ PLUS", provider = ChannelProvider.JOJ, providerValue = "plus", epgIds = mapOf(EpgSourceId.SKYLINK to "2aa59e1b0cb34399f6ffc387e52a437b"))
+        val JOJ_KRIMI = TvChannel("joj-krimi", displayName = "JOJ KRIMI", provider = ChannelProvider.JOJ, providerValue = "wau", epgIds = mapOf(EpgSourceId.SKYLINK to "d4bf459e0c7e39dff6a5dbf3c7c76432"))
+        val JOJ_SPORT = TvChannel("joj-sport", displayName = "JOJ ŠPORT", provider = ChannelProvider.JOJ, providerValue = "jojsport", epgIds = mapOf(EpgSourceId.SKYLINK to "eacbd3c220de39cfa7e7e4506192b1b2"))
+        val JOJ_SPORT_2 = TvChannel("joj-sport-2", displayName = "JOJ ŠPORT 2", provider = ChannelProvider.JOJ, providerValue = "jojsport2", epgIds = mapOf(EpgSourceId.SKYLINK to "755362842dc7526d01a6706c66dd1ec5"))
+        val JOJ_FAMILY = TvChannel("joj-family", displayName = "JOJ FAMILY", provider = ChannelProvider.JOJ, providerValue = "family")
+        val JOJKO = TvChannel("jojko", displayName = "JOJKO", provider = ChannelProvider.JOJ, providerValue = "jojko", epgIds = mapOf(EpgSourceId.SKYLINK to "c562602b114a9614998fbb29142f4017"))
+        val JOJ_24 = TvChannel("joj-24", displayName = "JOJ 24", provider = ChannelProvider.JOJ, providerValue = "joj24", epgIds = mapOf(EpgSourceId.SKYLINK to "ce6596c6d0663e92b84184a09fa033a0"))
+        val JOJ_CINEMA = TvChannel("joj-cinema", displayName = "JOJ CINEMA", provider = ChannelProvider.JOJ, providerValue = "jojsport", epgIds = mapOf(EpgSourceId.SKYLINK to "d214870fb6ac73b8b55d7767af74aef9"))
         val CS_FILM = TvChannel("cs-film", displayName = "CS FILM", provider = ChannelProvider.JOJ, providerValue = "csfilm")
         val CS_HISTORY = TvChannel("cs-history", displayName = "CS HISTORY", provider = ChannelProvider.JOJ, providerValue = "cshistory")
         val CS_MYSTERY = TvChannel("cs-mystery", displayName = "CS MYSTERY", provider = ChannelProvider.JOJ, providerValue = "csmystery")
@@ -49,7 +49,7 @@ data class TvChannel(
         val CT_2 = TvChannel("ct-2", displayName = "ČT2", provider = ChannelProvider.CT, providerValue = "CH_2")
         val CT_24 = TvChannel("ct-24", displayName = "ČT24", provider = ChannelProvider.CT, providerValue = "CH_24")
         val CT_SPORT = TvChannel("ct-sport", displayName = "ČT SPORT", provider = ChannelProvider.CT, providerValue = "CH_4")
-        val CT_D_ART = TvChannel("ct-d-art", displayName = "ČT :D/ART", provider = ChannelProvider.CT, epgIds = mapOf(EpgSourceId.IPTV_ORG to "ČT:D/ČTart.cz"))
+        val CT_D_ART = TvChannel("ct-d-art", displayName = "ČT :D/ART", provider = ChannelProvider.CT)
         val NOVA_CINEMA = TvChannel("nova-cinema", displayName = "NOVA CINEMA", provider = ChannelProvider.NOVA)
         val CNN_PRIMA_NEWS = TvChannel("cnn-prima-news", displayName = "CNN PRIMA NEWS", provider = ChannelProvider.CNN_PRIMA_NEWS)
         val WATERBEAR = TvChannel("waterbear", displayName = "WATERBEAR", provider = ChannelProvider.DIRECT)

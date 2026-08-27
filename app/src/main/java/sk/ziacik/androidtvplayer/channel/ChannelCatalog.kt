@@ -11,7 +11,10 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
 
-class ChannelCatalog(val channels: List<TvChannel>) {
+class ChannelCatalog(
+    val channels: List<TvChannel>,
+    val version: Int = 0,
+) {
     init {
         require(channels.isNotEmpty())
         require(channels.map(TvChannel::storageKey).distinct().size == channels.size)
@@ -36,7 +39,8 @@ class ChannelCatalog(val channels: List<TvChannel>) {
 
 object ChannelCatalogJsonParser {
     fun parse(json: String): ChannelCatalog {
-        val parsed = JSONObject(json).optJSONArray("channels") ?: error("channels is missing")
+        val root = JSONObject(json)
+        val parsed = root.optJSONArray("channels") ?: error("channels is missing")
         val channels = buildList<TvChannel> {
             repeat(parsed.length()) { index ->
                 val value = parsed.optJSONObject(index) ?: return@repeat
@@ -46,13 +50,13 @@ object ChannelCatalogJsonParser {
                 if (id.isBlank() || name.isBlank() || !(url.startsWith("http://") || url.startsWith("https://")) || this@buildList.any { it.storageKey == id }) return@repeat
                 val epg = value.optJSONObject("epg")
                 val epgIds = buildMap {
+                    epg?.optString("openEpg")?.takeIf { it.isNotBlank() }?.let { put(EpgSourceId.OPEN_EPG, it) }
                     epg?.optString("skylink")?.takeIf { it.isNotBlank() }?.let { put(EpgSourceId.SKYLINK, it) }
-                    epg?.optString("iptvOrg")?.takeIf { it.isNotBlank() }?.let { put(EpgSourceId.IPTV_ORG, it) }
                 }
                 add(TvChannel(id, displayName = name, provider = ChannelProvider.DIRECT, providerValue = url, epgIds = epgIds))
             }
         }
-        return ChannelCatalog(channels)
+        return ChannelCatalog(channels, version = root.optInt("version"))
     }
 }
 
@@ -61,8 +65,12 @@ class ChannelCatalogRepository(
     private val cacheFile: File,
     private val download: suspend () -> String,
 ) {
-    fun load(): ChannelCatalog = runCatching { ChannelCatalogJsonParser.parse(cacheFile.readText()) }
-        .getOrElse { ChannelCatalogJsonParser.parse(seed()) }
+    private val seedCatalog by lazy { ChannelCatalogJsonParser.parse(seed()) }
+
+    fun load(): ChannelCatalog {
+        val cached = runCatching { ChannelCatalogJsonParser.parse(cacheFile.readText()) }.getOrNull()
+        return cached?.takeIf { it.version >= seedCatalog.version } ?: seedCatalog
+    }
 
     suspend fun refresh(): ChannelCatalog = withContext(Dispatchers.IO) {
         val json = try {
@@ -71,6 +79,8 @@ class ChannelCatalogRepository(
             throw error
         }
         val catalog = ChannelCatalogJsonParser.parse(json)
+        val current = load()
+        if (catalog.version < current.version) return@withContext current
         cacheFile.parentFile?.mkdirs()
         val temporary = File(cacheFile.parentFile, "${cacheFile.name}.tmp")
         temporary.writeText(json)

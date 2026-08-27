@@ -25,6 +25,17 @@ class ChannelCatalogTest {
     }
 
     @Test
+    fun `parses Open EPG channel identifier`() {
+        val catalog = ChannelCatalogJsonParser.parse(
+            """{"channels":[{"id":"markiza","name":"MARKÍZA","url":"https://example.com/live.m3u8","epg":{"openEpg":"Markíza HD.sk","skylink":"skylink-id","iptvOrg":"obsolete"}}]}""",
+        )
+
+        assertEquals("Markíza HD.sk", catalog.channels.single().epgIds[EpgSourceId.OPEN_EPG])
+        assertEquals("skylink-id", catalog.channels.single().epgIds[EpgSourceId.SKYLINK])
+        assertEquals(2, catalog.channels.single().epgIds.size)
+    }
+
+    @Test
     fun `skips malformed duplicate and non HTTP entries`() {
         val catalog = ChannelCatalogJsonParser.parse(
             """

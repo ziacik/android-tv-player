@@ -73,17 +73,18 @@ class MainActivity : ComponentActivity() {
         TvChannel.setRuntimeEntries(catalog.channels)
         val channelStore = SharedPreferencesChannelStore(this)
         val epgDirectory = File(filesDir, "epg")
+        File(epgDirectory, "iptv-org-cz.xml.gz").delete()
         val epgRepository = CachedXmltvEpgRepository(
             sources = listOf(
+                XmltvEpgSource(
+                    id = EpgSourceId.OPEN_EPG,
+                    cacheFile = File(epgDirectory, "open-epg.xml.gz"),
+                    download = OkHttpEpgDownloader(OPEN_EPG_URL)::download,
+                ),
                 XmltvEpgSource(
                     id = EpgSourceId.SKYLINK,
                     cacheFile = File(epgDirectory, "skylink-a3b-a1.xml"),
                     download = OkHttpEpgDownloader(SKYLINK_EPG_URL)::download,
-                ),
-                XmltvEpgSource(
-                    id = EpgSourceId.IPTV_ORG,
-                    cacheFile = File(epgDirectory, "iptv-org-cz.xml.gz"),
-                    download = OkHttpEpgDownloader(IPTV_ORG_EPG_URL)::download,
                 ),
             ),
             diagnostics = { message, cause ->
@@ -109,7 +110,9 @@ class MainActivity : ComponentActivity() {
                 )
             }
                 .onSuccess { refreshedCatalog ->
+                    val changed = TvChannel.entries != refreshedCatalog.channels
                     TvChannel.setRuntimeEntries(refreshedCatalog.channels)
+                    if (changed) playerController.retry()
                 }
                 .onFailure { Log.w("AndroidTvPlayer", "Channel catalog refresh failed") }
         }
@@ -137,7 +140,7 @@ class MainActivity : ComponentActivity() {
     private companion object {
         const val SKYLINK_EPG_URL =
             "https://raw.githubusercontent.com/370network/skylink-xmltv/refs/heads/main/a3b_a1.xml"
-        const val IPTV_ORG_EPG_URL = "https://iptv-epg.org/files/epg-cz.xml.gz"
+        const val OPEN_EPG_URL = "https://www.open-epg.com/generate/jnapkTB7Wq.xml.gz"
         const val CHANNELS_URL = "https://raw.githubusercontent.com/ziacik/android-tv-player/master/channels.json"
     }
 }

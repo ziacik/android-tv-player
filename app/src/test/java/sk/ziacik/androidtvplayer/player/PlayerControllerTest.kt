@@ -21,6 +21,28 @@ import sk.ziacik.androidtvplayer.resolver.StreamSource
 @OptIn(ExperimentalCoroutinesApi::class)
 class PlayerControllerTest {
     @Test
+    fun `EPG lookup starts before media becomes ready`() = runTest {
+        var requests = 0
+        val player = FakePlayerPort()
+        val controller = PlayerController(
+            scope = this,
+            initialChannel = TvChannel.MARKIZA,
+            resolve = { fallbackResolution(TvChannel.MARKIZA) },
+            playerPort = player,
+            epgRepository = EpgRepository { _, _ ->
+                requests += 1
+                ProgramMetadata("EPG relácia", 1_000L, 2_000L, true)
+            },
+        )
+
+        controller.start()
+        advanceUntilIdle()
+
+        assertEquals(1, requests)
+        assertTrue(controller.state.value is PlayerUiState.Preparing)
+    }
+
+    @Test
     fun `ready playback is not delayed and receives EPG metadata when it arrives`() = runTest {
         val player = FakePlayerPort()
         val epgResult = CompletableDeferred<ProgramMetadata?>()

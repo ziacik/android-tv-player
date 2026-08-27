@@ -232,6 +232,7 @@ class PlayerController(
                 activeLoadId = loadId
                 mutableState.value = PlayerUiState.Preparing(channel)
                 try {
+                    requestEpgProgrammeIfNeeded(resolution.program)
                     playerPort.load(loadId, resolution.source)
                 } catch (_: Exception) {
                     if (!acceptsPlaybackCallback(loadId)) return
@@ -318,9 +319,9 @@ class PlayerController(
                 return@launch
             }
             if (!acceptsPlaybackCallback(loadId)) return@launch
+            activeProgram = epgProgramme
             val ready = mutableState.value as? PlayerUiState.Ready ?: return@launch
             if (ready.channel != channel) return@launch
-            activeProgram = epgProgramme
             mutableState.value = ready.copy(program = epgProgramme)
         }
     }

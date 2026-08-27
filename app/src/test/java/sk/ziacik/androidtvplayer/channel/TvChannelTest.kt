@@ -6,10 +6,9 @@ import org.junit.Test
 class TvChannelTest {
     @Test
     fun `covered channels expose their XMLTV identifiers and remaining direct streams stay null`() {
+        assertEquals(listOf("OPEN_EPG", "SKYLINK"), EpgSourceId.entries.map(EpgSourceId::name))
         assertEquals("336e46bf4276e77a716e494c6285d5db", TvChannel.MARKIZA.epgIds[EpgSourceId.SKYLINK])
         assertEquals("84a2364ade7443e6d6afe03f9aa2361a", TvChannel.JOJ.epgIds[EpgSourceId.SKYLINK])
-        assertEquals("MARKÍZA.cz", TvChannel.MARKIZA.epgIds[EpgSourceId.IPTV_ORG])
-        assertEquals("ČT:D/ČTart.cz", TvChannel.CT_D_ART.epgIds[EpgSourceId.IPTV_ORG])
         assertEquals("87a9a0429e3edc255adbb8601cfddc0a", TvChannel.LOVE_NATURE.epgIds[EpgSourceId.SKYLINK])
         assertEquals(null, TvChannel.WATERBEAR.epgIds[EpgSourceId.SKYLINK])
     }
