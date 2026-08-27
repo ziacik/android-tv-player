@@ -47,7 +47,7 @@ class TvChannelTest {
     @Test
     fun `sweet tv channels expose their anonymous channel ids`() {
         assertEquals(
-            listOf(TvChannel.SVET_NARUBY, TvChannel.MEN_WITH_THE_POT),
+            listOf(TvChannel.MEN_WITH_THE_POT, TvChannel.SVET_NARUBY),
             TvChannel.sweetTvChannels,
         )
         assertEquals(ChannelProvider.SWEET_TV, TvChannel.MEN_WITH_THE_POT.provider)
@@ -75,12 +75,12 @@ class TvChannelTest {
         assertEquals(TvChannel.STVR_24, TvChannel.MARKIZA.next())
         assertEquals(TvChannel.TV5MONDE_CHEFS, TvChannel.TASTEMADE.next())
         assertEquals(TvChannel.PAPRIKA_TV, TvChannel.TV5MONDE_CHEFS.next())
-        assertEquals(TvChannel.SVET_NARUBY, TvChannel.PAPRIKA_TV.next())
-        assertEquals(TvChannel.MEN_WITH_THE_POT, TvChannel.SVET_NARUBY.next())
-        assertEquals(TvChannel.JEDNOTKA, TvChannel.MEN_WITH_THE_POT.next())
-        assertEquals(TvChannel.MEN_WITH_THE_POT, TvChannel.JEDNOTKA.previous())
-        assertEquals(TvChannel.SVET_NARUBY, TvChannel.MEN_WITH_THE_POT.previous())
-        assertEquals(TvChannel.PAPRIKA_TV, TvChannel.SVET_NARUBY.previous())
+        assertEquals(TvChannel.MEN_WITH_THE_POT, TvChannel.PAPRIKA_TV.next())
+        assertEquals(TvChannel.SVET_NARUBY, TvChannel.MEN_WITH_THE_POT.next())
+        assertEquals(TvChannel.JEDNOTKA, TvChannel.SVET_NARUBY.next())
+        assertEquals(TvChannel.SVET_NARUBY, TvChannel.JEDNOTKA.previous())
+        assertEquals(TvChannel.MEN_WITH_THE_POT, TvChannel.SVET_NARUBY.previous())
+        assertEquals(TvChannel.PAPRIKA_TV, TvChannel.MEN_WITH_THE_POT.previous())
         assertEquals(TvChannel.MARKIZA, TvChannel.STVR_24.previous())
     }
 
