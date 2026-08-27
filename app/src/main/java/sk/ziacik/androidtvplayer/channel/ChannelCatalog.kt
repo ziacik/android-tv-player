@@ -65,11 +65,14 @@ class ChannelCatalogRepository(
     private val cacheFile: File,
     private val download: suspend () -> String,
 ) {
-    private val seedCatalog by lazy { ChannelCatalogJsonParser.parse(seed()) }
+    private val seedJson by lazy(seed)
+    private val seedCatalog by lazy { ChannelCatalogJsonParser.parse(seedJson) }
 
     fun load(): ChannelCatalog {
         val cached = runCatching { ChannelCatalogJsonParser.parse(cacheFile.readText()) }.getOrNull()
-        return cached?.takeIf { it.version >= seedCatalog.version } ?: seedCatalog
+        cached?.takeIf { it.version >= seedCatalog.version }?.let { return it }
+        runCatching { writeCache(seedJson) }
+        return seedCatalog
     }
 
     suspend fun refresh(): ChannelCatalog = withContext(Dispatchers.IO) {
@@ -81,11 +84,15 @@ class ChannelCatalogRepository(
         val catalog = ChannelCatalogJsonParser.parse(json)
         val current = load()
         if (catalog.version < current.version) return@withContext current
+        writeCache(json)
+        catalog
+    }
+
+    private fun writeCache(json: String) {
         cacheFile.parentFile?.mkdirs()
         val temporary = File(cacheFile.parentFile, "${cacheFile.name}.tmp")
         temporary.writeText(json)
         Files.move(temporary.toPath(), cacheFile.toPath(), ATOMIC_MOVE, REPLACE_EXISTING)
-        catalog
     }
 }
 

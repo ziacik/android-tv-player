@@ -44,6 +44,10 @@ class ChannelCatalogRepositoryTest {
         )
 
         assertEquals(listOf("bundled"), repository.load().channels.map(TvChannel::storageKey))
+        assertEquals(
+            listOf("bundled"),
+            ChannelCatalogJsonParser.parse(cacheFile.readText()).channels.map(TvChannel::storageKey),
+        )
     }
 
     @Test
@@ -56,7 +60,10 @@ class ChannelCatalogRepositoryTest {
         )
 
         assertEquals(listOf("bundled"), repository.refresh().channels.map(TvChannel::storageKey))
-        assertEquals(false, cacheFile.exists())
+        assertEquals(
+            listOf("bundled"),
+            ChannelCatalogJsonParser.parse(cacheFile.readText()).channels.map(TvChannel::storageKey),
+        )
     }
 
     private fun catalog(version: Int, id: String) =
