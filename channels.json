@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "channels": [
     { "id": "jednotka", "name": "JEDNOTKA", "url": "https://sktv.mxnticek.eu/new/stream.php?ch=Jednotka", "epg": { "openEpg": "Jednotka HD.sk", "skylink": "7a55634018be710a62bbf1750443a199" } },
     { "id": "dvojka", "name": "DVOJKA", "url": "https://sktv.mxnticek.eu/new/stream.php?ch=Dvojka", "epg": { "openEpg": "Dvojka HD.sk", "skylink": "584c86a108172efc9c27af06eb3d4652" } },
