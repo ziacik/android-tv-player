@@ -54,17 +54,18 @@ class ChannelCatalogRepository(
     fun load(): ChannelCatalog = runCatching { ChannelCatalogJsonParser.parse(cacheFile.readText()) }
         .getOrElse { ChannelCatalogJsonParser.parse(seed()) }
 
-    suspend fun refresh() = withContext(Dispatchers.IO) {
+    suspend fun refresh(): ChannelCatalog = withContext(Dispatchers.IO) {
         val json = try {
             download()
         } catch (error: CancellationException) {
             throw error
         }
-        ChannelCatalogJsonParser.parse(json)
+        val catalog = ChannelCatalogJsonParser.parse(json)
         cacheFile.parentFile?.mkdirs()
         val temporary = File(cacheFile.parentFile, "${cacheFile.name}.tmp")
         temporary.writeText(json)
         Files.move(temporary.toPath(), cacheFile.toPath(), ATOMIC_MOVE, REPLACE_EXISTING)
+        catalog
     }
 }
 
