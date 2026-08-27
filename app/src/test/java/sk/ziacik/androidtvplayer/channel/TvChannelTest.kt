@@ -46,11 +46,16 @@ class TvChannelTest {
     }
 
     @Test
-    fun `Paprika TV uses the supplied direct HLS stream`() {
+    fun `legacy direct channel constants do not duplicate stream URLs`() {
         assertEquals("paprika-tv", TvChannel.PAPRIKA_TV.storageKey)
         assertEquals("PAPRIKA TV", TvChannel.PAPRIKA_TV.displayName)
         assertEquals(ChannelProvider.DIRECT, TvChannel.PAPRIKA_TV.provider)
-        assertEquals("http://185.188.188.237:5000/live/paprika/playlist.m3u8", TvChannel.PAPRIKA_TV.providerValue)
+        assertEquals(null, TvChannel.PAPRIKA_TV.providerValue)
+        assertEquals(null, TvChannel.WATERBEAR.providerValue)
+        assertEquals(null, TvChannel.LOVE_NATURE.providerValue)
+        assertEquals(null, TvChannel.GUSTO_TV.providerValue)
+        assertEquals(null, TvChannel.TASTEMADE.providerValue)
+        assertEquals(null, TvChannel.TV5MONDE_CHEFS.providerValue)
     }
 
     @Test
