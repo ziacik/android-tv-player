@@ -10,9 +10,18 @@ data class TvChannel(
     val providerValue: String? = null,
     val epgIds: Map<EpgSourceId, String> = emptyMap(),
 ) {
-    fun next(): TvChannel = entries[(ordinal + 1) % entries.size]
-    fun previous(): TvChannel = entries[(ordinal - 1 + entries.size) % entries.size]
-    val ordinal: Int get() = entries.indexOf(this).takeIf { it >= 0 } ?: 0
+    fun next(): TvChannel {
+        val index = entries.indexOfFirst { it.storageKey == storageKey }
+        return entries[if (index >= 0) (index + 1) % entries.size else 0]
+    }
+
+    fun previous(): TvChannel {
+        val index = entries.indexOfFirst { it.storageKey == storageKey }
+        return entries[if (index >= 0) (index - 1 + entries.size) % entries.size else entries.lastIndex]
+    }
+
+    val ordinal: Int
+        get() = entries.indexOfFirst { it.storageKey == storageKey }.takeIf { it >= 0 } ?: 0
 
     companion object {
         val JEDNOTKA = TvChannel("jednotka", "1", "JEDNOTKA", ChannelProvider.STVR, epgIds = mapOf(EpgSourceId.SKYLINK to "7a55634018be710a62bbf1750443a199", EpgSourceId.IPTV_ORG to "JEDNOTKA.cz"))
