@@ -94,7 +94,7 @@ class PlayerController(
 
     private fun switchTo(channel: TvChannel) {
         if (released) return
-        if (channel == currentChannel) return
+        if (channel.storageKey == currentChannel.storageKey) return
         currentChannel = channel
         onChannelSelected(channel)
         activeProgram = null
@@ -111,6 +111,9 @@ class PlayerController(
         restrictedRetryJob?.cancel()
         restrictedRetryJob = null
         cancelEpgLookup()
+        currentChannel = TvChannel.entries
+            .firstOrNull { it.storageKey == currentChannel.storageKey }
+            ?: currentChannel
         val channel = currentChannel
         val generation = ++resolveGeneration
         resolveJob = scope.launch {
