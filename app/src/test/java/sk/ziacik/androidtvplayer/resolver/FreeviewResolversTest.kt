@@ -24,7 +24,7 @@ class FreeviewResolversTest {
     }
 
     @Test
-    fun `JOJ Sport uses Andromeda HLS fallback`() = runTest {
+    fun `JOJ Tivio HLS source is marked as HLS`() = runTest {
         val result = JojResolver(
             object : FreeviewHttpClient {
                 override suspend fun get(url: String, headers: Map<String, String>): String = error("unused")
@@ -33,11 +33,11 @@ class FreeviewResolversTest {
                     url: String,
                     body: String,
                     headers: Map<String, String>,
-                ): String = error("unused")
+                ): String = """{"result":{"url":"https://cdn.example/joj.m3u8"}}"""
             },
-        ).resolve(TvChannel.JOJ_SPORT) as StreamResolution.Playable
+        ).resolve(TvChannel.JOJ) as StreamResolution.Playable
 
-        assertEquals("https://live.cdn.joj.sk/live/andromeda/joj_sport-1080.m3u8", result.source.url)
+        assertEquals("https://cdn.example/joj.m3u8", result.source.url)
         assertEquals(StreamManifest.HLS, result.source.manifest)
     }
 }
