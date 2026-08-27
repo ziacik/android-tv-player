@@ -35,6 +35,19 @@ class SweetTvResolverTest {
     }
 
     @Test
+    fun `requests Men With The Pot with its Sweet TV channel id`() = runTest {
+        val http = RecordingHttpClient(
+            response = """{"result":"OK","scheme":"HTTP_HLS","url":"https://cdn.example/men-with-the-pot.m3u8"}""",
+        )
+
+        SweetTvResolver(http).resolve(TvChannel.MEN_WITH_THE_POT)
+
+        val request = JSONObject(http.requestBody)
+        assertTrue(request.getBoolean("without_auth"))
+        assertEquals(2648, request.getInt("channel_id"))
+    }
+
+    @Test
     fun `rejects a response that is not an anonymous HLS stream`() = runTest {
         val http = RecordingHttpClient(
             response = """{"result":"OK","scheme":"HTTP_DASH","url":"https://cdn.example/live.mpd"}""",
