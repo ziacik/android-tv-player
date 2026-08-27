@@ -1,5 +1,6 @@
 package sk.ziacik.androidtvplayer.player
 
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -10,6 +11,7 @@ import sk.ziacik.androidtvplayer.resolver.ProgramMetadata
 import sk.ziacik.androidtvplayer.resolver.StreamResolution
 import sk.ziacik.androidtvplayer.resolver.StreamSource
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class PlayerControllerCatalogRefreshTest {
     @Test
     fun `retry resolves refreshed channel instance with the same storage key`() = runTest {
