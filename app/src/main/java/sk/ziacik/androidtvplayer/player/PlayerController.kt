@@ -188,24 +188,35 @@ class PlayerController(
         resolveCurrentChannel()
     }
 
-    fun seekBack() {
-        if (released) return
+    fun seekBack(): Long? {
+        if (released) return null
         val snapshot = playerPort.snapshot()
-        if (!snapshot.isSeekable) return
-        playerPort.seekTo(
-            (snapshot.currentPositionMs - SEEK_INCREMENT_MS).coerceAtLeast(0L),
-        )
+        if (!snapshot.isSeekable) return null
+        val target = (snapshot.currentPositionMs - SEEK_INCREMENT_MS).coerceAtLeast(0L)
+        playerPort.seekTo(target)
+        return seekClockTime(snapshot, target)
     }
 
-    fun seekForward() {
-        if (released) return
+    fun seekForward(): Long? {
+        if (released) return null
         val snapshot = playerPort.snapshot()
-        if (!snapshot.isSeekable) return
+        if (!snapshot.isSeekable) return null
         val requested = snapshot.currentPositionMs + SEEK_INCREMENT_MS
         val target = snapshot.durationMs?.let { duration ->
             requested.coerceIn(0L, duration.coerceAtLeast(0L))
         } ?: requested
         playerPort.seekTo(target)
+        return seekClockTime(snapshot, target)
+    }
+
+    private fun seekClockTime(snapshot: PlaybackSnapshot, targetPositionMs: Long): Long? {
+        val playbackOffsetMs = snapshot.liveOffsetMs
+            ?: snapshot.durationMs
+                ?.minus(snapshot.currentPositionMs)
+                ?.coerceAtLeast(0L)
+            ?: return null
+        val currentPlaybackClockMs = nowMs() - playbackOffsetMs
+        return currentPlaybackClockMs + (targetPositionMs - snapshot.currentPositionMs)
     }
 
     fun togglePlayback() {
