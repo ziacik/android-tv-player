@@ -129,7 +129,7 @@ class PlayerOverlayModelTest {
     }
 
     @Test
-    fun `missing or reversed programme timestamps hide the progress marker`() {
+    fun `missing programme timestamps fall back to seekable stream progress`() {
         val missing = PlayerOverlayModel.from(
             ready(position = 40_000L, duration = 100_000L, offset = 60_000L).copy(
                 program = program.copy(startsAtMs = null),
@@ -143,14 +143,28 @@ class PlayerOverlayModelTest {
             nowMs = 40_000L,
         )
 
-        assertNull(missing.progress)
-        assertNull(reversed.progress)
+        assertEquals(0.4f, missing.progress!!, 0.0001f)
+        assertEquals(0.4f, reversed.progress!!, 0.0001f)
         assertNull(missing.programmeStartMs)
         assertNull(missing.programmeNowMs)
         assertNull(missing.programmeEndMs)
         assertNull(reversed.programmeStartMs)
         assertNull(reversed.programmeNowMs)
         assertNull(reversed.programmeEndMs)
+    }
+
+    @Test
+    fun `no EPG still exposes seekable stream progress`() {
+        val model = PlayerOverlayModel.from(
+            ready(position = 75_000L, duration = 100_000L, offset = 25_000L).copy(program = null),
+            nowMs = 100_000L,
+        )
+
+        assertEquals(0.75f, model.progress!!, 0.0001f)
+        assertNull(model.programmeStartMs)
+        assertNull(model.programmeNowMs)
+        assertNull(model.programmeEndMs)
+        assertTrue(model.isSeekable)
     }
 
     @Test
@@ -173,7 +187,7 @@ class PlayerOverlayModelTest {
     }
 
     @Test
-    fun `recovery model without programme hides timeline`() {
+    fun `recovery model without programme keeps an empty timeline slot`() {
         val model = PlayerOverlayModel.from(
             channel = TvChannel.DVOJKA,
             program = null,
