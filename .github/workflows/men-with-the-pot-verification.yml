@@ -7,6 +7,7 @@ on:
       - fix/prefer-hd-adaptive-streams
       - feat/modern-osd-timeline-clock
       - feat/kanalik-modern-broadcast-osd
+      - feature/mini-epg
 
 jobs:
   verify:
