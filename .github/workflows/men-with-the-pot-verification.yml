@@ -7,55 +7,12 @@ on:
       - fix/prefer-hd-adaptive-streams
       - feat/modern-osd-timeline-clock
       - feat/kanalik-modern-broadcast-osd
-      - feat/seamless-channel-switch
-
-permissions:
-  contents: write
 
 jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Update channel-switch test expectations
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          path = Path('app/src/test/java/sk/ziacik/androidtvplayer/player/PlayerControllerTest.kt')
-          text = path.read_text()
-          replacements = [
-              (
-                  'fun `channel up stops old source loads Dvojka and persists it`()',
-                  'fun `channel up pauses old source loads Dvojka and persists it`()',
-              ),
-              (
-                  'fun `direct selection stops old source loads requested channel and persists it`()',
-                  'fun `direct selection pauses old source loads requested channel and persists it`()',
-              ),
-              (
-                  '''assertEquals(listOf(TvChannel.DVOJKA), savedChannels)\n        assertEquals(1, player.stopCalls)\n        assertEquals(TvChannel.DVOJKA, controller.state.value.channel)''',
-                  '''assertEquals(listOf(TvChannel.DVOJKA), savedChannels)\n        assertEquals(1, player.pauseCalls)\n        assertEquals(0, player.stopCalls)\n        assertEquals(TvChannel.DVOJKA, controller.state.value.channel)''',
-              ),
-              (
-                  '''assertEquals(listOf(TvChannel.entries[11]), savedChannels)\n        assertEquals(1, player.stopCalls)\n        assertEquals(TvChannel.entries[11], controller.state.value.channel)''',
-                  '''assertEquals(listOf(TvChannel.entries[11]), savedChannels)\n        assertEquals(1, player.pauseCalls)\n        assertEquals(0, player.stopCalls)\n        assertEquals(TvChannel.entries[11], controller.state.value.channel)''',
-              ),
-          ]
-          for old, new in replacements:
-              if old in text:
-                  text = text.replace(old, new, 1)
-              elif new not in text:
-                  raise SystemExit(f'Expected test fragment not found: {old[:80]}')
-          path.write_text(text)
-          PY
-          if ! git diff --quiet; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add app/src/test/java/sk/ziacik/androidtvplayer/player/PlayerControllerTest.kt
-            git commit -m "test: update channel switch expectations"
-            git push
-          fi
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
