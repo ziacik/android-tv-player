@@ -6,6 +6,7 @@ on:
       - feat/men-with-the-pot
       - fix/prefer-hd-adaptive-streams
       - feat/modern-osd-timeline-clock
+      - fix/osd-timeout-after-epg
 
 jobs:
   verify:
