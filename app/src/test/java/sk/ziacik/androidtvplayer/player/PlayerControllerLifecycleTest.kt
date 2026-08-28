@@ -4,7 +4,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import sk.ziacik.androidtvplayer.channel.TvChannel
 import sk.ziacik.androidtvplayer.resolver.ProgramMetadata
@@ -42,12 +41,7 @@ class PlayerControllerLifecycleTest {
         advanceUntilIdle()
         assertEquals(1, resolveCalls)
 
-        val stopMethod = runCatching {
-            PlayerController::class.java.getDeclaredMethod("stop")
-        }.getOrNull()
-        assertTrue("PlayerController must expose a non-terminal stop()", stopMethod != null)
-
-        stopMethod!!.invoke(controller)
+        controller.stop()
         assertEquals(1, player.stopCalls)
         assertEquals(0, player.releaseCalls)
 
