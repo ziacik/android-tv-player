@@ -14,7 +14,7 @@ import sk.ziacik.androidtvplayer.resolver.StreamSource
 @OptIn(ExperimentalCoroutinesApi::class)
 class PlayerControllerLifecycleTest {
     @Test
-    fun `background stop stops playback and allows a fresh start`() = runTest {
+    fun `background stop blocks playback until a fresh start`() = runTest {
         var resolveCalls = 0
         val player = FakePlayerPort()
         val controller = PlayerController(
@@ -50,6 +50,11 @@ class PlayerControllerLifecycleTest {
         stopMethod!!.invoke(controller)
         assertEquals(1, player.stopCalls)
         assertEquals(0, player.releaseCalls)
+
+        controller.retry()
+        advanceUntilIdle()
+        assertEquals(1, resolveCalls)
+        assertEquals(1, player.loadedSources.size)
 
         controller.start()
         advanceUntilIdle()
