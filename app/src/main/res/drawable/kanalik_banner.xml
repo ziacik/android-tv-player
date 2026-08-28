@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <size
+                android:width="320dp"
+                android:height="180dp" />
+            <gradient
+                android:type="linear"
+                android:angle="315"
+                android:startColor="#FFFFE56A"
+                android:centerColor="#FFFFD84A"
+                android:endColor="#FFFFB82E" />
+        </shape>
+    </item>
+    <item
+        android:width="304dp"
+        android:height="92dp"
+        android:gravity="center"
+        android:drawable="@drawable/kanalik_wordmark_banner" />
+</layer-list>

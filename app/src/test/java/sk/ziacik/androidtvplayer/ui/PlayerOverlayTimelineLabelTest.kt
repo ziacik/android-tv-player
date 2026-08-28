@@ -7,12 +7,12 @@ import org.junit.Test
 class PlayerOverlayTimelineLabelTest {
     @Test
     fun `remaining label rounds partial minutes up`() {
-        assertEquals("18 min left", formatRemainingTimeLabel(1_000L, 1_081_000L))
+        assertEquals("18 min", formatRemainingTimeLabel(1_000L, 1_081_000L))
     }
 
     @Test
     fun `remaining label reaches zero at programme end`() {
-        assertEquals("0 min left", formatRemainingTimeLabel(100_000L, 100_000L))
+        assertEquals("0 min", formatRemainingTimeLabel(100_000L, 100_000L))
     }
 
     @Test
