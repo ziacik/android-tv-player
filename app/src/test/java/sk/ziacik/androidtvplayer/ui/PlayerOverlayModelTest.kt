@@ -39,10 +39,10 @@ class PlayerOverlayModelTest {
     }
 
     @Test
-    fun `uses programme progress and exposes its EPG times`() {
+    fun `uses watched programme progress and exposes its EPG times`() {
         val model = PlayerOverlayModel.from(
             ready(position = 40_000L, duration = 100_000L, offset = 60_000L),
-            nowMs = 40_000L,
+            nowMs = 100_000L,
         )
 
         assertEquals(0.4f, model.progress!!, 0.0001f)
@@ -115,7 +115,7 @@ class PlayerOverlayModelTest {
     }
 
     @Test
-    fun `programme timeline ignores the stream window position`() {
+    fun `programme timeline follows the stream window position`() {
         val model = PlayerOverlayModel.from(
             ready(position = 95_000L, duration = 100_000L, offset = 5_000L).copy(
                 program = ProgramMetadata("Film", 1_000L, 101_000L, true),
@@ -123,7 +123,8 @@ class PlayerOverlayModelTest {
             nowMs = 41_000L,
         )
 
-        assertEquals(0.4f, model.progress!!, 0.0001f)
+        assertEquals(0.35f, model.progress!!, 0.0001f)
+        assertEquals(36_000L, model.programmeNowMs)
         assertTrue(model.isLive)
     }
 
