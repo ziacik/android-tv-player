@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feat/men-with-the-pot
+      - fix/prefer-hd-adaptive-streams
 
 jobs:
   verify:
