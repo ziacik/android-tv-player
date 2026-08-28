@@ -28,7 +28,7 @@ class PlayerOverlayTest {
     }
 
     @Test
-    fun cinematicOverlayExposesProgramTimelineAndActions() {
+    fun cinematicOverlayExposesModernTimelineClockAndSeekPreview() {
         compose.setContent {
             AndroidTvPlayerTheme {
                 PlayerOverlay(
@@ -50,9 +50,10 @@ class PlayerOverlayTest {
                         mapOf(
                             1_000L to "20:15",
                             2_000L to "20:42",
-                            3_000L to "21:20",
                         ).getValue(milliseconds)
                     },
+                    seekPreviewMs = 2_500L,
+                    formatSeekTime = { "20:42:37" },
                 )
             }
         }
@@ -61,15 +62,19 @@ class PlayerOverlayTest {
         compose.onNodeWithText("Večerný program").assertIsDisplayed()
         compose.onNodeWithText("20:15").assertIsDisplayed()
         compose.onNodeWithText("20:42").assertIsDisplayed()
-        compose.onNodeWithText("21:20").assertIsDisplayed()
+        compose.onNodeWithText("20:42:37").assertIsDisplayed()
+        compose.onNodeWithText("1 min left").assertIsDisplayed()
         compose.onNodeWithText("↶ 10").assertIsDisplayed()
         compose.onNodeWithText("10 ↷").assertIsDisplayed()
         compose.onNodeWithText("NAŽIVO").assertIsDisplayed()
+        compose.onNodeWithTag("wall-clock").assertIsDisplayed()
         compose.onNodeWithTag("live-window-progress").assertIsDisplayed()
-        compose.onNodeWithTag("current-programme-time").assertIsDisplayed()
+        compose.onNodeWithTag("seek-preview-time").assertIsDisplayed()
         compose.onNodeWithTag("programme-progress-marker").assertIsDisplayed()
         compose.onNodeWithTag("programme-start-boundary").assertIsDisplayed()
-        compose.onNodeWithTag("programme-end-boundary").assertIsDisplayed()
+        compose.onNodeWithTag("programme-time-remaining").assertIsDisplayed()
+        compose.onNodeWithTag("current-programme-time").assertDoesNotExist()
+        compose.onNodeWithTag("programme-end-boundary").assertDoesNotExist()
     }
 
     @Test
@@ -102,6 +107,7 @@ class PlayerOverlayTest {
 
         compose.onNodeWithText("2 · DVOJKA").assertIsDisplayed()
         compose.onNodeWithText("Večerný program").assertIsDisplayed()
+        compose.onNodeWithTag("wall-clock").assertIsDisplayed()
     }
 
     @Test
@@ -119,6 +125,7 @@ class PlayerOverlayTest {
 
         compose.onNodeWithText("2 · DVOJKA").assertIsDisplayed()
         compose.onNodeWithTag("switching-indicator").assertIsDisplayed()
+        compose.onNodeWithTag("wall-clock").assertIsDisplayed()
         compose.onNodeWithText("PREPÍNAM…").assertDoesNotExist()
     }
 
@@ -146,10 +153,11 @@ class PlayerOverlayTest {
 
         compose.onNodeWithText("1 · JEDNOTKA").assertIsDisplayed()
         compose.onNodeWithText("↻").assertIsDisplayed()
+        compose.onNodeWithTag("wall-clock").assertIsDisplayed()
     }
 
     @Test
-    fun noEpgTimelineKeepsCurrentTimeWithoutProgrammeBounds() {
+    fun noEpgKeepsWallClockAndHidesMeaninglessTimeline() {
         compose.setContent {
             AndroidTvPlayerTheme {
                 PlayerOverlay(
@@ -173,11 +181,11 @@ class PlayerOverlayTest {
             }
         }
 
-        compose.onNodeWithTag("live-window-progress").assertIsDisplayed()
-        compose.onNodeWithTag("current-programme-time").assertIsDisplayed()
+        compose.onNodeWithTag("wall-clock").assertIsDisplayed()
+        compose.onNodeWithTag("live-window-progress").assertDoesNotExist()
+        compose.onNodeWithTag("seek-preview-time").assertDoesNotExist()
         compose.onNodeWithTag("programme-start-boundary").assertDoesNotExist()
-        compose.onNodeWithTag("programme-end-boundary").assertDoesNotExist()
-        compose.onNodeWithTag("programme-progress-marker").assertIsDisplayed()
+        compose.onNodeWithTag("programme-progress-marker").assertDoesNotExist()
         compose.onNodeWithTag("switching-indicator").assertIsDisplayed()
         compose.onNodeWithText("PREPÍNAM…").assertDoesNotExist()
     }
@@ -201,5 +209,6 @@ class PlayerOverlayTest {
         }
 
         compose.onNodeWithText("Večerný program").assertDoesNotExist()
+        compose.onNodeWithTag("wall-clock").assertDoesNotExist()
     }
 }
