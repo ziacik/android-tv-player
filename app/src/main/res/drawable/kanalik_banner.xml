@@ -5,12 +5,12 @@
             <size
                 android:width="320dp"
                 android:height="180dp" />
-            <solid android:color="#FF0C0C11" />
+            <solid android:color="#FFFFD84A" />
         </shape>
     </item>
     <item
-        android:width="260dp"
-        android:height="78dp"
+        android:width="292dp"
+        android:height="88dp"
         android:gravity="center"
-        android:drawable="@drawable/kanalik_wordmark" />
+        android:drawable="@drawable/kanalik_wordmark_banner" />
 </layer-list>
