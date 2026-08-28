@@ -130,7 +130,7 @@ class PlayerController(
         activePlaybackChannel = null
         activeLoadId = null
         cancelEpgLookup()
-        playerPort.stop()
+        playerPort.pause()
         resolveCurrentChannel()
     }
 
