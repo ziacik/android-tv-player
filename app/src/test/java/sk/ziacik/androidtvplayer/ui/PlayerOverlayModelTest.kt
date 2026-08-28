@@ -156,7 +156,13 @@ class PlayerOverlayModelTest {
     @Test
     fun `no EPG still exposes seekable stream progress`() {
         val model = PlayerOverlayModel.from(
-            ready(position = 75_000L, duration = 100_000L, offset = 25_000L).copy(program = null),
+            ready(position = 75_000L, duration = 100_000L, offset = 25_000L).copy(
+                program = program.copy(
+                    startsAtMs = null,
+                    endsAtMs = null,
+                    isEpgLookupPending = true,
+                ),
+            ),
             nowMs = 100_000L,
         )
 
