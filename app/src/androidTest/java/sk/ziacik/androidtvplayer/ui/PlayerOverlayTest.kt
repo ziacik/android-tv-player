@@ -1,6 +1,5 @@
 package sk.ziacik.androidtvplayer.ui
 
-import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -65,8 +64,8 @@ class PlayerOverlayTest {
         compose.onNodeWithText("20:42").assertIsDisplayed()
         compose.onNodeWithText("20:42:37").assertIsDisplayed()
         compose.onNodeWithText("1 min").assertIsDisplayed()
-        compose.onNodeWithText("↶").assertIsDisplayed()
-        compose.onNodeWithText("↷").assertIsDisplayed()
+        compose.onNodeWithText("↶").assertDoesNotExist()
+        compose.onNodeWithText("↷").assertDoesNotExist()
         compose.onNodeWithText("↶ 10").assertDoesNotExist()
         compose.onNodeWithText("10 ↷").assertDoesNotExist()
         compose.onNodeWithText("NAŽIVO").assertIsDisplayed()
