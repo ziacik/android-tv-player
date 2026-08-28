@@ -21,15 +21,21 @@ class Media3PlayerPort(context: Context) : PlayerPort {
     private var listener: PlayerPort.Listener? = null
     private var activePlayerListener: Player.Listener? = null
 
-    override fun snapshot() = PlaybackSnapshot(
-        currentPositionMs = player.currentPosition.coerceAtLeast(0L),
-        durationMs = player.duration
-            .takeUnless { duration -> duration == C.TIME_UNSET || duration < 0L },
-        liveOffsetMs = player.currentLiveOffset
-            .takeUnless { offset -> offset == C.TIME_UNSET || offset < 0L },
-        isSeekable = player.isCurrentMediaItemSeekable,
-        isPlaying = player.isPlaying,
-    )
+    override fun snapshot(): PlaybackSnapshot {
+        val videoFormat = player.videoFormat
+        return PlaybackSnapshot(
+            currentPositionMs = player.currentPosition.coerceAtLeast(0L),
+            durationMs = player.duration
+                .takeUnless { duration -> duration == C.TIME_UNSET || duration < 0L },
+            liveOffsetMs = player.currentLiveOffset
+                .takeUnless { offset -> offset == C.TIME_UNSET || offset < 0L },
+            isSeekable = player.isCurrentMediaItemSeekable,
+            isPlaying = player.isPlaying,
+            videoWidth = videoFormat?.width?.takeIf { it > 0 },
+            videoHeight = videoFormat?.height?.takeIf { it > 0 },
+            videoBitrate = videoFormat?.bitrate?.takeIf { it > 0 },
+        )
+    }
 
     override fun load(loadId: Long, source: StreamSource) {
         val loadListener = object : Player.Listener {
