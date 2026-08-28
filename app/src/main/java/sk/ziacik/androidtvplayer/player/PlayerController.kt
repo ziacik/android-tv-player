@@ -36,7 +36,8 @@ class PlayerController(
     private var activePlaybackChannel: TvChannel? = null
     private var activeLoadId: Long? = null
     private var resolveJob: Job? = null
-    private var restrictedRetryJob: Job? = null
+    private var retryJob: Job? = null
+    private var retryAttempt = 0
     private var epgJob: Job? = null
     private var epgLoadId: Long? = null
     private var refreshedProgrammeEndMs: Long? = null
@@ -63,6 +64,7 @@ class PlayerController(
 
                 override fun onError(loadId: Long, message: String) {
                     if (!acceptsPlaybackCallback(loadId)) return
+                    val program = activeProgram
                     cancelEpgLookup()
                     diagnostics("Media3 playback failed: $message", null)
                     activeProgram = null
@@ -72,10 +74,13 @@ class PlayerController(
                         resolveCurrentChannel()
                         return
                     }
+                    val nextRetryAtMs = scheduleOrdinaryRetry(currentChannel)
                     mutableState.value = PlayerUiState.Error(
                         channel = currentChannel,
                         message = ERROR_MESSAGE,
                         reason = playbackFailureReason(message),
+                        nextRetryAtMs = nextRetryAtMs,
+                        program = program,
                     )
                 }
             },
@@ -84,7 +89,10 @@ class PlayerController(
 
     fun start() = resolveCurrentChannel()
 
-    fun retry() = resolveCurrentChannel()
+    fun retry() {
+        retryAttempt = 0
+        resolveCurrentChannel()
+    }
 
     fun channelUp() = switchTo(currentChannel.next())
 
@@ -108,8 +116,8 @@ class PlayerController(
     private fun resolveCurrentChannel() {
         if (released) return
         resolveJob?.cancel()
-        restrictedRetryJob?.cancel()
-        restrictedRetryJob = null
+        retryJob?.cancel()
+        retryJob = null
         cancelEpgLookup()
         currentChannel = TvChannel.entries
             .firstOrNull { it.storageKey == currentChannel.storageKey }
@@ -142,10 +150,12 @@ class PlayerController(
                     return@launch
                 }
                 diagnostics("Stream resolve failed for ${channel.displayName}", error)
+                val nextRetryAtMs = scheduleOrdinaryRetry(channel)
                 mutableState.value = PlayerUiState.Error(
                     channel = channel,
                     message = ERROR_MESSAGE,
                     reason = resolverFailureReason(error),
+                    nextRetryAtMs = nextRetryAtMs,
                 )
             }
         }
@@ -214,8 +224,8 @@ class PlayerController(
         resolveGeneration += 1
         resolveJob?.cancel()
         resolveJob = null
-        restrictedRetryJob?.cancel()
-        restrictedRetryJob = null
+        retryJob?.cancel()
+        retryJob = null
         cancelEpgLookup()
         activeProgram = null
         activePlaybackChannel = null
@@ -230,7 +240,7 @@ class PlayerController(
                 activePlaybackChannel = channel
                 val loadId = ++nextLoadId
                 activeLoadId = loadId
-                mutableState.value = PlayerUiState.Preparing(channel)
+                mutableState.value = PlayerUiState.Preparing(channel, resolution.program)
                 try {
                     requestEpgProgrammeIfNeeded(resolution.program)
                     playerPort.load(loadId, resolution.source)
@@ -240,10 +250,13 @@ class PlayerController(
                     activePlaybackChannel = null
                     activeLoadId = null
                     diagnostics("Media3 load failed", null)
+                    val nextRetryAtMs = scheduleOrdinaryRetry(channel)
                     mutableState.value = PlayerUiState.Error(
                         channel = channel,
                         message = ERROR_MESSAGE,
                         reason = "Prehrávač nedokázal pripraviť stream",
+                        nextRetryAtMs = nextRetryAtMs,
+                        program = resolution.program,
                     )
                 }
             }
@@ -251,11 +264,12 @@ class PlayerController(
                 activeProgram = null
                 activePlaybackChannel = null
                 activeLoadId = null
+                val nextRetryAtMs = scheduleUnavailableRetry(channel, resolution.program.endsAtMs)
                 mutableState.value = PlayerUiState.Unavailable(
                     channel = channel,
                     program = resolution.program,
+                    nextRetryAtMs = nextRetryAtMs,
                 )
-                scheduleRestrictedRetry(channel, resolution.program.endsAtMs)
             }
             is StreamResolution.RequiresCredentials -> {
                 activeProgram = null
@@ -266,18 +280,33 @@ class PlayerController(
         }
     }
 
-    private fun scheduleRestrictedRetry(channel: TvChannel, endsAtMs: Long?) {
-        restrictedRetryJob?.cancel()
+    private fun scheduleUnavailableRetry(channel: TvChannel, endsAtMs: Long?): Long {
         val untilEnd = endsAtMs?.minus(nowMs())
         val retryDelayMs = if (untilEnd != null && untilEnd > 0L) {
             untilEnd + RETRY_AFTER_END_PADDING_MS
         } else {
-            RESTRICTED_RETRY_FALLBACK_MS
+            nextRetryDelayMs()
         }
-        restrictedRetryJob = scope.launch {
+        return scheduleRetry(channel, retryDelayMs)
+    }
+
+    private fun scheduleOrdinaryRetry(channel: TvChannel): Long =
+        scheduleRetry(channel, nextRetryDelayMs())
+
+    private fun scheduleRetry(channel: TvChannel, retryDelayMs: Long): Long {
+        retryJob?.cancel()
+        val nextRetryAtMs = nowMs() + retryDelayMs
+        retryJob = scope.launch {
             delay(retryDelayMs)
-            if (!released && channel == currentChannel) retry()
+            if (!released && channel == currentChannel) resolveCurrentChannel()
         }
+        return nextRetryAtMs
+    }
+
+    private fun nextRetryDelayMs(): Long {
+        val delayMs = RETRY_DELAYS_MS[retryAttempt.coerceAtMost(RETRY_DELAYS_MS.lastIndex)]
+        retryAttempt += 1
+        return delayMs
     }
 
     private fun acceptsPlaybackCallback(loadId: Long): Boolean =
@@ -287,6 +316,7 @@ class PlayerController(
 
     private fun updateReadyState(isPlaying: Boolean) {
         val program = activeProgram ?: return
+        retryAttempt = 0
         mutableState.value = PlayerUiState.Ready(
             channel = currentChannel,
             program = program,
@@ -320,9 +350,15 @@ class PlayerController(
             }
             if (!acceptsPlaybackCallback(loadId)) return@launch
             activeProgram = epgProgramme
-            val ready = mutableState.value as? PlayerUiState.Ready ?: return@launch
-            if (ready.channel != channel) return@launch
-            mutableState.value = ready.copy(program = epgProgramme)
+            when (val current = mutableState.value) {
+                is PlayerUiState.Ready -> if (current.channel == channel) {
+                    mutableState.value = current.copy(program = epgProgramme)
+                }
+                is PlayerUiState.Preparing -> if (current.channel == channel) {
+                    mutableState.value = current.copy(program = epgProgramme)
+                }
+                else -> Unit
+            }
         }
     }
 
@@ -355,7 +391,7 @@ class PlayerController(
     private companion object {
         const val SEEK_INCREMENT_MS = 10_000L
         const val RETRY_AFTER_END_PADDING_MS = 2_000L
-        const val RESTRICTED_RETRY_FALLBACK_MS = 60_000L
+        val RETRY_DELAYS_MS = longArrayOf(1_000L, 2_000L, 4_000L, 8_000L, 16_000L, 32_000L, 60_000L)
         const val ERROR_MESSAGE = "Stream sa nepodarilo načítať"
     }
 }

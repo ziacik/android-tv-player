@@ -33,9 +33,10 @@ class PlayerOverlayTest {
             AndroidTvPlayerTheme {
                 PlayerOverlay(
                     model = PlayerOverlayModel(
-                        channelLabel = "1 · JEDNOTKA · NAŽIVO",
+                        channelLabel = "1 · JEDNOTKA",
                         programTitle = "Večerný program",
                         progress = 0.4f,
+                        displayNowMs = 2_000L,
                         programmeStartMs = 1_000L,
                         programmeNowMs = 2_000L,
                         programmeEndMs = 3_000L,
@@ -56,7 +57,7 @@ class PlayerOverlayTest {
             }
         }
 
-        compose.onNodeWithText("1 · JEDNOTKA · NAŽIVO").assertIsDisplayed()
+        compose.onNodeWithText("1 · JEDNOTKA").assertIsDisplayed()
         compose.onNodeWithText("Večerný program").assertIsDisplayed()
         compose.onNodeWithText("20:15").assertIsDisplayed()
         compose.onNodeWithText("20:42").assertIsDisplayed()
@@ -69,24 +70,6 @@ class PlayerOverlayTest {
         compose.onNodeWithTag("programme-progress-marker").assertIsDisplayed()
         compose.onNodeWithTag("programme-start-boundary").assertIsDisplayed()
         compose.onNodeWithTag("programme-end-boundary").assertIsDisplayed()
-    }
-
-    @Test
-    fun restrictedPanelShowsProgramAndRetryTime() {
-        compose.setContent {
-            AndroidTvPlayerTheme {
-                RestrictedProgramPanel(
-                    channelLabel = "JEDNOTKA",
-                    programTitle = "Ordinácia v Eifeli: Šance",
-                    retryTime = "12:54",
-                )
-            }
-        }
-
-        compose.onNodeWithText("Tento program nie je dostupný online").assertIsDisplayed()
-        compose.onNodeWithText("Ordinácia v Eifeli: Šance").assertIsDisplayed()
-        compose.onNodeWithText("Vysielanie skúsime obnoviť o 12:54").assertIsDisplayed()
-        compose.onNodeWithText("Skúsiť znova").assertIsDisplayed()
     }
 
     @Test
@@ -117,12 +100,12 @@ class PlayerOverlayTest {
             }
         }
 
-        compose.onNodeWithText("2 · DVOJKA · NAŽIVO").assertIsDisplayed()
+        compose.onNodeWithText("2 · DVOJKA").assertIsDisplayed()
         compose.onNodeWithText("Večerný program").assertIsDisplayed()
     }
 
     @Test
-    fun resolvingDvojkaStateShowsChannelWhileOverlayIsHidden() {
+    fun resolvingDvojkaStateRendersStandardOverlay() {
         compose.setContent {
             AndroidTvPlayerTheme {
                 PlayerStateLayer(
@@ -134,11 +117,13 @@ class PlayerOverlayTest {
             }
         }
 
-        compose.onNodeWithText("DVOJKA · NAČÍTAVAM").assertIsDisplayed()
+        compose.onNodeWithText("2 · DVOJKA").assertIsDisplayed()
+        compose.onNodeWithTag("switching-indicator").assertIsDisplayed()
+        compose.onNodeWithText("PREPÍNAM…").assertDoesNotExist()
     }
 
     @Test
-    fun unavailableStateRendersRestrictedPanel() {
+    fun unavailableStateRendersStandardOverlay() {
         compose.setContent {
             AndroidTvPlayerTheme {
                 PlayerStateLayer(
@@ -150,6 +135,7 @@ class PlayerOverlayTest {
                             endsAtMs = 20_000L,
                             internetAllowed = false,
                         ),
+                        nextRetryAtMs = 0L,
                     ),
                     overlayVisible = false,
                     focusedControl = FocusedControl.PLAY_PAUSE,
@@ -158,34 +144,42 @@ class PlayerOverlayTest {
             }
         }
 
-        compose.onNodeWithText("Tento program nie je dostupný online").assertIsDisplayed()
-        compose.onNodeWithText("Vysielanie skúsime obnoviť o 12:54").assertIsDisplayed()
+        compose.onNodeWithText("1 · JEDNOTKA").assertIsDisplayed()
+        compose.onNodeWithText("↻").assertIsDisplayed()
     }
 
     @Test
-    fun unavailableDvojkaStateRendersChannelRestrictionAndRetryTime() {
+    fun noEpgTimelineKeepsCurrentTimeWithoutProgrammeBounds() {
         compose.setContent {
             AndroidTvPlayerTheme {
-                PlayerStateLayer(
-                    state = PlayerUiState.Unavailable(
-                        channel = TvChannel.DVOJKA,
-                        program = ProgramMetadata(
-                            title = "Ordinácia v Eifeli: Šance",
-                            startsAtMs = null,
-                            endsAtMs = 20_000L,
-                            internetAllowed = false,
-                        ),
+                PlayerOverlay(
+                    model = PlayerOverlayModel(
+                        channelLabel = "2 · DVOJKA",
+                        programTitle = "",
+                        progress = null,
+                        displayNowMs = 2_000L,
+                        programmeStartMs = null,
+                        programmeNowMs = null,
+                        programmeEndMs = null,
+                        isLive = false,
+                        isPlaying = false,
+                        isSeekable = false,
+                        liveActionText = "PREPÍNAM…",
+                        stateIndicator = PlayerOverlayStateIndicator.SWITCHING,
                     ),
-                    overlayVisible = false,
-                    focusedControl = FocusedControl.PLAY_PAUSE,
+                    focusedControl = FocusedControl.TIMELINE,
                     formatTime = { "12:54" },
                 )
             }
         }
 
-        compose.onNodeWithText("DVOJKA").assertIsDisplayed()
-        compose.onNodeWithText("Tento program nie je dostupný online").assertIsDisplayed()
-        compose.onNodeWithText("Vysielanie skúsime obnoviť o 12:54").assertIsDisplayed()
+        compose.onNodeWithTag("live-window-progress").assertIsDisplayed()
+        compose.onNodeWithTag("current-programme-time").assertIsDisplayed()
+        compose.onNodeWithTag("programme-start-boundary").assertDoesNotExist()
+        compose.onNodeWithTag("programme-end-boundary").assertDoesNotExist()
+        compose.onNodeWithTag("programme-progress-marker").assertIsDisplayed()
+        compose.onNodeWithTag("switching-indicator").assertIsDisplayed()
+        compose.onNodeWithText("PREPÍNAM…").assertDoesNotExist()
     }
 
     @Test

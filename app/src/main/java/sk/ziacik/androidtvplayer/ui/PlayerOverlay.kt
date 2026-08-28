@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -80,18 +81,16 @@ fun PlayerOverlay(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (shouldShowProgramTimeline(model.progress)) {
-                Spacer(Modifier.height(3.dp))
-                LiveTimeline(
-                    progress = model.progress,
-                    programmeStartMs = model.programmeStartMs,
-                    programmeNowMs = model.programmeNowMs,
-                    programmeEndMs = model.programmeEndMs,
-                    formatTime = formatTime,
-                    focused = timelineFocused,
-                )
-                Spacer(Modifier.height(4.dp))
-            }
+            Spacer(Modifier.height(3.dp))
+            LiveTimeline(
+                progress = model.progress,
+                programmeStartMs = model.programmeStartMs,
+                displayNowMs = model.displayNowMs,
+                programmeEndMs = model.programmeEndMs,
+                formatTime = formatTime,
+                focused = timelineFocused,
+            )
+            Spacer(Modifier.height(4.dp))
             TransportControls(
                 model = model,
                 focusedControl = focusedControl,
@@ -106,15 +105,12 @@ internal fun shouldShowProgramTimeline(progress: Float?): Boolean = progress != 
 private fun LiveTimeline(
     progress: Float?,
     programmeStartMs: Long?,
-    programmeNowMs: Long?,
+    displayNowMs: Long,
     programmeEndMs: Long?,
     formatTime: (Long) -> String,
     focused: Boolean,
 ) {
-    val clampedProgress = progress?.coerceIn(0f, 1f) ?: return
-    val startMs = programmeStartMs ?: return
-    val nowMs = programmeNowMs ?: return
-    val endMs = programmeEndMs ?: return
+    val clampedProgress = progress?.coerceIn(0f, 1f)
 
     Column(
         modifier = Modifier
@@ -131,31 +127,29 @@ private fun LiveTimeline(
             val currentTimePillWidth = 52.dp
             val markerSize = if (focused) 10.dp else 8.dp
             val trackHeight = if (focused) 6.dp else 4.dp
-            val markerOffset = (maxWidth - markerSize) * clampedProgress
-            val currentTimeOffset = (markerOffset + markerSize / 2 - currentTimePillWidth / 2)
+            val markerOffset = clampedProgress?.let { (maxWidth - markerSize) * it }
+                ?: (maxWidth - markerSize) / 2
+            val currentTimeOffset = markerOffset + markerSize / 2 - currentTimePillWidth / 2
+            val clampedTimeOffset = currentTimeOffset
                 .coerceIn(0.dp, (maxWidth - currentTimePillWidth).coerceAtLeast(0.dp))
 
-            Text(
+            programmeStartMs?.let { startMs -> Text(
                 text = formatTime(startMs),
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .testTag("programme-start-boundary"),
+                modifier = Modifier.align(Alignment.BottomStart).testTag("programme-start-boundary"),
                 color = MutedWhite,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
-            )
-            Text(
+            ) }
+            programmeEndMs?.let { endMs -> Text(
                 text = formatTime(endMs),
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .testTag("programme-end-boundary"),
+                modifier = Modifier.align(Alignment.BottomEnd).testTag("programme-end-boundary"),
                 color = MutedWhite,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
-            )
+            ) }
             Box(
                 modifier = Modifier
-                    .offset(x = currentTimeOffset, y = (-4).dp)
+                    .offset(x = clampedTimeOffset, y = (-4).dp)
                     .align(Alignment.TopStart)
                     .width(currentTimePillWidth)
                     .height(24.dp)
@@ -165,7 +159,7 @@ private fun LiveTimeline(
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = formatTime(nowMs),
+                    text = formatTime(displayNowMs),
                     color = Color.White,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
@@ -179,14 +173,16 @@ private fun LiveTimeline(
                     .clip(CircleShape)
                     .background(Color.White.copy(alpha = 0.30f)),
             )
-            Box(
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .fillMaxWidth(clampedProgress)
-                    .height(trackHeight)
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.92f)),
-            )
+            clampedProgress?.let { activeProgress ->
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .fillMaxWidth(activeProgress)
+                        .height(trackHeight)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.92f)),
+                )
+            }
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
@@ -227,11 +223,30 @@ private fun TransportControls(
             focused = false,
         )
         Spacer(Modifier.weight(1f))
-        LivePill(
-            text = model.liveActionText,
-            isLive = model.isLive,
-            focused = focusedControl == FocusedControl.LIVE,
-        )
+        when (model.stateIndicator) {
+            PlayerOverlayStateIndicator.LIVE -> LivePill(
+                text = model.liveActionText,
+                isLive = model.isLive,
+                focused = focusedControl == FocusedControl.LIVE,
+            )
+            PlayerOverlayStateIndicator.SWITCHING -> Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .testTag("switching-indicator"),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    color = Color.White,
+                    strokeWidth = 2.dp,
+                )
+            }
+            PlayerOverlayStateIndicator.RETRYING -> LivePill(
+                text = "↻",
+                isLive = false,
+                focused = focusedControl == FocusedControl.LIVE,
+            )
+        }
     }
 }
 
@@ -301,73 +316,5 @@ private fun LivePill(
             fontWeight = FontWeight.Bold,
             letterSpacing = 0.5.sp,
         )
-    }
-}
-
-@Composable
-fun RestrictedProgramPanel(
-    channelLabel: String,
-    programTitle: String,
-    retryTime: String?,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth(0.72f)
-            .background(Color(0xE6111114), RoundedCornerShape(22.dp))
-            .padding(horizontal = 42.dp, vertical = 34.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text(
-            text = channelLabel,
-            color = MutedWhite,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 1.4.sp,
-        )
-        Box(
-            modifier = Modifier
-                .size(8.dp)
-                .background(LiveRed, CircleShape),
-        )
-        Text(
-            text = "Tento program nie je dostupný online",
-            color = Color.White,
-            fontSize = 23.sp,
-            fontWeight = FontWeight.SemiBold,
-            textAlign = TextAlign.Center,
-        )
-        Text(
-            text = programTitle,
-            color = MutedWhite,
-            fontSize = 17.sp,
-            textAlign = TextAlign.Center,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            text = retryTime?.let { "Vysielanie skúsime obnoviť o $it" }
-                ?: "Vysielanie budeme skúšať obnoviť automaticky",
-            color = Color.White.copy(alpha = 0.52f),
-            fontSize = 14.sp,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(4.dp))
-        Box(
-            modifier = Modifier
-                .height(40.dp)
-                .shadow(8.dp, RoundedCornerShape(22.dp))
-                .background(FocusedBackground, RoundedCornerShape(22.dp))
-                .padding(horizontal = 22.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = "Skúsiť znova",
-                color = FocusedContent,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-            )
-        }
     }
 }

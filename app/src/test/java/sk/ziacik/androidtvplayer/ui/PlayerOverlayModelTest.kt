@@ -35,7 +35,7 @@ class PlayerOverlayModelTest {
             nowMs = 40_000L,
         )
 
-        assertEquals("2 · DVOJKA · NAŽIVO", model.channelLabel)
+        assertEquals("2 · DVOJKA", model.channelLabel)
     }
 
     @Test
@@ -150,6 +150,43 @@ class PlayerOverlayModelTest {
         assertNull(reversed.programmeStartMs)
         assertNull(reversed.programmeNowMs)
         assertNull(reversed.programmeEndMs)
+    }
+
+    @Test
+    fun `switching model shows target programme and status`() {
+        val model = PlayerOverlayModel.from(
+            channel = TvChannel.DVOJKA,
+            program = program,
+            playback = null,
+            statusText = "Prepínam…",
+            nowMs = 40_000L,
+        )
+
+        assertEquals("2 · DVOJKA", model.channelLabel)
+        assertEquals("Večerný program", model.programTitle)
+        assertEquals(PlayerOverlayStateIndicator.SWITCHING, model.stateIndicator)
+        assertEquals(40_000L, model.displayNowMs)
+        assertEquals(0.4f, model.progress!!, 0.0001f)
+        assertFalse(model.isPlaying)
+        assertFalse(model.isSeekable)
+    }
+
+    @Test
+    fun `recovery model without programme hides timeline`() {
+        val model = PlayerOverlayModel.from(
+            channel = TvChannel.DVOJKA,
+            program = null,
+            playback = null,
+            statusText = "Obnovím o 12:54",
+            nowMs = 40_000L,
+        )
+
+        assertEquals("2 · DVOJKA", model.channelLabel)
+        assertEquals("", model.programTitle)
+        assertEquals(PlayerOverlayStateIndicator.RETRYING, model.stateIndicator)
+        assertEquals(40_000L, model.displayNowMs)
+        assertNull(model.progress)
+        assertNull(model.programmeStartMs)
     }
 
     private fun ready(

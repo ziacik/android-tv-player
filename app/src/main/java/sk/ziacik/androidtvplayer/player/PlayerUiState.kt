@@ -6,9 +6,15 @@ import sk.ziacik.androidtvplayer.resolver.ProgramMetadata
 sealed interface PlayerUiState {
     val channel: TvChannel
 
-    data class Resolving(override val channel: TvChannel) : PlayerUiState
+    data class Resolving(
+        override val channel: TvChannel,
+        val program: ProgramMetadata? = null,
+    ) : PlayerUiState
 
-    data class Preparing(override val channel: TvChannel) : PlayerUiState
+    data class Preparing(
+        override val channel: TvChannel,
+        val program: ProgramMetadata? = null,
+    ) : PlayerUiState
 
     data class Ready(
         override val channel: TvChannel,
@@ -19,6 +25,7 @@ sealed interface PlayerUiState {
     data class Unavailable(
         override val channel: TvChannel,
         val program: ProgramMetadata,
+        val nextRetryAtMs: Long? = null,
     ) : PlayerUiState
 
     data class CredentialsRequired(
@@ -29,5 +36,7 @@ sealed interface PlayerUiState {
         override val channel: TvChannel,
         val message: String,
         val reason: String,
+        val nextRetryAtMs: Long? = null,
+        val program: ProgramMetadata? = null,
     ) : PlayerUiState
 }

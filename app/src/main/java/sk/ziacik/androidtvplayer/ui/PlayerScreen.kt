@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedTextField
@@ -168,6 +167,7 @@ fun PlayerScreen(
                     useController = false
                     resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                     keepScreenOn = true
+                    setKeepContentOnPlayerReset(true)
                     isFocusable = false
                     isFocusableInTouchMode = false
                     this.player = player
@@ -224,10 +224,21 @@ internal fun PlayerStateLayer(
     modifier: Modifier = Modifier,
 ) {
     when (val current = state) {
-        is PlayerUiState.Resolving,
-        is PlayerUiState.Preparing,
-        -> LoadingChannelPanel(
-            channelLabel = current.channel.displayName,
+        is PlayerUiState.Resolving -> StateOverlay(
+            channel = current.channel,
+            program = current.program,
+            statusText = "Prepínam…",
+            focusedControl = focusedControl,
+            formatTime = formatTime,
+            modifier = modifier,
+        )
+
+        is PlayerUiState.Preparing -> StateOverlay(
+            channel = current.channel,
+            program = current.program,
+            statusText = "Prepínam…",
+            focusedControl = focusedControl,
+            formatTime = formatTime,
             modifier = modifier,
         )
 
@@ -241,10 +252,13 @@ internal fun PlayerStateLayer(
             )
         }
 
-        is PlayerUiState.Unavailable -> RestrictedProgramPanel(
-            channelLabel = current.channel.displayName,
-            programTitle = current.program.title,
-            retryTime = current.program.endsAtMs?.let(formatTime),
+        is PlayerUiState.Unavailable -> StateOverlay(
+            channel = current.channel,
+            program = current.program,
+            statusText = current.nextRetryAtMs?.let { "Program nie je dostupný online · obnovím o ${formatTime(it)}" }
+                ?: "Program nie je dostupný online",
+            focusedControl = focusedControl,
+            formatTime = formatTime,
             modifier = modifier,
         )
 
@@ -253,14 +267,40 @@ internal fun PlayerStateLayer(
             modifier = modifier,
         )
 
-        is PlayerUiState.Error -> ErrorPanel(
-            channelLabel = current.channel.displayName,
-            message = current.message,
-            reason = current.reason,
-            actionText = "Skúsiť znova",
+        is PlayerUiState.Error -> StateOverlay(
+            channel = current.channel,
+            program = current.program,
+            statusText = current.nextRetryAtMs?.let { "Obnovím vysielanie o ${formatTime(it)}" }
+                ?: current.message,
+            focusedControl = focusedControl,
+            formatTime = formatTime,
             modifier = modifier,
         )
     }
+}
+
+@Composable
+private fun StateOverlay(
+    channel: sk.ziacik.androidtvplayer.channel.TvChannel,
+    program: sk.ziacik.androidtvplayer.resolver.ProgramMetadata?,
+    statusText: String,
+    focusedControl: FocusedControl,
+    formatTime: (Long) -> String,
+    modifier: Modifier,
+) {
+    PlayerOverlay(
+        model = PlayerOverlayModel.from(
+            channel = channel,
+            program = program,
+            playback = null,
+            statusText = statusText,
+            nowMs = System.currentTimeMillis(),
+        ),
+        focusedControl = focusedControl,
+        timelineFocused = false,
+        formatTime = formatTime,
+        modifier = modifier,
+    )
 }
 
 @Composable
@@ -299,67 +339,6 @@ private fun MarkizaCredentialsPanel(
         ) {
             Text("Prihlásiť sa")
         }
-    }
-}
-
-@Composable
-private fun LoadingChannelPanel(
-    channelLabel: String,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(18.dp),
-    ) {
-        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-        Text(
-            text = "$channelLabel · NAČÍTAVAM",
-            color = Color.White.copy(alpha = 0.78f),
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 1.sp,
-        )
-    }
-}
-
-@Composable
-private fun ErrorPanel(
-    channelLabel: String,
-    message: String,
-    reason: String,
-    actionText: String,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(22.dp),
-    ) {
-        Text(
-            text = channelLabel,
-            color = Color.White.copy(alpha = 0.68f),
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 1.4.sp,
-        )
-        Text(text = message, color = Color.White, fontSize = 24.sp)
-        Text(
-            text = reason,
-            color = Color.White.copy(alpha = 0.72f),
-            fontSize = 16.sp,
-        )
-        Text(
-            text = actionText,
-            modifier = Modifier
-                .background(
-                    MaterialTheme.colorScheme.primary,
-                    RoundedCornerShape(12.dp),
-                )
-                .padding(horizontal = 28.dp, vertical = 14.dp),
-            color = MaterialTheme.colorScheme.onPrimary,
-            fontSize = 20.sp,
-        )
     }
 }
 

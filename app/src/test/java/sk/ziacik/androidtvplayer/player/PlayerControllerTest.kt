@@ -253,6 +253,7 @@ class PlayerControllerTest {
             PlayerUiState.Unavailable(
                 TvChannel.JEDNOTKA,
                 ProgramMetadata("Obmedzená relácia", 100_000L, 200_000L, false),
+                nextRetryAtMs = 202_000L,
             ),
             controller.state.value,
         )
@@ -392,7 +393,10 @@ class PlayerControllerTest {
             ),
             player.loadedSources.map(StreamSource::url),
         )
-        assertEquals(PlayerUiState.Preparing(TvChannel.SVET_NARUBY), controller.state.value)
+        assertEquals(
+            PlayerUiState.Preparing(TvChannel.SVET_NARUBY, PROGRAM),
+            controller.state.value,
+        )
     }
 
     @Test
@@ -405,16 +409,67 @@ class PlayerControllerTest {
         )
 
         controller.start()
-        advanceUntilIdle()
+        runCurrent()
 
-        assertEquals(
-            PlayerUiState.Error(
-                TvChannel.JEDNOTKA,
-                "Stream sa nepodarilo načítať",
-                "Sieťové pripojenie nie je dostupné",
-            ),
-            controller.state.value,
+        val error = controller.state.value as PlayerUiState.Error
+        assertEquals(TvChannel.JEDNOTKA, error.channel)
+        assertEquals("Stream sa nepodarilo načítať", error.message)
+        assertEquals("Sieťové pripojenie nie je dostupné", error.reason)
+        controller.release()
+    }
+
+    @Test
+    fun `ordinary resolve failures retry with exponential backoff`() = runTest {
+        var resolveCalls = 0
+        val controller = PlayerController(
+            scope = this,
+            initialChannel = TvChannel.JEDNOTKA,
+            resolve = {
+                resolveCalls += 1
+                throw IOException("offline")
+            },
+            playerPort = FakePlayerPort(),
+            nowMs = { testScheduler.currentTime },
         )
+
+        controller.start()
+        runCurrent()
+
+        assertEquals(1, resolveCalls)
+        assertEquals(1_000L, (controller.state.value as PlayerUiState.Error).nextRetryAtMs)
+        advanceTimeBy(999L)
+        runCurrent()
+        assertEquals(1, resolveCalls)
+        advanceTimeBy(1L)
+        runCurrent()
+        assertEquals(2, resolveCalls)
+        assertEquals(3_000L, (controller.state.value as PlayerUiState.Error).nextRetryAtMs)
+        controller.release()
+    }
+
+    @Test
+    fun `manual retry replaces the pending ordinary retry`() = runTest {
+        var resolveCalls = 0
+        val controller = PlayerController(
+            scope = this,
+            initialChannel = TvChannel.JEDNOTKA,
+            resolve = {
+                resolveCalls += 1
+                throw IOException("offline")
+            },
+            playerPort = FakePlayerPort(),
+            nowMs = { testScheduler.currentTime },
+        )
+
+        controller.start()
+        runCurrent()
+        controller.retry()
+        runCurrent()
+        advanceTimeBy(1_000L)
+        runCurrent()
+
+        assertEquals(3, resolveCalls)
+        controller.release()
     }
 
     @Test
@@ -427,13 +482,14 @@ class PlayerControllerTest {
         )
 
         controller.start()
-        advanceUntilIdle()
+        runCurrent()
 
         assertTrue(
             controller.state.value.toString().contains(
                 "reason=Sieťové pripojenie nie je dostupné",
             ),
         )
+        controller.release()
     }
 
     @Test
@@ -449,10 +505,11 @@ class PlayerControllerTest {
         )
 
         controller.start()
-        advanceUntilIdle()
+        runCurrent()
 
         assertEquals("Stream resolve failed for JEDNOTKA", diagnostics.single().first)
         assertSame(failure, diagnostics.single().second)
+        controller.release()
     }
 
     @Test
@@ -577,7 +634,7 @@ class PlayerControllerTest {
     }
 
     @Test
-    fun `missing end time uses one minute retry`() = runTest {
+    fun `unavailable programme without end time uses ordinary retry`() = runTest {
         var resolveCalls = 0
         val controller = PlayerController(
             scope = this,
@@ -592,7 +649,7 @@ class PlayerControllerTest {
 
         controller.start()
         runCurrent()
-        advanceTimeBy(59_999L)
+        advanceTimeBy(999L)
         runCurrent()
         assertEquals(1, resolveCalls)
         advanceTimeBy(1L)
@@ -831,7 +888,7 @@ class PlayerControllerTest {
         player.registeredListener.onReady(jednotkaLoadId, isPlaying = true)
         player.registeredListener.onError(jednotkaLoadId, "OLD_SOURCE_ERROR")
 
-        assertEquals(PlayerUiState.Preparing(TvChannel.DVOJKA), controller.state.value)
+        assertEquals(PlayerUiState.Preparing(TvChannel.DVOJKA, PROGRAM), controller.state.value)
         assertTrue(diagnostics.isEmpty())
         player.registeredListener.onReady(dvojkaLoadId, isPlaying = true)
         assertEquals(TvChannel.DVOJKA, controller.state.value.channel)
@@ -862,7 +919,7 @@ class PlayerControllerTest {
         player.registeredListener.onReady(firstJednotkaLoadId, isPlaying = true)
         player.registeredListener.onError(firstJednotkaLoadId, "VERY_OLD_SOURCE_ERROR")
 
-        assertEquals(PlayerUiState.Preparing(TvChannel.JEDNOTKA), controller.state.value)
+        assertEquals(PlayerUiState.Preparing(TvChannel.JEDNOTKA, PROGRAM), controller.state.value)
         assertTrue(diagnostics.isEmpty())
         player.registeredListener.onReady(latestJednotkaLoadId, isPlaying = true)
         assertTrue(controller.state.value is PlayerUiState.Ready)
@@ -933,17 +990,13 @@ class PlayerControllerTest {
         )
 
         controller.start()
-        advanceUntilIdle()
+        runCurrent()
         val failedLoadId = player.latestLoadId
 
-        assertEquals(
-            PlayerUiState.Error(
-                TvChannel.DVOJKA,
-                "Stream sa nepodarilo načítať",
-                "Prehrávač nedokázal pripraviť stream",
-            ),
-            controller.state.value,
-        )
+        val error = controller.state.value as PlayerUiState.Error
+        assertEquals(TvChannel.DVOJKA, error.channel)
+        assertEquals("Stream sa nepodarilo načítať", error.message)
+        assertEquals("Prehrávač nedokázal pripraviť stream", error.reason)
         assertEquals("Media3 load failed", diagnostics.single().first)
         assertEquals(null, diagnostics.single().second)
         assertTrue(!diagnostics.single().first.contains("secret-token"))
@@ -951,15 +1004,9 @@ class PlayerControllerTest {
         player.registeredListener.onReady(failedLoadId, isPlaying = true)
         player.registeredListener.onError(failedLoadId, "LATE_LOAD_CALLBACK")
 
-        assertEquals(
-            PlayerUiState.Error(
-                TvChannel.DVOJKA,
-                "Stream sa nepodarilo načítať",
-                "Prehrávač nedokázal pripraviť stream",
-            ),
-            controller.state.value,
-        )
+        assertEquals(error, controller.state.value)
         assertEquals(1, diagnostics.size)
+        controller.release()
     }
 
     private fun controller(
