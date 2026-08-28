@@ -24,7 +24,6 @@ internal fun formatStreamInfoLabel(width: Int?, height: Int?, bitrate: Int?): St
 
 data class PlayerOverlayModel(
     val channelLabel: String,
-    val streamInfoLabel: String? = null,
     val programTitle: String,
     val progress: Float?,
     val displayNowMs: Long = 0L,
@@ -83,16 +82,17 @@ data class PlayerOverlayModel(
                 "Prepínam…" -> PlayerOverlayStateIndicator.SWITCHING
                 else -> PlayerOverlayStateIndicator.RETRYING
             }
+            val baseChannelLabel = "${channel.ordinal + 1} · ${channel.displayName}"
+            val streamInfoLabel = playback?.let { snapshot ->
+                formatStreamInfoLabel(
+                    width = snapshot.videoWidth,
+                    height = snapshot.videoHeight,
+                    bitrate = snapshot.videoBitrate,
+                )
+            }
 
             return PlayerOverlayModel(
-                channelLabel = "${channel.ordinal + 1} · ${channel.displayName}",
-                streamInfoLabel = playback?.let { snapshot ->
-                    formatStreamInfoLabel(
-                        width = snapshot.videoWidth,
-                        height = snapshot.videoHeight,
-                        bitrate = snapshot.videoBitrate,
-                    )
-                },
+                channelLabel = listOfNotNull(baseChannelLabel, streamInfoLabel).joinToString("    "),
                 programTitle = program?.title.orEmpty(),
                 progress = progress,
                 displayNowMs = nowMs,
