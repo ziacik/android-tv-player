@@ -135,7 +135,11 @@ class PlayerController(
     }
 
     private fun resolveCurrentChannel() {
-        if (released || !started) return
+        if (released) return
+        if (!started) {
+            mutableState.value = PlayerUiState.Resolving(currentChannel)
+            return
+        }
         resolveJob?.cancel()
         retryJob?.cancel()
         retryJob = null
