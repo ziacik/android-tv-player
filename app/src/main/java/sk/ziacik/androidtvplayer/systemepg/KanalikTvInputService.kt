@@ -13,6 +13,7 @@ import androidx.media3.common.Player
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -100,6 +101,8 @@ private class KanalikTvInputSession(context: Context) : TvInputService.Session(c
         val dataSource = DefaultHttpDataSource.Factory()
             .setUserAgent(userAgent)
             .setDefaultRequestProperties(headers)
+            .setConnectTimeoutMs(TvInputPlaybackPolicy.connectTimeoutMs)
+            .setReadTimeoutMs(TvInputPlaybackPolicy.readTimeoutMs)
         val created = ExoPlayer.Builder(appContext).build()
         created.setVideoSurface(surface)
         created.addListener(object : Player.Listener {
@@ -111,7 +114,9 @@ private class KanalikTvInputSession(context: Context) : TvInputService.Session(c
             }
         })
         val mimeType = if (manifest == StreamManifest.DASH) MimeTypes.APPLICATION_MPD else MimeTypes.APPLICATION_M3U8
-        created.setMediaSource(DefaultMediaSourceFactory(dataSource).createMediaSource(MediaItem.Builder().setUri(url).setMimeType(mimeType).build()))
+        val mediaSourceFactory = DefaultMediaSourceFactory(dataSource)
+            .setLoadErrorHandlingPolicy(DefaultLoadErrorHandlingPolicy(TvInputPlaybackPolicy.loadRetryCount))
+        created.setMediaSource(mediaSourceFactory.createMediaSource(MediaItem.Builder().setUri(url).setMimeType(mimeType).build()))
         created.prepare()
         created.play()
         player = created
