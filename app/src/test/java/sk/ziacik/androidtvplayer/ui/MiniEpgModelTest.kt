@@ -54,6 +54,7 @@ class MiniEpgModelTest {
             title = "Current show",
             startsAtMs = 1_000L,
             endsAtMs = 9_000L,
+            internetAllowed = null,
         )
         val rows = buildMiniEpgRows(
             channels = channels,
