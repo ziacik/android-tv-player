@@ -711,7 +711,7 @@ class PlayerControllerTest {
     }
 
     @Test
-    fun `channel up stops old source loads Dvojka and persists it`() = runTest {
+    fun `channel up pauses old source loads Dvojka and persists it`() = runTest {
         val resolvedChannels = mutableListOf<TvChannel>()
         val savedChannels = mutableListOf<TvChannel>()
         val player = FakePlayerPort()
@@ -733,13 +733,14 @@ class PlayerControllerTest {
 
         assertEquals(listOf(TvChannel.JEDNOTKA, TvChannel.DVOJKA), resolvedChannels)
         assertEquals(listOf(TvChannel.DVOJKA), savedChannels)
-        assertEquals(1, player.stopCalls)
+        assertEquals(1, player.pauseCalls)
+        assertEquals(0, player.stopCalls)
         assertEquals(TvChannel.DVOJKA, controller.state.value.channel)
         assertEquals("https://cdn.example/dvojka.m3u8", player.loadedSources.last().url)
     }
 
     @Test
-    fun `direct selection stops old source loads requested channel and persists it`() = runTest {
+    fun `direct selection pauses old source loads requested channel and persists it`() = runTest {
         val resolvedChannels = mutableListOf<TvChannel>()
         val savedChannels = mutableListOf<TvChannel>()
         val player = FakePlayerPort()
@@ -761,7 +762,8 @@ class PlayerControllerTest {
 
         assertEquals(listOf(TvChannel.JEDNOTKA, TvChannel.entries[11]), resolvedChannels)
         assertEquals(listOf(TvChannel.entries[11]), savedChannels)
-        assertEquals(1, player.stopCalls)
+        assertEquals(1, player.pauseCalls)
+        assertEquals(0, player.stopCalls)
         assertEquals(TvChannel.entries[11], controller.state.value.channel)
     }
 
