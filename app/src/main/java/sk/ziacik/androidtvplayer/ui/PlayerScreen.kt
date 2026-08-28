@@ -68,10 +68,13 @@ fun PlayerScreen(
     val focusRequester = remember { FocusRequester() }
     val commandMapper = remember { RemoteCommandMapper() }
     val numericInputScope = rememberCoroutineScope()
-    val numericInput = remember(controller, numericInputScope) {
+    val numericInput = remember(controller, overlayController, numericInputScope) {
         NumericChannelInput(
             scope = numericInputScope,
-            onChannelSelected = controller::selectChannel,
+            onChannelSelected = { channel ->
+                overlayController.showUntilProgramTitleReady()
+                controller.selectChannel(channel)
+            },
         )
     }
     val numericDigits by numericInput.digits.collectAsState()
@@ -90,6 +93,12 @@ fun PlayerScreen(
 
     DisposableEffect(numericInput) {
         onDispose { numericInput.cancel() }
+    }
+
+    LaunchedEffect(state) {
+        if (state.hasResolvedProgramTitle()) {
+            overlayController.onProgramTitleReady()
+        }
     }
 
     LaunchedEffect(overlayVisible, state is PlayerUiState.Ready) {
@@ -144,10 +153,12 @@ fun PlayerScreen(
                     is RemoteCommand.NumericDigit -> numericInput.append(command.digit)
                     RemoteCommand.ChannelUp -> {
                         seekPreviewMs = null
+                        overlayController.showUntilProgramTitleReady()
                         controller.channelUp()
                     }
                     RemoteCommand.ChannelDown -> {
                         seekPreviewMs = null
+                        overlayController.showUntilProgramTitleReady()
                         controller.channelDown()
                     }
                     RemoteCommand.ShowOverlay -> {
@@ -375,6 +386,12 @@ private fun MarkizaCredentialsPanel(
             Text("Prihlásiť sa")
         }
     }
+}
+
+private fun PlayerUiState.hasResolvedProgramTitle(): Boolean = when (this) {
+    is PlayerUiState.Preparing -> program?.let { !it.isEpgLookupPending && it.title.isNotBlank() } == true
+    is PlayerUiState.Ready -> !program.isEpgLookupPending && program.title.isNotBlank()
+    else -> false
 }
 
 private fun Int.isCenterKey(): Boolean =
