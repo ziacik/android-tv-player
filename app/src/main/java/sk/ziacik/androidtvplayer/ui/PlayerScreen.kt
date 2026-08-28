@@ -44,7 +44,9 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.delay
 import sk.ziacik.androidtvplayer.player.PlayerController
 import sk.ziacik.androidtvplayer.player.PlayerUiState
@@ -62,6 +64,7 @@ fun PlayerScreen(
     val state by controller.state.collectAsState()
     val overlayVisible by overlayController.visible.collectAsState()
     var focusedControl by remember { mutableStateOf(FocusedControl.TIMELINE) }
+    var seekPreviewMs by remember { mutableStateOf<Long?>(null) }
     val focusRequester = remember { FocusRequester() }
     val commandMapper = remember { RemoteCommandMapper() }
     val numericInputScope = rememberCoroutineScope()
@@ -74,6 +77,12 @@ fun PlayerScreen(
     val numericDigits by numericInput.digits.collectAsState()
     val context = LocalContext.current
     val timeFormat = remember(context) { DateFormat.getTimeFormat(context) }
+    val seekTimeFormat = remember(context) {
+        SimpleDateFormat(
+            if (DateFormat.is24HourFormat(context)) "HH:mm:ss" else "h:mm:ss a",
+            Locale.getDefault(),
+        )
+    }
 
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
@@ -91,8 +100,19 @@ fun PlayerScreen(
         }
     }
 
+    LaunchedEffect(seekPreviewMs) {
+        if (seekPreviewMs == null) return@LaunchedEffect
+        delay(SEEK_PREVIEW_DURATION_MS)
+        seekPreviewMs = null
+    }
+
     BackHandler {
-        if (overlayVisible) overlayController.hide() else onExit()
+        if (overlayVisible) {
+            seekPreviewMs = null
+            overlayController.hide()
+        } else {
+            onExit()
+        }
     }
 
     Box(
@@ -123,25 +143,31 @@ fun PlayerScreen(
                 when (command) {
                     is RemoteCommand.NumericDigit -> numericInput.append(command.digit)
                     RemoteCommand.ChannelUp -> {
+                        seekPreviewMs = null
                         controller.channelUp()
                     }
                     RemoteCommand.ChannelDown -> {
+                        seekPreviewMs = null
                         controller.channelDown()
                     }
                     RemoteCommand.ShowOverlay -> {
                         focusedControl = FocusedControl.TIMELINE
                     }
                     RemoteCommand.SeekBack -> {
-                        controller.seekBack()
+                        seekPreviewMs = controller.seekBack()
+                        controller.refreshPlaybackSnapshot()
                     }
                     RemoteCommand.SeekForward -> {
-                        controller.seekForward()
+                        seekPreviewMs = controller.seekForward()
+                        controller.refreshPlaybackSnapshot()
                     }
                     RemoteCommand.TogglePlayback -> {
                         controller.togglePlayback()
                     }
                     RemoteCommand.GoLive -> {
+                        seekPreviewMs = null
                         controller.goLive()
+                        controller.refreshPlaybackSnapshot()
                     }
                     RemoteCommand.FocusPlayPause -> {
                         focusedControl = FocusedControl.PLAY_PAUSE
@@ -152,7 +178,10 @@ fun PlayerScreen(
                     RemoteCommand.FocusTimeline -> {
                         focusedControl = FocusedControl.TIMELINE
                     }
-                    RemoteCommand.HideOverlay -> overlayController.hide()
+                    RemoteCommand.HideOverlay -> {
+                        seekPreviewMs = null
+                        overlayController.hide()
+                    }
                     RemoteCommand.Exit -> onExit()
                     RemoteCommand.Ignore -> return@onPreviewKeyEvent false
                 }
@@ -184,6 +213,8 @@ fun PlayerScreen(
             formatTime = { millis -> timeFormat.format(Date(millis)) },
             onSaveMarkizaCredentials = onSaveMarkizaCredentials,
             modifier = Modifier.align(Alignment.Center),
+            seekPreviewMs = seekPreviewMs,
+            formatSeekTime = { millis -> seekTimeFormat.format(Date(millis)) },
         )
 
         numericDigits?.let { digits ->
@@ -191,7 +222,7 @@ fun PlayerScreen(
                 digits = digits,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(36.dp),
+                    .padding(top = 88.dp, end = 36.dp),
             )
         }
     }
@@ -222,6 +253,8 @@ internal fun PlayerStateLayer(
     formatTime: (Long) -> String,
     onSaveMarkizaCredentials: (String, String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
+    seekPreviewMs: Long? = null,
+    formatSeekTime: (Long) -> String = formatTime,
 ) {
     when (val current = state) {
         is PlayerUiState.Resolving -> StateOverlay(
@@ -249,6 +282,8 @@ internal fun PlayerStateLayer(
                 timelineFocused = focusedControl == FocusedControl.TIMELINE,
                 formatTime = formatTime,
                 modifier = modifier,
+                seekPreviewMs = seekPreviewMs,
+                formatSeekTime = formatSeekTime,
             )
         }
 
@@ -346,3 +381,5 @@ private fun Int.isCenterKey(): Boolean =
     this == KeyEvent.KEYCODE_DPAD_CENTER ||
         this == KeyEvent.KEYCODE_ENTER ||
         this == KeyEvent.KEYCODE_NUMPAD_ENTER
+
+private const val SEEK_PREVIEW_DURATION_MS = 1_800L
