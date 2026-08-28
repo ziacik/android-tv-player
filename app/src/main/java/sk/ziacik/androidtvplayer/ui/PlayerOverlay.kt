@@ -377,19 +377,9 @@ private fun TransportControls(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         ControlButton(
-            text = "↶",
-            enabled = model.isSeekable,
-            focused = false,
-        )
-        ControlButton(
             text = if (model.isPlaying) "Ⅱ" else "▶",
             enabled = true,
             focused = focusedControl == FocusedControl.PLAY_PAUSE,
-        )
-        ControlButton(
-            text = "↷",
-            enabled = model.isSeekable,
-            focused = false,
         )
         Spacer(Modifier.weight(1f))
         when (model.stateIndicator) {
