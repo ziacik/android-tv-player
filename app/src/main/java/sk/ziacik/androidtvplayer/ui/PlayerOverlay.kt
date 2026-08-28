@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -46,7 +47,7 @@ private val TrackBackground = Color(0xFF464250).copy(alpha = 0.82f)
 private val MutedWhite = Color.White.copy(alpha = 0.64f)
 private val LiveRed = Color(0xFFFF3347)
 private val ProgrammeTitleHeight = 32.dp
-private val ChannelInfoHeight = 48.dp
+private val ChannelInfoMinHeight = 48.dp
 private val TimelineSlotHeight = 60.dp
 
 internal fun formatRemainingTimeLabel(currentMs: Long?, endMs: Long?): String? {
@@ -104,7 +105,7 @@ fun PlayerOverlay(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(ChannelInfoHeight),
+                    .heightIn(min = ChannelInfoMinHeight),
                 contentAlignment = Alignment.TopStart,
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
