@@ -56,4 +56,39 @@ class OverlayControllerTest {
         runCurrent()
         assertFalse(controller.visible.value)
     }
+
+    @Test
+    fun `channel switch timeout starts only after programme title is ready`() = runTest {
+        val controller = OverlayController(this)
+
+        controller.showUntilProgramTitleReady()
+        advanceTimeBy(30_000L)
+        runCurrent()
+        assertTrue(controller.visible.value)
+
+        controller.onProgramTitleReady()
+        advanceTimeBy(5_999L)
+        runCurrent()
+        assertTrue(controller.visible.value)
+
+        advanceTimeBy(1L)
+        runCurrent()
+        assertFalse(controller.visible.value)
+    }
+
+    @Test
+    fun `programme title ready does not shorten a normal overlay timeout`() = runTest {
+        val controller = OverlayController(this)
+
+        controller.show(OverlayController.OK_TIMEOUT_MS)
+        advanceTimeBy(10_000L)
+        controller.onProgramTitleReady()
+        advanceTimeBy(49_999L)
+        runCurrent()
+        assertTrue(controller.visible.value)
+
+        advanceTimeBy(1L)
+        runCurrent()
+        assertFalse(controller.visible.value)
+    }
 }

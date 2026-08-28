@@ -32,8 +32,6 @@ fun RemoteCommand.isChannelSelection(): Boolean =
 
 fun RemoteCommand.overlayTimeoutMs(): Long? = when (this) {
     RemoteCommand.ShowOverlay -> OverlayController.OK_TIMEOUT_MS
-    RemoteCommand.ChannelUp,
-    RemoteCommand.ChannelDown,
     RemoteCommand.SeekBack,
     RemoteCommand.SeekForward,
     RemoteCommand.TogglePlayback,
