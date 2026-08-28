@@ -146,9 +146,10 @@ class RemoteCommandMapperTest {
     }
 
     @Test
-    fun `hidden OSD command uses one minute while ordinary commands use six seconds`() {
+    fun `hidden OSD command uses one minute while channel switching waits for programme title`() {
         assertEquals(OverlayController.OK_TIMEOUT_MS, RemoteCommand.ShowOverlay.overlayTimeoutMs())
-        assertEquals(OverlayController.NORMAL_TIMEOUT_MS, RemoteCommand.ChannelUp.overlayTimeoutMs())
+        assertNull(RemoteCommand.ChannelUp.overlayTimeoutMs())
+        assertNull(RemoteCommand.ChannelDown.overlayTimeoutMs())
         assertEquals(OverlayController.NORMAL_TIMEOUT_MS, RemoteCommand.SeekBack.overlayTimeoutMs())
         assertEquals(OverlayController.NORMAL_TIMEOUT_MS, RemoteCommand.TogglePlayback.overlayTimeoutMs())
         assertEquals(OverlayController.NORMAL_TIMEOUT_MS, RemoteCommand.FocusLive.overlayTimeoutMs())
