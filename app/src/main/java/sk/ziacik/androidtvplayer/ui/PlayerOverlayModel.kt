@@ -70,12 +70,20 @@ data class PlayerOverlayModel(
             }
             val watchedNowMs = offset?.let(nowMs::minus) ?: nowMs
             val timelineStartMs = startsAtMs?.coerceAtMost(watchedNowMs)
+            val streamProgress = playback
+                ?.durationMs
+                ?.takeIf { it > 0L }
+                ?.let { durationMs ->
+                    (playback.currentPositionMs.toDouble() / durationMs.toDouble())
+                        .coerceIn(0.0, 1.0)
+                        .toFloat()
+                }
             val progress = if (hasProgrammeInterval) {
                 ((watchedNowMs - timelineStartMs!!).toDouble() / (endsAtMs - timelineStartMs).toDouble())
                     .coerceIn(0.0, 1.0)
                     .toFloat()
             } else {
-                null
+                streamProgress
             }
             val isLive = offset != null && offset <= LIVE_THRESHOLD_MS
             val stateIndicator = when (statusText) {
