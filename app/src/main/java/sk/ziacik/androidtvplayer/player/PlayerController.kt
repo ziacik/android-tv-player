@@ -43,6 +43,7 @@ class PlayerController(
     private var refreshedProgrammeEndMs: Long? = null
     private var resolveGeneration = 0L
     private var nextLoadId = 0L
+    private var started = false
     private var released = false
 
     init {
@@ -87,10 +88,30 @@ class PlayerController(
         )
     }
 
-    fun start() = resolveCurrentChannel()
+    fun start() {
+        if (released || started) return
+        started = true
+        resolveCurrentChannel()
+    }
+
+    fun stop() {
+        if (released || !started) return
+        started = false
+        resolveGeneration += 1
+        resolveJob?.cancel()
+        resolveJob = null
+        retryJob?.cancel()
+        retryJob = null
+        cancelEpgLookup()
+        activeProgram = null
+        activePlaybackChannel = null
+        activeLoadId = null
+        playerPort.stop()
+    }
 
     fun retry() {
         retryAttempt = 0
+        if (!started) return
         resolveCurrentChannel()
     }
 
@@ -114,7 +135,7 @@ class PlayerController(
     }
 
     private fun resolveCurrentChannel() {
-        if (released) return
+        if (released || !started) return
         resolveJob?.cancel()
         retryJob?.cancel()
         retryJob = null
@@ -125,7 +146,12 @@ class PlayerController(
         val channel = currentChannel
         val generation = ++resolveGeneration
         resolveJob = scope.launch {
-            if (released || generation != resolveGeneration || channel != currentChannel) {
+            if (
+                released ||
+                !started ||
+                generation != resolveGeneration ||
+                channel != currentChannel
+            ) {
                 return@launch
             }
             mutableState.value = PlayerUiState.Resolving(channel)
@@ -133,6 +159,7 @@ class PlayerController(
                 val resolution = resolve(channel)
                 if (
                     released ||
+                    !started ||
                     generation != resolveGeneration ||
                     channel != currentChannel
                 ) {
@@ -144,6 +171,7 @@ class PlayerController(
             } catch (error: Exception) {
                 if (
                     released ||
+                    !started ||
                     generation != resolveGeneration ||
                     channel != currentChannel
                 ) {
@@ -232,6 +260,7 @@ class PlayerController(
     fun release() {
         if (released) return
         released = true
+        started = false
         resolveGeneration += 1
         resolveJob?.cancel()
         resolveJob = null
@@ -310,7 +339,7 @@ class PlayerController(
         val nextRetryAtMs = nowMs() + retryDelayMs
         retryJob = scope.launch {
             delay(retryDelayMs)
-            if (!released && channel == currentChannel) resolveCurrentChannel()
+            if (!released && started && channel == currentChannel) resolveCurrentChannel()
         }
         return nextRetryAtMs
     }
@@ -323,6 +352,7 @@ class PlayerController(
 
     private fun acceptsPlaybackCallback(loadId: Long): Boolean =
         !released &&
+            started &&
             loadId == activeLoadId &&
             activePlaybackChannel == currentChannel
 
