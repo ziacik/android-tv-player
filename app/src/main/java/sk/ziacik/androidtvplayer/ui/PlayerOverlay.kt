@@ -41,6 +41,8 @@ private val FocusedContent = Color(0xFF111113)
 private val GlassBackground = Color.White.copy(alpha = 0.14f)
 private val MutedWhite = Color.White.copy(alpha = 0.68f)
 private val LiveRed = Color(0xFFFF3347)
+private val ProgrammeTitleHeight = 30.dp
+private val TimelineSlotHeight = 64.dp
 
 internal fun formatRemainingTimeLabel(currentMs: Long?, endMs: Long?): String? {
     if (currentMs == null || endMs == null) return null
@@ -97,26 +99,47 @@ fun PlayerOverlay(
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.4.sp,
             )
-            Text(
-                text = model.programTitle,
-                color = Color.White,
-                fontSize = 23.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(ProgrammeTitleHeight),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                Text(
+                    text = model.programTitle,
+                    color = Color.White,
+                    fontSize = 23.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             if (shouldShowProgramTimeline(model.progress)) {
                 Spacer(Modifier.height(3.dp))
-                LiveTimeline(
-                    progress = model.progress,
-                    programmeStartMs = model.programmeStartMs,
-                    programmeNowMs = model.programmeNowMs,
-                    programmeEndMs = model.programmeEndMs,
-                    seekPreviewMs = seekPreviewMs,
-                    formatTime = formatTime,
-                    formatSeekTime = formatSeekTime,
-                    focused = timelineFocused,
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(TimelineSlotHeight),
+                ) {
+                    if (model.progress != null) {
+                        LiveTimeline(
+                            progress = model.progress,
+                            programmeStartMs = model.programmeStartMs,
+                            programmeNowMs = model.programmeNowMs,
+                            programmeEndMs = model.programmeEndMs,
+                            seekPreviewMs = seekPreviewMs,
+                            formatTime = formatTime,
+                            formatSeekTime = formatSeekTime,
+                            focused = timelineFocused,
+                        )
+                    } else {
+                        EmptyTimeline(
+                            seekPreviewMs = seekPreviewMs,
+                            formatSeekTime = formatSeekTime,
+                            focused = timelineFocused,
+                        )
+                    }
+                }
             }
             Spacer(Modifier.height(4.dp))
             TransportControls(
@@ -127,7 +150,58 @@ fun PlayerOverlay(
     }
 }
 
-internal fun shouldShowProgramTimeline(progress: Float?): Boolean = progress != null
+internal fun shouldShowProgramTimeline(progress: Float?): Boolean = true
+
+@Composable
+private fun EmptyTimeline(
+    seekPreviewMs: Long?,
+    formatSeekTime: (Long) -> String,
+    focused: Boolean,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("live-window-progress"),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(42.dp),
+        ) {
+            val trackHeight = if (focused) 8.dp else 6.dp
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .offset(y = (-3).dp)
+                    .fillMaxWidth()
+                    .height(trackHeight)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.16f)),
+            )
+
+            seekPreviewMs?.let { previewMs ->
+                val previewWidth = 94.dp
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .width(previewWidth)
+                        .height(25.dp)
+                        .background(Color.Black.copy(alpha = 0.72f), RoundedCornerShape(8.dp))
+                        .testTag("seek-preview-time"),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = formatSeekTime(previewMs),
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun LiveTimeline(
