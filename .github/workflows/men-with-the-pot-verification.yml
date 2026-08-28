@@ -7,6 +7,7 @@ on:
       - fix/prefer-hd-adaptive-streams
       - feat/modern-osd-timeline-clock
       - feat/kanalik-modern-broadcast-osd
+      - ui/remove-seek-buttons
 
 jobs:
   verify:
@@ -20,5 +21,7 @@ jobs:
           cache: gradle
       - name: Run unit tests
         run: ./gradlew testDebugUnitTest
+      - name: Compile instrumentation tests
+        run: ./gradlew compileDebugAndroidTestKotlin
       - name: Build debug APK
         run: ./gradlew assembleDebug
