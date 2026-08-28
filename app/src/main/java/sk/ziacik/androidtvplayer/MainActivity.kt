@@ -123,6 +123,7 @@ class MainActivity : ComponentActivity() {
                     controller = playerController,
                     player = playerPort.player,
                     overlayController = overlayController,
+                    epgRepository = epgRepository,
                     onExit = ::finish,
                 )
             }
