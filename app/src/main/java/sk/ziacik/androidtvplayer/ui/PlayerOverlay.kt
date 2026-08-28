@@ -2,6 +2,7 @@ package sk.ziacik.androidtvplayer.ui
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -32,10 +33,12 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import sk.ziacik.androidtvplayer.R
 
 private val BrandViolet = Color(0xFF7A5CFF)
 private val BrandYellow = Color(0xFFFFD84A)
@@ -177,25 +180,14 @@ fun PlayerOverlay(
 
 @Composable
 private fun BrandMark(modifier: Modifier = Modifier) {
-    Row(
-        modifier = modifier.testTag("brand-mark"),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(7.dp),
-    ) {
-        Text(
-            text = "/",
-            color = BrandYellow,
-            fontSize = 29.sp,
-            fontWeight = FontWeight.Bold,
-        )
-        Text(
-            text = "KANÁLIK",
-            color = Color.White,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 0.8.sp,
-        )
-    }
+    Image(
+        painter = painterResource(R.drawable.kanalik_wordmark),
+        contentDescription = null,
+        modifier = modifier
+            .width(118.dp)
+            .height(35.dp)
+            .testTag("brand-mark"),
+    )
 }
 
 @Composable
