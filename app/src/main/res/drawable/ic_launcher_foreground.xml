@@ -9,16 +9,16 @@
         android:pivotY="57"
         android:rotation="-42">
         <path
-            android:fillColor="#FF03B9F1"
+            android:fillColor="#FF7A5CFF"
             android:pathData="M32,27 C28,27 25,30 25,34 L25,80 C25,84 28,87 32,87 L64,87 C68,87 71,84 71,80 L71,34 C71,30 68,27 64,27 Z" />
         <path
-            android:fillColor="#FF303030"
+            android:fillColor="#FFFFD84A"
             android:pathData="M37,37 L59,37 L59,41 L37,41 Z M37,45 L59,45 L59,49 L37,49 Z M37,53 L59,53 L59,57 L37,57 Z M37,73 L59,73 L59,77 L37,77 Z" />
         <path
-            android:fillColor="#FF303030"
+            android:fillColor="#FFFFD84A"
             android:pathData="M48,59 A8,8 0,1 0,48.1,59 M48,63 A4,4 0,1 1,48,71 A4,4 0,1 1,48,63" />
     </group>
     <path
-        android:fillColor="#FF03B9F1"
+        android:fillColor="#FF7A5CFF"
         android:pathData="M76,17 C86,19 92,25 94,35 L90,35 C88,28 83,23 76,21 Z M78,25 C84,27 88,31 89,37 L85,37 C84,33 81,30 77,29 Z M79,33 C82,34 84,36 85,40 L81,40 C81,38 80,37 78,37 Z" />
 </vector>
