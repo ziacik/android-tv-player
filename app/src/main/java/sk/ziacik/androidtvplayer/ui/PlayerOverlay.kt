@@ -46,7 +46,7 @@ private val TrackBackground = Color(0xFF464250).copy(alpha = 0.82f)
 private val MutedWhite = Color.White.copy(alpha = 0.64f)
 private val LiveRed = Color(0xFFFF3347)
 private val ProgrammeTitleHeight = 32.dp
-private val ChannelInfoHeight = 38.dp
+private val ChannelInfoHeight = 48.dp
 private val TimelineSlotHeight = 60.dp
 
 internal fun formatRemainingTimeLabel(currentMs: Long?, endMs: Long?): String? {
