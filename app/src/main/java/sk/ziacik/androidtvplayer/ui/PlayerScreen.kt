@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -47,9 +46,13 @@ import androidx.media3.ui.PlayerView
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import sk.ziacik.androidtvplayer.channel.TvChannel
+import sk.ziacik.androidtvplayer.epg.EpgRepository
 import sk.ziacik.androidtvplayer.player.PlayerController
 import sk.ziacik.androidtvplayer.player.PlayerUiState
+import sk.ziacik.androidtvplayer.resolver.ProgramMetadata
 
 @Composable
 @androidx.annotation.OptIn(UnstableApi::class)
@@ -57,6 +60,7 @@ fun PlayerScreen(
     controller: PlayerController,
     player: Player,
     overlayController: OverlayController,
+    epgRepository: EpgRepository = EpgRepository { _, _ -> null },
     onSaveMarkizaCredentials: (String, String) -> Unit = { _, _ -> },
     onExit: () -> Unit,
     modifier: Modifier = Modifier,
@@ -65,6 +69,11 @@ fun PlayerScreen(
     val overlayVisible by overlayController.visible.collectAsState()
     var focusedControl by remember { mutableStateOf(FocusedControl.TIMELINE) }
     var seekPreviewMs by remember { mutableStateOf<Long?>(null) }
+    var miniEpgVisible by remember { mutableStateOf(false) }
+    var miniEpgSelectedChannel by remember { mutableStateOf<TvChannel?>(null) }
+    var miniEpgProgrammes by remember { mutableStateOf<Map<String, ProgramMetadata>>(emptyMap()) }
+    var miniEpgAttemptedChannels by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var miniEpgNowMs by remember { mutableStateOf(System.currentTimeMillis()) }
     val focusRequester = remember { FocusRequester() }
     val commandMapper = remember { RemoteCommandMapper() }
     val numericInputScope = rememberCoroutineScope()
@@ -115,12 +124,58 @@ fun PlayerScreen(
         seekPreviewMs = null
     }
 
+    LaunchedEffect(miniEpgVisible) {
+        if (!miniEpgVisible) return@LaunchedEffect
+        while (true) {
+            miniEpgNowMs = System.currentTimeMillis()
+            delay(1_000L)
+        }
+    }
+
+    LaunchedEffect(
+        miniEpgVisible,
+        miniEpgSelectedChannel?.storageKey,
+        state.channel.storageKey,
+    ) {
+        if (!miniEpgVisible) return@LaunchedEffect
+        val selected = miniEpgSelectedChannel ?: state.channel
+        val visibleChannels = buildMiniEpgRows(
+            channels = TvChannel.entries,
+            currentChannel = state.channel,
+            selectedChannel = selected,
+            programmes = miniEpgProgrammes,
+            nowMs = miniEpgNowMs,
+        ).map { it.channel }
+        val missingChannels = visibleChannels.filter { channel ->
+            channel.storageKey !in miniEpgAttemptedChannels
+        }
+
+        for (channel in missingChannels) {
+            val programme = try {
+                epgRepository.currentProgram(channel, System.currentTimeMillis())
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                null
+            }
+            miniEpgAttemptedChannels = miniEpgAttemptedChannels + channel.storageKey
+            if (programme != null && programme.title.isNotBlank()) {
+                miniEpgProgrammes = miniEpgProgrammes + (channel.storageKey to programme)
+            }
+        }
+    }
+
     BackHandler {
-        if (overlayVisible) {
-            seekPreviewMs = null
-            overlayController.hide()
-        } else {
-            onExit()
+        when {
+            miniEpgVisible -> {
+                miniEpgVisible = false
+                miniEpgSelectedChannel = null
+            }
+            overlayVisible -> {
+                seekPreviewMs = null
+                overlayController.hide()
+            }
+            else -> onExit()
         }
     }
 
@@ -139,27 +194,78 @@ fun PlayerScreen(
                     keyCode = keyCode,
                     overlayVisible = overlayVisible,
                     focusedControl = focusedControl,
+                    miniEpgVisible = miniEpgVisible,
                 )
                 if (state is PlayerUiState.CredentialsRequired && !command.isChannelSelection()) {
                     return@onPreviewKeyEvent false
                 }
                 val retryable = state is PlayerUiState.Unavailable || state is PlayerUiState.Error
-                if (retryable && keyCode.isCenterKey()) {
+                if (!miniEpgVisible && retryable && keyCode.isCenterKey()) {
                     controller.retry()
                     return@onPreviewKeyEvent true
                 }
 
                 when (command) {
-                    is RemoteCommand.NumericDigit -> numericInput.append(command.digit)
+                    is RemoteCommand.NumericDigit -> {
+                        miniEpgVisible = false
+                        miniEpgSelectedChannel = null
+                        numericInput.append(command.digit)
+                    }
                     RemoteCommand.ChannelUp -> {
+                        miniEpgVisible = false
+                        miniEpgSelectedChannel = null
                         seekPreviewMs = null
                         overlayController.showUntilProgramTitleReady()
                         controller.channelUp()
                     }
                     RemoteCommand.ChannelDown -> {
+                        miniEpgVisible = false
+                        miniEpgSelectedChannel = null
                         seekPreviewMs = null
                         overlayController.showUntilProgramTitleReady()
                         controller.channelDown()
+                    }
+                    RemoteCommand.OpenMiniEpg -> {
+                        val currentProgramme = state.currentProgramOrNull()
+                            ?.takeIf { !it.isEpgLookupPending && it.title.isNotBlank() }
+                        miniEpgSelectedChannel = state.channel
+                        miniEpgProgrammes = currentProgramme
+                            ?.let { mapOf(state.channel.storageKey to it) }
+                            ?: emptyMap()
+                        miniEpgAttemptedChannels = currentProgramme
+                            ?.let { setOf(state.channel.storageKey) }
+                            ?: emptySet()
+                        miniEpgNowMs = System.currentTimeMillis()
+                        miniEpgVisible = true
+                        seekPreviewMs = null
+                        overlayController.hide()
+                    }
+                    RemoteCommand.MiniEpgUp -> {
+                        miniEpgSelectedChannel = adjacentMiniEpgChannel(
+                            channels = TvChannel.entries,
+                            selectedChannel = miniEpgSelectedChannel ?: state.channel,
+                            direction = -1,
+                        )
+                    }
+                    RemoteCommand.MiniEpgDown -> {
+                        miniEpgSelectedChannel = adjacentMiniEpgChannel(
+                            channels = TvChannel.entries,
+                            selectedChannel = miniEpgSelectedChannel ?: state.channel,
+                            direction = 1,
+                        )
+                    }
+                    RemoteCommand.SelectMiniEpgChannel -> {
+                        val selected = miniEpgSelectedChannel ?: state.channel
+                        miniEpgVisible = false
+                        miniEpgSelectedChannel = null
+                        if (selected.storageKey != state.channel.storageKey) {
+                            overlayController.showUntilProgramTitleReady()
+                            controller.selectChannel(selected)
+                        }
+                    }
+                    RemoteCommand.CloseMiniEpg -> {
+                        miniEpgVisible = false
+                        miniEpgSelectedChannel = null
                     }
                     RemoteCommand.ShowOverlay -> {
                         focusedControl = FocusedControl.TIMELINE
@@ -227,6 +333,18 @@ fun PlayerScreen(
             seekPreviewMs = seekPreviewMs,
             formatSeekTime = { millis -> seekTimeFormat.format(Date(millis)) },
         )
+
+        if (miniEpgVisible) {
+            MiniEpgOverlay(
+                rows = buildMiniEpgRows(
+                    channels = TvChannel.entries,
+                    currentChannel = state.channel,
+                    selectedChannel = miniEpgSelectedChannel ?: state.channel,
+                    programmes = miniEpgProgrammes,
+                    nowMs = miniEpgNowMs,
+                ),
+            )
+        }
 
         numericDigits?.let { digits ->
             NumericChannelIndicator(
@@ -327,8 +445,8 @@ internal fun PlayerStateLayer(
 
 @Composable
 private fun StateOverlay(
-    channel: sk.ziacik.androidtvplayer.channel.TvChannel,
-    program: sk.ziacik.androidtvplayer.resolver.ProgramMetadata?,
+    channel: TvChannel,
+    program: ProgramMetadata?,
     statusText: String,
     focusedControl: FocusedControl,
     formatTime: (Long) -> String,
@@ -392,6 +510,15 @@ private fun PlayerUiState.hasResolvedProgramTitle(): Boolean = when (this) {
     is PlayerUiState.Preparing -> program?.let { !it.isEpgLookupPending && it.title.isNotBlank() } == true
     is PlayerUiState.Ready -> !program.isEpgLookupPending && program.title.isNotBlank()
     else -> false
+}
+
+private fun PlayerUiState.currentProgramOrNull(): ProgramMetadata? = when (this) {
+    is PlayerUiState.Resolving -> program
+    is PlayerUiState.Preparing -> program
+    is PlayerUiState.Ready -> program
+    is PlayerUiState.Unavailable -> program
+    is PlayerUiState.Error -> program
+    is PlayerUiState.CredentialsRequired -> null
 }
 
 private fun Int.isCenterKey(): Boolean =
