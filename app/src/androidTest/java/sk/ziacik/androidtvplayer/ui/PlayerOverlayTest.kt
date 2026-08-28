@@ -108,6 +108,9 @@ class PlayerOverlayTest {
         compose.onNodeWithText("2 · DVOJKA").assertIsDisplayed()
         compose.onNodeWithText("Večerný program").assertIsDisplayed()
         compose.onNodeWithTag("wall-clock").assertIsDisplayed()
+        compose.onNodeWithTag("live-window-progress").assertIsDisplayed()
+        compose.onNodeWithTag("programme-progress-marker").assertIsDisplayed()
+        compose.onNodeWithTag("programme-start-boundary").assertDoesNotExist()
     }
 
     @Test
@@ -126,6 +129,7 @@ class PlayerOverlayTest {
         compose.onNodeWithText("2 · DVOJKA").assertIsDisplayed()
         compose.onNodeWithTag("switching-indicator").assertIsDisplayed()
         compose.onNodeWithTag("wall-clock").assertIsDisplayed()
+        compose.onNodeWithTag("live-window-progress").assertIsDisplayed()
         compose.onNodeWithText("PREPÍNAM…").assertDoesNotExist()
     }
 
@@ -157,7 +161,7 @@ class PlayerOverlayTest {
     }
 
     @Test
-    fun noEpgKeepsWallClockAndHidesMeaninglessTimeline() {
+    fun noEpgSwitchingKeepsTimelineSlotWithoutInventingMarker() {
         compose.setContent {
             AndroidTvPlayerTheme {
                 PlayerOverlay(
@@ -182,7 +186,7 @@ class PlayerOverlayTest {
         }
 
         compose.onNodeWithTag("wall-clock").assertIsDisplayed()
-        compose.onNodeWithTag("live-window-progress").assertDoesNotExist()
+        compose.onNodeWithTag("live-window-progress").assertIsDisplayed()
         compose.onNodeWithTag("seek-preview-time").assertDoesNotExist()
         compose.onNodeWithTag("programme-start-boundary").assertDoesNotExist()
         compose.onNodeWithTag("programme-progress-marker").assertDoesNotExist()
