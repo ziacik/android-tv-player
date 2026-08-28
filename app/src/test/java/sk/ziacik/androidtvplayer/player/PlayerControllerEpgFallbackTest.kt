@@ -12,6 +12,7 @@ import sk.ziacik.androidtvplayer.epg.EpgRepository
 import sk.ziacik.androidtvplayer.resolver.ProgramMetadata
 import sk.ziacik.androidtvplayer.resolver.StreamResolution
 import sk.ziacik.androidtvplayer.resolver.StreamSource
+import sk.ziacik.androidtvplayer.ui.PlayerOverlayModel
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PlayerControllerEpgFallbackTest {
@@ -42,14 +43,16 @@ class PlayerControllerEpgFallbackTest {
         player.registeredListener.onReady(player.latestLoadId, isPlaying = true)
         runCurrent()
 
-        assertEquals("", (controller.state.value as PlayerUiState.Ready).program.title)
+        val loadingState = controller.state.value as PlayerUiState.Ready
+        assertEquals("", PlayerOverlayModel.from(loadingState, nowMs = 1_500L).programTitle)
 
         epgResult.complete(null)
         advanceUntilIdle()
 
+        val fallbackState = controller.state.value as PlayerUiState.Ready
         assertEquals(
             TvChannel.JEDNOTKA.displayName,
-            (controller.state.value as PlayerUiState.Ready).program.title,
+            PlayerOverlayModel.from(fallbackState, nowMs = 1_500L).programTitle,
         )
     }
 
