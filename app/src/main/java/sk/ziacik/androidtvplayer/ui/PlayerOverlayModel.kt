@@ -62,19 +62,20 @@ data class PlayerOverlayModel(
                 startsAtMs != null &&
                 endsAtMs != null &&
                 endsAtMs > startsAtMs
-            val timelineStartMs = startsAtMs?.coerceAtMost(nowMs)
-            val progress = if (hasProgrammeInterval) {
-                ((nowMs - timelineStartMs!!).toDouble() / (endsAtMs - timelineStartMs).toDouble())
-                    .coerceIn(0.0, 1.0)
-                    .toFloat()
-            } else {
-                null
-            }
             val offset = playback?.let { snapshot ->
                 snapshot.liveOffsetMs
                     ?: snapshot.durationMs
                         ?.minus(snapshot.currentPositionMs)
                         ?.coerceAtLeast(0L)
+            }
+            val watchedNowMs = offset?.let(nowMs::minus) ?: nowMs
+            val timelineStartMs = startsAtMs?.coerceAtMost(watchedNowMs)
+            val progress = if (hasProgrammeInterval) {
+                ((watchedNowMs - timelineStartMs!!).toDouble() / (endsAtMs - timelineStartMs).toDouble())
+                    .coerceIn(0.0, 1.0)
+                    .toFloat()
+            } else {
+                null
             }
             val isLive = offset != null && offset <= LIVE_THRESHOLD_MS
             val stateIndicator = when (statusText) {
@@ -97,7 +98,7 @@ data class PlayerOverlayModel(
                 progress = progress,
                 displayNowMs = nowMs,
                 programmeStartMs = timelineStartMs.takeIf { hasProgrammeInterval },
-                programmeNowMs = nowMs.takeIf { hasProgrammeInterval },
+                programmeNowMs = watchedNowMs.takeIf { hasProgrammeInterval },
                 programmeEndMs = endsAtMs.takeIf { hasProgrammeInterval },
                 isLive = stateIndicator == PlayerOverlayStateIndicator.LIVE && isLive,
                 isPlaying = playback?.isPlaying == true,
