@@ -86,6 +86,42 @@ class RemoteCommandMapperTest {
     }
 
     @Test
+    fun `up and down open mini EPG while OSD is hidden`() {
+        assertEquals(
+            RemoteCommand.OpenMiniEpg,
+            mapper.map(KeyEvent.KEYCODE_DPAD_UP, false, FocusedControl.TIMELINE),
+        )
+        assertEquals(
+            RemoteCommand.OpenMiniEpg,
+            mapper.map(KeyEvent.KEYCODE_DPAD_DOWN, false, FocusedControl.PLAY_PAUSE),
+        )
+    }
+
+    @Test
+    fun `mini EPG consumes vertical navigation center and back`() {
+        assertEquals(
+            RemoteCommand.MiniEpgUp,
+            mapper.map(KeyEvent.KEYCODE_DPAD_UP, false, FocusedControl.TIMELINE, miniEpgVisible = true),
+        )
+        assertEquals(
+            RemoteCommand.MiniEpgDown,
+            mapper.map(KeyEvent.KEYCODE_DPAD_DOWN, false, FocusedControl.TIMELINE, miniEpgVisible = true),
+        )
+        assertEquals(
+            RemoteCommand.SelectMiniEpgChannel,
+            mapper.map(KeyEvent.KEYCODE_DPAD_CENTER, false, FocusedControl.TIMELINE, miniEpgVisible = true),
+        )
+        assertEquals(
+            RemoteCommand.CloseMiniEpg,
+            mapper.map(KeyEvent.KEYCODE_BACK, false, FocusedControl.TIMELINE, miniEpgVisible = true),
+        )
+        assertEquals(
+            RemoteCommand.Ignore,
+            mapper.map(KeyEvent.KEYCODE_DPAD_LEFT, false, FocusedControl.TIMELINE, miniEpgVisible = true),
+        )
+    }
+
+    @Test
     fun `center shows a hidden overlay`() {
         assertEquals(
             RemoteCommand.ShowOverlay,
@@ -110,7 +146,7 @@ class RemoteCommandMapperTest {
     }
 
     @Test
-    fun `up and down move between the timeline and playback controls`() {
+    fun `up and down move between the timeline and playback controls while OSD is visible`() {
         assertEquals(
             RemoteCommand.FocusTimeline,
             mapper.map(KeyEvent.KEYCODE_DPAD_UP, true, FocusedControl.LIVE),
@@ -155,5 +191,7 @@ class RemoteCommandMapperTest {
         assertEquals(OverlayController.NORMAL_TIMEOUT_MS, RemoteCommand.FocusLive.overlayTimeoutMs())
         assertNull(RemoteCommand.HideOverlay.overlayTimeoutMs())
         assertNull(RemoteCommand.NumericDigit(1).overlayTimeoutMs())
+        assertNull(RemoteCommand.OpenMiniEpg.overlayTimeoutMs())
+        assertNull(RemoteCommand.MiniEpgDown.overlayTimeoutMs())
     }
 }
