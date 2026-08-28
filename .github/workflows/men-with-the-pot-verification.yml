@@ -5,6 +5,7 @@ on:
     branches:
       - feat/men-with-the-pot
       - fix/prefer-hd-adaptive-streams
+      - fix/osd-epg-title-fallback
 
 jobs:
   verify:
