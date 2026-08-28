@@ -58,8 +58,44 @@ class PlayerControllerLifecycleTest {
         assertEquals(0, player.releaseCalls)
     }
 
+    @Test
+    fun `channel switch pauses current playback without stopping player`() = runTest {
+        val player = FakePlayerPort()
+        val controller = PlayerController(
+            scope = this,
+            initialChannel = TvChannel.JEDNOTKA,
+            resolve = { channel ->
+                StreamResolution.Playable(
+                    program = ProgramMetadata(
+                        title = "Live",
+                        startsAtMs = 1_000L,
+                        endsAtMs = 100_000L,
+                        internetAllowed = true,
+                    ),
+                    source = StreamSource(
+                        url = "https://cdn.example/${channel.storageKey}.m3u8",
+                        userAgent = "ua",
+                    ),
+                )
+            },
+            playerPort = player,
+        )
+
+        controller.start()
+        advanceUntilIdle()
+        assertEquals(1, player.loadedSources.size)
+
+        controller.channelUp()
+
+        assertEquals(1, player.pauseCalls)
+        assertEquals(0, player.stopCalls)
+        advanceUntilIdle()
+        assertEquals(2, player.loadedSources.size)
+    }
+
     private class FakePlayerPort : PlayerPort {
         val loadedSources = mutableListOf<StreamSource>()
+        var pauseCalls = 0
         var stopCalls = 0
         var releaseCalls = 0
         private var listener: PlayerPort.Listener? = null
@@ -78,7 +114,9 @@ class PlayerControllerLifecycleTest {
 
         override fun play() = Unit
 
-        override fun pause() = Unit
+        override fun pause() {
+            pauseCalls += 1
+        }
 
         override fun seekTo(positionMs: Long) = Unit
 
