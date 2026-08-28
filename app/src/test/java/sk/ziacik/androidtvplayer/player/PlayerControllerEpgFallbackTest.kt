@@ -39,7 +39,7 @@ class PlayerControllerEpgFallbackTest {
 
         controller.start()
         advanceUntilIdle()
-        player.listener.onReady(player.latestLoadId, isPlaying = true)
+        player.registeredListener.onReady(player.latestLoadId, isPlaying = true)
         runCurrent()
 
         assertEquals("", (controller.state.value as PlayerUiState.Ready).program.title)
@@ -54,7 +54,7 @@ class PlayerControllerEpgFallbackTest {
     }
 
     private class FakePlayerPort : PlayerPort {
-        lateinit var listener: PlayerPort.Listener
+        lateinit var registeredListener: PlayerPort.Listener
         private val loadIds = mutableListOf<Long>()
 
         val latestLoadId: Long
@@ -80,7 +80,7 @@ class PlayerControllerEpgFallbackTest {
         override fun release() = Unit
 
         override fun setListener(listener: PlayerPort.Listener) {
-            this.listener = listener
+            registeredListener = listener
         }
     }
 }
