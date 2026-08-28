@@ -93,7 +93,7 @@ data class PlayerOverlayModel(
 
             return PlayerOverlayModel(
                 channelLabel = listOfNotNull(baseChannelLabel, streamInfoLabel).joinToString("    "),
-                programTitle = program?.title.orEmpty(),
+                programTitle = if (program?.isEpgLookupPending == true) "" else program?.title.orEmpty(),
                 progress = progress,
                 displayNowMs = nowMs,
                 programmeStartMs = timelineStartMs.takeIf { hasProgrammeInterval },
