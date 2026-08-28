@@ -127,8 +127,16 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+    }
 
+    override fun onStart() {
+        super.onStart()
         playerController.start()
+    }
+
+    override fun onStop() {
+        playerController.stop()
+        super.onStop()
     }
 
     override fun onDestroy() {
