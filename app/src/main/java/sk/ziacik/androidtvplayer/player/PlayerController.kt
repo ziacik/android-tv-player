@@ -236,13 +236,14 @@ class PlayerController(
     private fun applyResolution(channel: TvChannel, resolution: StreamResolution) {
         when (resolution) {
             is StreamResolution.Playable -> {
-                activeProgram = resolution.program
+                val program = resolution.program.withEpgLookupPending(channel)
+                activeProgram = program
                 activePlaybackChannel = channel
                 val loadId = ++nextLoadId
                 activeLoadId = loadId
-                mutableState.value = PlayerUiState.Preparing(channel, resolution.program)
+                mutableState.value = PlayerUiState.Preparing(channel, program)
                 try {
-                    requestEpgProgrammeIfNeeded(resolution.program)
+                    requestEpgProgrammeIfNeeded(program)
                     playerPort.load(loadId, resolution.source)
                 } catch (_: Exception) {
                     if (!acceptsPlaybackCallback(loadId)) return
@@ -345,17 +346,18 @@ class PlayerController(
                 diagnostics("EPG lookup failed for ${channel.displayName}", error)
                 null
             }
-            if (epgProgramme == null) {
-                return@launch
-            }
             if (!acceptsPlaybackCallback(loadId)) return@launch
-            activeProgram = epgProgramme
+            val resolvedProgram = epgProgramme
+                ?.takeIf { it.title.isNotBlank() }
+                ?.copy(isEpgLookupPending = false)
+                ?: program.copy(isEpgLookupPending = false)
+            activeProgram = resolvedProgram
             when (val current = mutableState.value) {
                 is PlayerUiState.Ready -> if (current.channel == channel) {
-                    mutableState.value = current.copy(program = epgProgramme)
+                    mutableState.value = current.copy(program = resolvedProgram)
                 }
                 is PlayerUiState.Preparing -> if (current.channel == channel) {
-                    mutableState.value = current.copy(program = epgProgramme)
+                    mutableState.value = current.copy(program = resolvedProgram)
                 }
                 else -> Unit
             }
@@ -368,6 +370,19 @@ class PlayerController(
         epgLoadId = null
         refreshedProgrammeEndMs = null
     }
+
+    private fun ProgramMetadata.withEpgLookupPending(channel: TvChannel): ProgramMetadata =
+        if (
+            !hasProgrammeInterval() &&
+            (title.isBlank() || title == channel.displayName)
+        ) {
+            copy(
+                title = channel.displayName,
+                isEpgLookupPending = true,
+            )
+        } else {
+            this
+        }
 
     private fun ProgramMetadata.hasProgrammeInterval(): Boolean =
         startsAtMs != null && endsAtMs != null && endsAtMs > startsAtMs
