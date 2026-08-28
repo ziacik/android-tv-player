@@ -1,7 +1,8 @@
 package sk.ziacik.androidtvplayer.ui
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -17,9 +18,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,6 +42,13 @@ private val GlassBackground = Color.White.copy(alpha = 0.14f)
 private val MutedWhite = Color.White.copy(alpha = 0.68f)
 private val LiveRed = Color(0xFFFF3347)
 
+internal fun formatRemainingTimeLabel(currentMs: Long?, endMs: Long?): String? {
+    if (currentMs == null || endMs == null) return null
+    val remainingMs = (endMs - currentMs).coerceAtLeast(0L)
+    val minutes = remainingMs / 60_000L + if (remainingMs % 60_000L == 0L) 0L else 1L
+    return "$minutes min left"
+}
+
 @Composable
 fun PlayerOverlay(
     model: PlayerOverlayModel,
@@ -47,6 +56,8 @@ fun PlayerOverlay(
     timelineFocused: Boolean = false,
     formatTime: (Long) -> String,
     modifier: Modifier = Modifier,
+    seekPreviewMs: Long? = null,
+    formatSeekTime: (Long) -> String = formatTime,
 ) {
     Box(
         modifier = modifier
@@ -59,6 +70,19 @@ fun PlayerOverlay(
                 ),
             ),
     ) {
+        Text(
+            text = formatTime(model.displayNowMs),
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(36.dp)
+                .background(Color.Black.copy(alpha = 0.38f), RoundedCornerShape(12.dp))
+                .padding(horizontal = 15.dp, vertical = 8.dp)
+                .testTag("wall-clock"),
+            color = Color.White,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
@@ -81,15 +105,19 @@ fun PlayerOverlay(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Spacer(Modifier.height(3.dp))
-            LiveTimeline(
-                progress = model.progress,
-                programmeStartMs = model.programmeStartMs,
-                displayNowMs = model.displayNowMs,
-                programmeEndMs = model.programmeEndMs,
-                formatTime = formatTime,
-                focused = timelineFocused,
-            )
+            if (shouldShowProgramTimeline(model.progress)) {
+                Spacer(Modifier.height(3.dp))
+                LiveTimeline(
+                    progress = model.progress,
+                    programmeStartMs = model.programmeStartMs,
+                    programmeNowMs = model.programmeNowMs,
+                    programmeEndMs = model.programmeEndMs,
+                    seekPreviewMs = seekPreviewMs,
+                    formatTime = formatTime,
+                    formatSeekTime = formatSeekTime,
+                    focused = timelineFocused,
+                )
+            }
             Spacer(Modifier.height(4.dp))
             TransportControls(
                 model = model,
@@ -105,93 +133,111 @@ internal fun shouldShowProgramTimeline(progress: Float?): Boolean = progress != 
 private fun LiveTimeline(
     progress: Float?,
     programmeStartMs: Long?,
-    displayNowMs: Long,
+    programmeNowMs: Long?,
     programmeEndMs: Long?,
+    seekPreviewMs: Long?,
     formatTime: (Long) -> String,
+    formatSeekTime: (Long) -> String,
     focused: Boolean,
 ) {
-    val clampedProgress = progress?.coerceIn(0f, 1f)
+    val clampedProgress = progress?.coerceIn(0f, 1f) ?: return
+    val animatedProgress by animateFloatAsState(
+        targetValue = clampedProgress,
+        animationSpec = tween(durationMillis = 240),
+        label = "programme-progress",
+    )
+    val remainingLabel = formatRemainingTimeLabel(programmeNowMs, programmeEndMs)
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("live-window-progress"),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(50.dp),
-            contentAlignment = Alignment.CenterStart,
+                .height(42.dp),
         ) {
-            val currentTimePillWidth = 52.dp
-            val markerSize = if (focused) 10.dp else 8.dp
-            val trackHeight = if (focused) 6.dp else 4.dp
-            val markerOffset = clampedProgress?.let { (maxWidth - markerSize) * it }
-                ?: (maxWidth - markerSize) / 2
-            val currentTimeOffset = markerOffset + markerSize / 2 - currentTimePillWidth / 2
-            val clampedTimeOffset = currentTimeOffset
-                .coerceIn(0.dp, (maxWidth - currentTimePillWidth).coerceAtLeast(0.dp))
+            val markerSize = if (focused) 14.dp else 12.dp
+            val trackHeight = if (focused) 8.dp else 6.dp
+            val markerOffset = (maxWidth - markerSize) * animatedProgress
 
-            programmeStartMs?.let { startMs -> Text(
-                text = formatTime(startMs),
-                modifier = Modifier.align(Alignment.BottomStart).testTag("programme-start-boundary"),
-                color = MutedWhite,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-            ) }
-            programmeEndMs?.let { endMs -> Text(
-                text = formatTime(endMs),
-                modifier = Modifier.align(Alignment.BottomEnd).testTag("programme-end-boundary"),
-                color = MutedWhite,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-            ) }
             Box(
                 modifier = Modifier
-                    .offset(x = clampedTimeOffset, y = (-4).dp)
-                    .align(Alignment.TopStart)
-                    .width(currentTimePillWidth)
-                    .height(24.dp)
-                    .background(Color.Black.copy(alpha = 0.56f), RoundedCornerShape(7.dp))
-                    .border(1.dp, Color.White.copy(alpha = 0.20f), RoundedCornerShape(7.dp))
-                    .testTag("current-programme-time"),
-                contentAlignment = Alignment.Center,
-            ) {
+                    .align(Alignment.BottomStart)
+                    .offset(y = (-3).dp)
+                    .fillMaxWidth()
+                    .height(trackHeight)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.22f)),
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .offset(y = (-3).dp)
+                    .fillMaxWidth(animatedProgress)
+                    .height(trackHeight)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.94f)),
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .offset(x = markerOffset)
+                    .size(markerSize)
+                    .shadow(if (focused) 7.dp else 5.dp, CircleShape)
+                    .background(Color.White, CircleShape)
+                    .testTag("programme-progress-marker"),
+            )
+
+            seekPreviewMs?.let { previewMs ->
+                val previewWidth = 94.dp
+                val previewOffset = (markerOffset + markerSize / 2 - previewWidth / 2)
+                    .coerceIn(0.dp, (maxWidth - previewWidth).coerceAtLeast(0.dp))
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .offset(x = previewOffset)
+                        .width(previewWidth)
+                        .height(25.dp)
+                        .background(Color.Black.copy(alpha = 0.72f), RoundedCornerShape(8.dp))
+                        .testTag("seek-preview-time"),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = formatSeekTime(previewMs),
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            programmeStartMs?.let { startMs ->
                 Text(
-                    text = formatTime(displayNowMs),
-                    color = Color.White,
+                    text = formatTime(startMs),
+                    modifier = Modifier.testTag("programme-start-boundary"),
+                    color = MutedWhite,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
                 )
             }
-            Box(
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .fillMaxWidth()
-                    .height(trackHeight)
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.30f)),
-            )
-            clampedProgress?.let { activeProgress ->
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .fillMaxWidth(activeProgress)
-                        .height(trackHeight)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.92f)),
+            remainingLabel?.let { label ->
+                Text(
+                    text = label,
+                    modifier = Modifier.testTag("programme-time-remaining"),
+                    color = Color.White.copy(alpha = 0.82f),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
                 )
             }
-            Box(
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .offset(x = markerOffset)
-                    .size(markerSize)
-                    .shadow(if (focused) 6.dp else 4.dp, CircleShape)
-                    .background(Color.White, CircleShape)
-                    .testTag("programme-progress-marker"),
-            )
         }
     }
 }
