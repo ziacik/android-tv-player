@@ -12,6 +12,11 @@ sealed interface RemoteCommand {
     data class NumericDigit(val digit: Int) : RemoteCommand
     data object ChannelUp : RemoteCommand
     data object ChannelDown : RemoteCommand
+    data object OpenMiniEpg : RemoteCommand
+    data object MiniEpgUp : RemoteCommand
+    data object MiniEpgDown : RemoteCommand
+    data object SelectMiniEpgChannel : RemoteCommand
+    data object CloseMiniEpg : RemoteCommand
     data object ShowOverlay : RemoteCommand
     data object SeekBack : RemoteCommand
     data object SeekForward : RemoteCommand
@@ -48,16 +53,33 @@ class RemoteCommandMapper {
         keyCode: Int,
         overlayVisible: Boolean,
         focusedControl: FocusedControl,
+        miniEpgVisible: Boolean = false,
     ): RemoteCommand {
         keyCode.toNumericDigit()?.let(RemoteCommand::NumericDigit)?.let { return it }
 
-        return when (keyCode) {
+        when (keyCode) {
             KeyEvent.KEYCODE_CHANNEL_UP,
             KeyEvent.KEYCODE_PAGE_UP,
-            -> RemoteCommand.ChannelUp
+            -> return RemoteCommand.ChannelUp
             KeyEvent.KEYCODE_CHANNEL_DOWN,
             KeyEvent.KEYCODE_PAGE_DOWN,
-            -> RemoteCommand.ChannelDown
+            -> return RemoteCommand.ChannelDown
+        }
+
+        if (miniEpgVisible) {
+            return when (keyCode) {
+                KeyEvent.KEYCODE_DPAD_UP -> RemoteCommand.MiniEpgUp
+                KeyEvent.KEYCODE_DPAD_DOWN -> RemoteCommand.MiniEpgDown
+                KeyEvent.KEYCODE_DPAD_CENTER,
+                KeyEvent.KEYCODE_ENTER,
+                KeyEvent.KEYCODE_NUMPAD_ENTER,
+                -> RemoteCommand.SelectMiniEpgChannel
+                KeyEvent.KEYCODE_BACK -> RemoteCommand.CloseMiniEpg
+                else -> RemoteCommand.Ignore
+            }
+        }
+
+        return when (keyCode) {
             KeyEvent.KEYCODE_DPAD_LEFT -> when (focusedControl) {
                 FocusedControl.TIMELINE -> RemoteCommand.SeekBack
                 FocusedControl.LIVE -> RemoteCommand.FocusPlayPause
@@ -68,17 +90,25 @@ class RemoteCommandMapper {
                 FocusedControl.PLAY_PAUSE -> RemoteCommand.FocusLive
                 FocusedControl.LIVE -> RemoteCommand.FocusLive
             }
-            KeyEvent.KEYCODE_DPAD_UP -> when (focusedControl) {
-                FocusedControl.TIMELINE -> RemoteCommand.FocusTimeline
-                FocusedControl.PLAY_PAUSE,
-                FocusedControl.LIVE,
-                -> RemoteCommand.FocusTimeline
+            KeyEvent.KEYCODE_DPAD_UP -> if (!overlayVisible) {
+                RemoteCommand.OpenMiniEpg
+            } else {
+                when (focusedControl) {
+                    FocusedControl.TIMELINE -> RemoteCommand.FocusTimeline
+                    FocusedControl.PLAY_PAUSE,
+                    FocusedControl.LIVE,
+                    -> RemoteCommand.FocusTimeline
+                }
             }
-            KeyEvent.KEYCODE_DPAD_DOWN -> when (focusedControl) {
-                FocusedControl.TIMELINE -> RemoteCommand.FocusPlayPause
-                FocusedControl.PLAY_PAUSE,
-                FocusedControl.LIVE,
-                -> RemoteCommand.FocusLive
+            KeyEvent.KEYCODE_DPAD_DOWN -> if (!overlayVisible) {
+                RemoteCommand.OpenMiniEpg
+            } else {
+                when (focusedControl) {
+                    FocusedControl.TIMELINE -> RemoteCommand.FocusPlayPause
+                    FocusedControl.PLAY_PAUSE,
+                    FocusedControl.LIVE,
+                    -> RemoteCommand.FocusLive
+                }
             }
             KeyEvent.KEYCODE_DPAD_CENTER,
             KeyEvent.KEYCODE_ENTER,
