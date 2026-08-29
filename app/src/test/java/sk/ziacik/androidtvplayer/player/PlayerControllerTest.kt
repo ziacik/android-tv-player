@@ -553,6 +553,33 @@ class PlayerControllerTest {
     }
 
     @Test
+    fun `behind live window recovers at the live edge without resolving again`() = runTest {
+        var resolveCalls = 0
+        val player = FakePlayerPort()
+        val controller = PlayerController(
+            scope = this,
+            initialChannel = TvChannel.JEDNOTKA,
+            resolve = {
+                resolveCalls += 1
+                playableResolution()
+            },
+            playerPort = player,
+        )
+
+        controller.start()
+        advanceUntilIdle()
+        player.registeredListener.onReady(player.latestLoadId, isPlaying = true)
+        player.registeredListener.onError(player.latestLoadId, "ERROR_CODE_BEHIND_LIVE_WINDOW")
+        advanceTimeBy(1_000L)
+        runCurrent()
+
+        assertEquals(1, player.goLiveCalls)
+        assertEquals(1, resolveCalls)
+        assertTrue(controller.state.value is PlayerUiState.Ready)
+        controller.release()
+    }
+
+    @Test
     fun `malformed HLS manifest explains that the source is not a playlist`() = runTest {
         val player = FakePlayerPort()
         val controller = controller(player, this)

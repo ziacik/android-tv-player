@@ -10,6 +10,7 @@ interface PlayerPort {
     fun pause()
     fun seekTo(positionMs: Long)
     fun goLive()
+    fun recoverFromBehindLiveWindow() = goLive()
     fun stop()
     fun release()
     fun setListener(listener: Listener)

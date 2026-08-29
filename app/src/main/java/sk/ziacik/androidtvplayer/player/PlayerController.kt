@@ -68,6 +68,11 @@ class PlayerController(
 
                 override fun onError(loadId: Long, message: String) {
                     if (!acceptsPlaybackCallback(loadId)) return
+                    if (message == ERROR_CODE_BEHIND_LIVE_WINDOW) {
+                        diagnostics("Media3 playback fell behind the live window", null)
+                        playerPort.recoverFromBehindLiveWindow()
+                        return
+                    }
                     val program = activeProgram
                     cancelEpgLookup()
                     diagnostics("Media3 playback failed: $message", null)
@@ -463,6 +468,7 @@ class PlayerController(
     }
 
     private companion object {
+        const val ERROR_CODE_BEHIND_LIVE_WINDOW = "ERROR_CODE_BEHIND_LIVE_WINDOW"
         const val SEEK_INCREMENT_MS = 10_000L
         const val RETRY_AFTER_END_PADDING_MS = 2_000L
         val RETRY_DELAYS_MS = longArrayOf(1_000L, 2_000L, 4_000L, 8_000L, 16_000L, 32_000L, 60_000L)

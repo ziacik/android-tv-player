@@ -94,6 +94,12 @@ class Media3PlayerPort(context: Context) : PlayerPort {
         player.play()
     }
 
+    override fun recoverFromBehindLiveWindow() {
+        player.seekToDefaultPosition()
+        player.prepare()
+        player.play()
+    }
+
     override fun stop() {
         detachActivePlayerListener()
         player.stop()
