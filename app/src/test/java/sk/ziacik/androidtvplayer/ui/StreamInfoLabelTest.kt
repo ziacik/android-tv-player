@@ -19,6 +19,19 @@ class StreamInfoLabelTest {
     }
 
     @Test
+    fun `shows stream host before video format is known`() {
+        assertEquals(
+            "185.188.188.237",
+            formatStreamInfoLabel(
+                width = null,
+                height = null,
+                bitrate = null,
+                streamHost = "185.188.188.237",
+            ),
+        )
+    }
+
+    @Test
     fun `falls back to resolution when bitrate is unknown`() {
         assertEquals(
             "1280×720",
@@ -27,7 +40,7 @@ class StreamInfoLabelTest {
     }
 
     @Test
-    fun `hides label when video format is unknown`() {
+    fun `hides label when video format and stream host are unknown`() {
         assertNull(formatStreamInfoLabel(width = null, height = null, bitrate = null))
     }
 }
