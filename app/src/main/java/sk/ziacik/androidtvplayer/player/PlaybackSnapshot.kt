@@ -9,4 +9,5 @@ data class PlaybackSnapshot(
     val videoWidth: Int? = null,
     val videoHeight: Int? = null,
     val videoBitrate: Int? = null,
+    val streamHost: String? = null,
 )
