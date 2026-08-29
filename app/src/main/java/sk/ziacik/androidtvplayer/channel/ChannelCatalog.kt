@@ -53,7 +53,24 @@ object ChannelCatalogJsonParser {
                     epg?.optString("openEpg")?.takeIf { it.isNotBlank() }?.let { put(EpgSourceId.OPEN_EPG, it) }
                     epg?.optString("skylink")?.takeIf { it.isNotBlank() }?.let { put(EpgSourceId.SKYLINK, it) }
                 }
-                add(TvChannel(id, displayName = name, provider = ChannelProvider.DIRECT, providerValue = url, epgIds = epgIds))
+                val requestHeaders = buildMap {
+                    val headers = value.optJSONObject("headers")
+                    val keys = headers?.keys()
+                    while (keys != null && keys.hasNext()) {
+                        val key = keys.next()
+                        headers.optString(key).takeIf { it.isNotBlank() }?.let { put(key, it) }
+                    }
+                }
+                add(
+                    TvChannel(
+                        id,
+                        displayName = name,
+                        provider = ChannelProvider.DIRECT,
+                        providerValue = url,
+                        epgIds = epgIds,
+                        requestHeaders = requestHeaders,
+                    ),
+                )
             }
         }
         return ChannelCatalog(channels, version = root.optInt("version"))
