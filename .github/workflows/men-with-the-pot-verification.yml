@@ -7,9 +7,7 @@ on:
       - fix/prefer-hd-adaptive-streams
       - feat/modern-osd-timeline-clock
       - feat/kanalik-modern-broadcast-osd
-      - feature/stream-host-in-osd
 
-# Temporary branch verification for PR #17.
 jobs:
   verify:
     runs-on: ubuntu-latest
