@@ -42,7 +42,7 @@ class StreamHostStateTest {
 
         controller.start()
         advanceUntilIdle()
-        player.listener.onError(player.latestLoadId, "ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT")
+        player.capturedListener.onError(player.latestLoadId, "ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT")
         runCurrent()
 
         assertEquals("185.188.188.237", controller.streamHost.value)
@@ -60,7 +60,7 @@ class StreamHostStateTest {
     )
 
     private class FakePlayerPort : PlayerPort {
-        lateinit var listener: PlayerPort.Listener
+        lateinit var capturedListener: PlayerPort.Listener
         private val loadIds = mutableListOf<Long>()
 
         val latestLoadId: Long
@@ -86,7 +86,7 @@ class StreamHostStateTest {
         override fun release() = Unit
 
         override fun setListener(listener: PlayerPort.Listener) {
-            this.listener = listener
+            capturedListener = listener
         }
     }
 }
