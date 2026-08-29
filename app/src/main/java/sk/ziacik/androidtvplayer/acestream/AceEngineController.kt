@@ -11,6 +11,8 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStreamReader
+import java.net.InetSocketAddress
+import java.net.Socket
 import java.util.concurrent.TimeUnit
 import java.util.zip.ZipInputStream
 import kotlinx.coroutines.Dispatchers
@@ -18,16 +20,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.Request
 
 class AceEngineController(
     context: Context,
-    private val httpClient: OkHttpClient = OkHttpClient.Builder()
-        .connectTimeout(1, TimeUnit.SECONDS)
-        .readTimeout(1, TimeUnit.SECONDS)
-        .callTimeout(1, TimeUnit.SECONDS)
-        .build(),
 ) {
     private val context = context.applicationContext
     private val startupMutex = Mutex()
@@ -50,7 +45,8 @@ class AceEngineController(
                 }
             }
 
-            val deadline = System.nanoTime() + STARTUP_TIMEOUT_NANOS
+            val deadline = System.nanoTime() +
+                TimeUnit.MILLISECONDS.toNanos(AceStartupPolicy.STARTUP_TIMEOUT_MILLIS)
             while (System.nanoTime() < deadline) {
                 val current = currentProcess()
                     ?: throw IOException("AceServe process disappeared during startup")
@@ -59,7 +55,7 @@ class AceEngineController(
                     throw IOException("AceServe exited during startup$detail")
                 }
                 if (withContext(Dispatchers.IO) { isHealthy() }) {
-                    Log.i(TAG, "AceServe is ready on 127.0.0.1:6878")
+                    Log.i(TAG, "AceServe is ready on 127.0.0.1 ports ${AceStartupPolicy.REQUIRED_PORTS.joinToString()}")
                     return
                 }
                 delay(250)
@@ -67,7 +63,9 @@ class AceEngineController(
 
             stop()
             val detail = lastLogLine?.let { ": $it" }.orEmpty()
-            throw IOException("AceServe did not become ready within 20 seconds$detail")
+            throw IOException(
+                "AceServe did not become ready within ${AceStartupPolicy.STARTUP_TIMEOUT_MILLIS / 1000} seconds$detail",
+            )
         }
     }
 
@@ -180,9 +178,13 @@ class AceEngineController(
         deletePythonBridge(root)
     }
 
-    private fun isHealthy(): Boolean = runCatching {
-        val request = Request.Builder().url(HEALTH_URL).build()
-        httpClient.newCall(request).execute().use { response -> response.isSuccessful }
+    private fun isHealthy(): Boolean = AceStartupPolicy.REQUIRED_PORTS.all(::isPortOpen)
+
+    private fun isPortOpen(port: Int): Boolean = runCatching {
+        Socket().use { socket ->
+            socket.connect(InetSocketAddress(LOCAL_HOST, port), TCP_PROBE_TIMEOUT_MILLIS)
+        }
+        true
     }.getOrDefault(false)
 
     private fun startLogThread(current: Process) {
@@ -251,7 +253,7 @@ class AceEngineController(
 
     private companion object {
         const val TAG = "AceEngine"
-        const val HEALTH_URL = "http://127.0.0.1:6878/webui/api/service?method=get_version"
-        const val STARTUP_TIMEOUT_NANOS = 20_000_000_000L
+        const val LOCAL_HOST = "127.0.0.1"
+        const val TCP_PROBE_TIMEOUT_MILLIS = 250
     }
 }
