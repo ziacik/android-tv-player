@@ -1,0 +1,224 @@
+name: Apply stream host implementation v2
+
+on:
+  push:
+    branches:
+      - feature/stream-host-in-osd
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: "${{ github.event.head_commit.message == 'ci: apply stream host implementation v2' }}"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply implementation
+        run: |
+          cat > /tmp/stream-host.patch <<'PATCH'
+          diff --git a/app/src/main/java/sk/ziacik/androidtvplayer/player/PlayerController.kt b/app/src/main/java/sk/ziacik/androidtvplayer/player/PlayerController.kt
+          --- a/app/src/main/java/sk/ziacik/androidtvplayer/player/PlayerController.kt
+          +++ b/app/src/main/java/sk/ziacik/androidtvplayer/player/PlayerController.kt
+          @@
+           import java.io.IOException
+          +import java.net.URI
+           import kotlinx.coroutines.CancellationException
+          @@
+               )
+               val state: StateFlow<PlayerUiState> = mutableState.asStateFlow()
+          +    private val mutableStreamHost = MutableStateFlow<String?>(null)
+          +    val streamHost: StateFlow<String?> = mutableStreamHost.asStateFlow()
+           
+               private var currentChannel = initialChannel
+          @@
+               activeProgram = null
+               activePlaybackChannel = null
+               activeLoadId = null
+          +    mutableStreamHost.value = null
+               playerPort.stop()
+           }
+          @@
+               activeProgram = null
+               activePlaybackChannel = null
+               activeLoadId = null
+          +    mutableStreamHost.value = null
+               cancelEpgLookup()
+               playerPort.pause()
+          @@
+                   is StreamResolution.Playable -> {
+                       val program = resolution.program.withEpgLookupPending(channel)
+          +            mutableStreamHost.value = streamHost(resolution.source.url)
+                       activeProgram = program
+                       activePlaybackChannel = channel
+          @@
+                   }
+                   is StreamResolution.Unavailable -> {
+          +            mutableStreamHost.value = null
+                       activeProgram = null
+                       activePlaybackChannel = null
+          @@
+                   }
+                   is StreamResolution.RequiresCredentials -> {
+          +            mutableStreamHost.value = null
+                       activeProgram = null
+                       activePlaybackChannel = null
+          @@
+               activeProgram = null
+               activePlaybackChannel = null
+               activeLoadId = null
+          +    mutableStreamHost.value = null
+               playerPort.release()
+           }
+          @@
+               private fun ProgramMetadata.hasProgrammeInterval(): Boolean =
+                   startsAtMs != null && endsAtMs != null && endsAtMs > startsAtMs
+           
+          +    private fun streamHost(url: String): String? =
+          +        runCatching { URI(url).host }
+          +            .getOrNull()
+          +            ?.takeIf { it.isNotBlank() }
+          +
+               private fun resolverFailureReason(error: Exception): String = when (error) {
+          diff --git a/app/src/main/java/sk/ziacik/androidtvplayer/ui/PlayerScreen.kt b/app/src/main/java/sk/ziacik/androidtvplayer/ui/PlayerScreen.kt
+          --- a/app/src/main/java/sk/ziacik/androidtvplayer/ui/PlayerScreen.kt
+          +++ b/app/src/main/java/sk/ziacik/androidtvplayer/ui/PlayerScreen.kt
+          @@
+           ) {
+               val state by controller.state.collectAsState()
+          +    val streamHost by controller.streamHost.collectAsState()
+               val overlayVisible by overlayController.visible.collectAsState()
+          @@
+                   PlayerStateLayer(
+                       state = state,
+          +            streamHost = streamHost,
+                       overlayVisible = overlayVisible,
+          @@
+           internal fun PlayerStateLayer(
+               state: PlayerUiState,
+          +    streamHost: String? = null,
+               overlayVisible: Boolean,
+          @@
+                   is PlayerUiState.Resolving -> StateOverlay(
+                       channel = current.channel,
+                       program = current.program,
+          +            streamHost = streamHost,
+                       statusText = "Prepínam…",
+          @@
+                   is PlayerUiState.Preparing -> StateOverlay(
+                       channel = current.channel,
+                       program = current.program,
+          +            streamHost = streamHost,
+                       statusText = "Prepínam…",
+          @@
+                   is PlayerUiState.Ready -> if (overlayVisible) {
+                       PlayerOverlay(
+          -                model = PlayerOverlayModel.from(current, System.currentTimeMillis()),
+          +                model = PlayerOverlayModel.from(current, System.currentTimeMillis(), streamHost),
+          @@
+                   is PlayerUiState.Unavailable -> StateOverlay(
+                       channel = current.channel,
+                       program = current.program,
+          +            streamHost = streamHost,
+                       statusText = current.nextRetryAtMs?.let { "Program nie je dostupný online · obnovím o ${formatTime(it)}" }
+          @@
+                   is PlayerUiState.Error -> StateOverlay(
+                       channel = current.channel,
+                       program = current.program,
+          +            streamHost = streamHost,
+                       statusText = current.nextRetryAtMs?.let { "Obnovím vysielanie o ${formatTime(it)}" }
+          @@
+           private fun StateOverlay(
+               channel: TvChannel,
+               program: ProgramMetadata?,
+          +    streamHost: String?,
+               statusText: String,
+          @@
+                       channel = channel,
+                       program = program,
+                       playback = null,
+          +            streamHost = streamHost,
+                       statusText = statusText,
+          diff --git a/app/src/main/java/sk/ziacik/androidtvplayer/ui/PlayerOverlayModel.kt b/app/src/main/java/sk/ziacik/androidtvplayer/ui/PlayerOverlayModel.kt
+          --- a/app/src/main/java/sk/ziacik/androidtvplayer/ui/PlayerOverlayModel.kt
+          +++ b/app/src/main/java/sk/ziacik/androidtvplayer/ui/PlayerOverlayModel.kt
+          @@
+               val bitrateLabel = bitrate
+                   ?.takeIf { it > 0 }
+                   ?.let { String.format(Locale.US, "%.1f Mbps", it / 1_000_000.0) }
+          -    val streamInfo = listOfNotNull(resolution, bitrateLabel)
+          +    return listOfNotNull(
+          +        resolution,
+          +        bitrateLabel,
+          +        streamHost?.takeIf { it.isNotBlank() },
+          +    )
+                   .takeIf { it.isNotEmpty() }
+          -        ?: return null
+          -    return (streamInfo + listOfNotNull(streamHost?.takeIf { it.isNotBlank() }))
+          -        .joinToString(" · ")
+          +        ?.joinToString(" · ")
+           }
+          @@
+                   fun from(
+                       state: PlayerUiState.Ready,
+                       nowMs: Long,
+          +            streamHost: String? = null,
+                   ): PlayerOverlayModel = from(
+                       channel = state.channel,
+                       program = state.program,
+                       playback = state.playback,
+          +            streamHost = streamHost,
+                       statusText = null,
+          @@
+                       channel: TvChannel,
+                       program: ProgramMetadata?,
+                       playback: PlaybackSnapshot?,
+          +            streamHost: String? = null,
+                       statusText: String?,
+          @@
+                       }
+                       val baseChannelLabel = "${channel.ordinal + 1} · ${channel.displayName}"
+          -            val streamInfoLabel = playback?.let { snapshot ->
+          -                formatStreamInfoLabel(
+          -                    width = snapshot.videoWidth,
+          -                    height = snapshot.videoHeight,
+          -                    bitrate = snapshot.videoBitrate,
+          -                    streamHost = snapshot.streamHost,
+          -                )
+          -            }
+          +            val streamInfoLabel = formatStreamInfoLabel(
+          +                width = playback?.videoWidth,
+          +                height = playback?.videoHeight,
+          +                bitrate = playback?.videoBitrate,
+          +                streamHost = streamHost,
+          +            )
+          diff --git a/app/src/main/java/sk/ziacik/androidtvplayer/player/PlaybackSnapshot.kt b/app/src/main/java/sk/ziacik/androidtvplayer/player/PlaybackSnapshot.kt
+          --- a/app/src/main/java/sk/ziacik/androidtvplayer/player/PlaybackSnapshot.kt
+          +++ b/app/src/main/java/sk/ziacik/androidtvplayer/player/PlaybackSnapshot.kt
+          @@
+               val videoWidth: Int? = null,
+               val videoHeight: Int? = null,
+               val videoBitrate: Int? = null,
+          -    val streamHost: String? = null,
+           )
+          diff --git a/app/src/main/java/sk/ziacik/androidtvplayer/player/Media3PlayerPort.kt b/app/src/main/java/sk/ziacik/androidtvplayer/player/Media3PlayerPort.kt
+          --- a/app/src/main/java/sk/ziacik/androidtvplayer/player/Media3PlayerPort.kt
+          +++ b/app/src/main/java/sk/ziacik/androidtvplayer/player/Media3PlayerPort.kt
+          @@
+                       videoWidth = videoFormat?.width?.takeIf { it > 0 },
+                       videoHeight = videoFormat?.height?.takeIf { it > 0 },
+                       videoBitrate = videoFormat?.bitrate?.takeIf { it > 0 },
+          -            streamHost = player.currentMediaItem?.localConfiguration?.uri?.host,
+                   )
+          PATCH
+          git apply --check /tmp/stream-host.patch
+          git apply /tmp/stream-host.patch
+      - name: Commit implementation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/java
+          git commit -m "fix: keep playlist host visible while loading"
+          git push origin HEAD:feature/stream-host-in-osd
