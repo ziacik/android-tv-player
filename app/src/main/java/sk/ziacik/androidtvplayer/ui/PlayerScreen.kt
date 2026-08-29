@@ -66,6 +66,7 @@ fun PlayerScreen(
     modifier: Modifier = Modifier,
 ) {
     val state by controller.state.collectAsState()
+    val streamHost by controller.streamHost.collectAsState()
     val overlayVisible by overlayController.visible.collectAsState()
     var focusedControl by remember { mutableStateOf(FocusedControl.TIMELINE) }
     var seekPreviewMs by remember { mutableStateOf<Long?>(null) }
@@ -325,6 +326,7 @@ fun PlayerScreen(
 
         PlayerStateLayer(
             state = state,
+            streamHost = streamHost,
             overlayVisible = overlayVisible,
             focusedControl = focusedControl,
             formatTime = { millis -> timeFormat.format(Date(millis)) },
@@ -377,6 +379,7 @@ internal fun NumericChannelIndicator(
 @Composable
 internal fun PlayerStateLayer(
     state: PlayerUiState,
+    streamHost: String? = null,
     overlayVisible: Boolean,
     focusedControl: FocusedControl,
     formatTime: (Long) -> String,
@@ -389,6 +392,7 @@ internal fun PlayerStateLayer(
         is PlayerUiState.Resolving -> StateOverlay(
             channel = current.channel,
             program = current.program,
+            streamHost = streamHost,
             statusText = "Prepínam…",
             focusedControl = focusedControl,
             formatTime = formatTime,
@@ -398,6 +402,7 @@ internal fun PlayerStateLayer(
         is PlayerUiState.Preparing -> StateOverlay(
             channel = current.channel,
             program = current.program,
+            streamHost = streamHost,
             statusText = "Prepínam…",
             focusedControl = focusedControl,
             formatTime = formatTime,
@@ -406,7 +411,7 @@ internal fun PlayerStateLayer(
 
         is PlayerUiState.Ready -> if (overlayVisible) {
             PlayerOverlay(
-                model = PlayerOverlayModel.from(current, System.currentTimeMillis()),
+                model = PlayerOverlayModel.from(current, System.currentTimeMillis(), streamHost),
                 focusedControl = focusedControl,
                 timelineFocused = focusedControl == FocusedControl.TIMELINE,
                 formatTime = formatTime,
@@ -419,6 +424,7 @@ internal fun PlayerStateLayer(
         is PlayerUiState.Unavailable -> StateOverlay(
             channel = current.channel,
             program = current.program,
+            streamHost = streamHost,
             statusText = current.nextRetryAtMs?.let { "Program nie je dostupný online · obnovím o ${formatTime(it)}" }
                 ?: "Program nie je dostupný online",
             focusedControl = focusedControl,
@@ -434,6 +440,7 @@ internal fun PlayerStateLayer(
         is PlayerUiState.Error -> StateOverlay(
             channel = current.channel,
             program = current.program,
+            streamHost = streamHost,
             statusText = current.nextRetryAtMs?.let { "Obnovím vysielanie o ${formatTime(it)}" }
                 ?: current.message,
             focusedControl = focusedControl,
@@ -447,6 +454,7 @@ internal fun PlayerStateLayer(
 private fun StateOverlay(
     channel: TvChannel,
     program: ProgramMetadata?,
+    streamHost: String?,
     statusText: String,
     focusedControl: FocusedControl,
     formatTime: (Long) -> String,
@@ -457,6 +465,7 @@ private fun StateOverlay(
             channel = channel,
             program = program,
             playback = null,
+            streamHost = streamHost,
             statusText = statusText,
             nowMs = System.currentTimeMillis(),
         ),
