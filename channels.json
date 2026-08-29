@@ -1,5 +1,5 @@
 {
-  "version": 5,
+  "version": 6,
   "channels": [
     { "id": "jednotka", "name": "JEDNOTKA", "url": "https://sktv.mxnticek.eu/new/stream.php?ch=Jednotka", "epg": { "openEpg": "Jednotka HD.sk", "skylink": "7a55634018be710a62bbf1750443a199" } },
     { "id": "jednotka-ace", "name": "JEDNOTKA ACE", "url": "acestream://e72b5c0d4ab0a0b906b5866b81551e929643339f", "epg": { "openEpg": "Jednotka HD.sk", "skylink": "7a55634018be710a62bbf1750443a199" } },
@@ -12,6 +12,7 @@
     { "id": "stvr-24", "name": "STVR :24", "url": "https://sktv.mxnticek.eu/new/stream.php?ch=STVR%20%3A24", "epg": { "skylink": "6a5461ba82cabcb95db5b344e6440e15" } },
     { "id": "stvr-sport", "name": "STVR ŠPORT", "url": "https://sktv.mxnticek.eu/new/stream.php?ch=%C5%A0port", "epg": { "openEpg": "ŠPORT HD.sk", "skylink": "09fc492d319c8813389e11c167b3a053" } },
     { "id": "joj", "name": "JOJ", "url": "https://sktv.mxnticek.eu/new/stream.php?ch=JOJ", "epg": { "openEpg": "JOJ HD.sk", "skylink": "84a2364ade7443e6d6afe03f9aa2361a" } },
+    { "id": "joj-ace", "name": "JOJ ACE", "url": "acestream://1f0d971ed711c50d9eba5a06dbbadc9ae0c5a7a6", "epg": { "openEpg": "JOJ HD.sk", "skylink": "84a2364ade7443e6d6afe03f9aa2361a" } },
     { "id": "joj-plus", "name": "JOJ PLUS", "url": "https://sktv.mxnticek.eu/new/stream.php?ch=JOJ%20Plus", "epg": { "openEpg": "Plus HD.sk", "skylink": "2aa59e1b0cb34399f6ffc387e52a437b" } },
     { "id": "joj-krimi", "name": "JOJ KRIMI", "url": "https://sktv.mxnticek.eu/new/stream.php?ch=Wau", "epg": { "openEpg": "JOJ KRIMI HD.sk", "skylink": "d4bf459e0c7e39dff6a5dbf3c7c76432" } },
     { "id": "joj-sport", "name": "JOJ ŠPORT", "url": "http://185.188.188.237:5000/live/jojsport/playlist.m3u8", "epg": { "openEpg": "JOJ ŠPORT HD.sk", "skylink": "eacbd3c220de39cfa7e7e4506192b1b2" } },
