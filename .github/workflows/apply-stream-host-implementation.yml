@@ -1,0 +1,158 @@
+name: Apply stream host implementation
+
+on:
+  push:
+    branches:
+      - feature/stream-host-in-osd
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.event.head_commit.message == 'ci: apply stream host implementation'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply implementation
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new, count=None):
+              p = Path(path)
+              text = p.read_text()
+              actual = text.count(old)
+              expected = count if count is not None else 1
+              if actual != expected:
+                  raise SystemExit(f'{path}: expected {expected} matches, found {actual}')
+              p.write_text(text.replace(old, new, expected))
+
+          controller = 'app/src/main/java/sk/ziacik/androidtvplayer/player/PlayerController.kt'
+          replace(controller, 'import java.io.IOException\n', 'import java.io.IOException\nimport java.net.URI\n')
+          replace(
+              controller,
+              '    val state: StateFlow<PlayerUiState> = mutableState.asStateFlow()\n\n    private var currentChannel = initialChannel\n',
+              '    val state: StateFlow<PlayerUiState> = mutableState.asStateFlow()\n    private val mutableStreamHost = MutableStateFlow<String?>(null)\n    val streamHost: StateFlow<String?> = mutableStreamHost.asStateFlow()\n\n    private var currentChannel = initialChannel\n',
+          )
+          replace(
+              controller,
+              '        activeProgram = null\n        activePlaybackChannel = null\n        activeLoadId = null\n        playerPort.stop()\n',
+              '        activeProgram = null\n        activePlaybackChannel = null\n        activeLoadId = null\n        mutableStreamHost.value = null\n        playerPort.stop()\n',
+          )
+          replace(
+              controller,
+              '        activeProgram = null\n        activePlaybackChannel = null\n        activeLoadId = null\n        cancelEpgLookup()\n        playerPort.pause()\n',
+              '        activeProgram = null\n        activePlaybackChannel = null\n        activeLoadId = null\n        mutableStreamHost.value = null\n        cancelEpgLookup()\n        playerPort.pause()\n',
+          )
+          replace(
+              controller,
+              '                val program = resolution.program.withEpgLookupPending(channel)\n                activeProgram = program\n',
+              '                val program = resolution.program.withEpgLookupPending(channel)\n                mutableStreamHost.value = streamHost(resolution.source.url)\n                activeProgram = program\n',
+          )
+          replace(
+              controller,
+              '            is StreamResolution.Unavailable -> {\n                activeProgram = null\n',
+              '            is StreamResolution.Unavailable -> {\n                mutableStreamHost.value = null\n                activeProgram = null\n',
+          )
+          replace(
+              controller,
+              '            is StreamResolution.RequiresCredentials -> {\n                activeProgram = null\n',
+              '            is StreamResolution.RequiresCredentials -> {\n                mutableStreamHost.value = null\n                activeProgram = null\n',
+          )
+          replace(
+              controller,
+              '        activeProgram = null\n        activePlaybackChannel = null\n        activeLoadId = null\n        playerPort.release()\n',
+              '        activeProgram = null\n        activePlaybackChannel = null\n        activeLoadId = null\n        mutableStreamHost.value = null\n        playerPort.release()\n',
+          )
+          replace(
+              controller,
+              '    private fun resolverFailureReason(error: Exception): String = when (error) {\n',
+              '    private fun streamHost(url: String): String? =\n        runCatching { URI(url).host }\n            .getOrNull()\n            ?.takeIf { it.isNotBlank() }\n\n    private fun resolverFailureReason(error: Exception): String = when (error) {\n',
+          )
+
+          screen = 'app/src/main/java/sk/ziacik/androidtvplayer/ui/PlayerScreen.kt'
+          replace(
+              screen,
+              '    val state by controller.state.collectAsState()\n    val overlayVisible by overlayController.visible.collectAsState()\n',
+              '    val state by controller.state.collectAsState()\n    val streamHost by controller.streamHost.collectAsState()\n    val overlayVisible by overlayController.visible.collectAsState()\n',
+          )
+          replace(
+              screen,
+              '        PlayerStateLayer(\n            state = state,\n            overlayVisible = overlayVisible,\n',
+              '        PlayerStateLayer(\n            state = state,\n            streamHost = streamHost,\n            overlayVisible = overlayVisible,\n',
+          )
+          replace(
+              screen,
+              'internal fun PlayerStateLayer(\n    state: PlayerUiState,\n    overlayVisible: Boolean,\n',
+              'internal fun PlayerStateLayer(\n    state: PlayerUiState,\n    streamHost: String? = null,\n    overlayVisible: Boolean,\n',
+          )
+          replace(
+              screen,
+              '            program = current.program,\n            statusText =',
+              '            program = current.program,\n            streamHost = streamHost,\n            statusText =',
+              count=4,
+          )
+          replace(
+              screen,
+              '                model = PlayerOverlayModel.from(current, System.currentTimeMillis()),\n',
+              '                model = PlayerOverlayModel.from(current, System.currentTimeMillis(), streamHost),\n',
+          )
+          replace(
+              screen,
+              'private fun StateOverlay(\n    channel: TvChannel,\n    program: ProgramMetadata?,\n    statusText: String,\n',
+              'private fun StateOverlay(\n    channel: TvChannel,\n    program: ProgramMetadata?,\n    streamHost: String?,\n    statusText: String,\n',
+          )
+          replace(
+              screen,
+              '            playback = null,\n            statusText = statusText,\n',
+              '            playback = null,\n            streamHost = streamHost,\n            statusText = statusText,\n',
+          )
+
+          model = 'app/src/main/java/sk/ziacik/androidtvplayer/ui/PlayerOverlayModel.kt'
+          replace(
+              model,
+              '    val streamInfo = listOfNotNull(resolution, bitrateLabel)\n        .takeIf { it.isNotEmpty() }\n        ?: return null\n    return (streamInfo + listOfNotNull(streamHost?.takeIf { it.isNotBlank() }))\n        .joinToString(" · ")\n',
+              '    return listOfNotNull(\n        resolution,\n        bitrateLabel,\n        streamHost?.takeIf { it.isNotBlank() },\n    )\n        .takeIf { it.isNotEmpty() }\n        ?.joinToString(" · ")\n',
+          )
+          replace(
+              model,
+              '        fun from(\n            state: PlayerUiState.Ready,\n            nowMs: Long,\n        ): PlayerOverlayModel = from(\n',
+              '        fun from(\n            state: PlayerUiState.Ready,\n            nowMs: Long,\n            streamHost: String? = null,\n        ): PlayerOverlayModel = from(\n',
+          )
+          replace(
+              model,
+              '            playback = state.playback,\n            statusText = null,\n',
+              '            playback = state.playback,\n            streamHost = streamHost,\n            statusText = null,\n',
+          )
+          replace(
+              model,
+              '            playback: PlaybackSnapshot?,\n            statusText: String?,\n',
+              '            playback: PlaybackSnapshot?,\n            streamHost: String? = null,\n            statusText: String?,\n',
+          )
+          replace(
+              model,
+              '                    bitrate = snapshot.videoBitrate,\n                    streamHost = snapshot.streamHost,\n',
+              '                    bitrate = snapshot.videoBitrate,\n                    streamHost = streamHost,\n',
+          )
+          replace(
+              model,
+              '            val streamInfoLabel = playback?.let { snapshot ->\n                formatStreamInfoLabel(\n                    width = snapshot.videoWidth,\n                    height = snapshot.videoHeight,\n                    bitrate = snapshot.videoBitrate,\n                    streamHost = streamHost,\n                )\n            }\n',
+              '            val streamInfoLabel = formatStreamInfoLabel(\n                width = playback?.videoWidth,\n                height = playback?.videoHeight,\n                bitrate = playback?.videoBitrate,\n                streamHost = streamHost,\n            )\n',
+          )
+
+          snapshot = 'app/src/main/java/sk/ziacik/androidtvplayer/player/PlaybackSnapshot.kt'
+          replace(snapshot, '    val videoBitrate: Int? = null,\n    val streamHost: String? = null,\n', '    val videoBitrate: Int? = null,\n')
+
+          media3 = 'app/src/main/java/sk/ziacik/androidtvplayer/player/Media3PlayerPort.kt'
+          replace(media3, '            videoBitrate = videoFormat?.bitrate?.takeIf { it > 0 },\n            streamHost = player.currentMediaItem?.localConfiguration?.uri?.host,\n', '            videoBitrate = videoFormat?.bitrate?.takeIf { it > 0 },\n')
+          PY
+      - name: Commit implementation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/java
+          git commit -m "fix: keep playlist host visible while loading"
+          git push origin HEAD:feature/stream-host-in-osd
