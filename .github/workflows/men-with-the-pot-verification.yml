@@ -9,6 +9,7 @@ on:
       - feat/kanalik-modern-broadcast-osd
       - feature/stream-host-in-osd
 
+# Temporary branch verification for PR #17.
 jobs:
   verify:
     runs-on: ubuntu-latest
