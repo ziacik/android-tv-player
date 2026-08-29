@@ -25,6 +25,19 @@ class ChannelCatalogTest {
     }
 
     @Test
+    fun `parses AceStream direct channels`() {
+        val catalog = ChannelCatalogJsonParser.parse(
+            """{"channels":[{"id":"ace","name":"ACE","url":"acestream://94c2fd8fb9bc8f2fc71a2cbe9d4b866f227a0209"}]}""",
+        )
+
+        assertEquals(ChannelProvider.DIRECT, catalog.channels.single().provider)
+        assertEquals(
+            "acestream://94c2fd8fb9bc8f2fc71a2cbe9d4b866f227a0209",
+            catalog.channels.single().providerValue,
+        )
+    }
+
+    @Test
     fun `parses Open EPG channel identifier`() {
         val catalog = ChannelCatalogJsonParser.parse(
             """{"channels":[{"id":"markiza","name":"MARKÍZA","url":"https://example.com/live.m3u8","epg":{"openEpg":"Markíza HD.sk","skylink":"skylink-id","iptvOrg":"obsolete"}}]}""",
@@ -36,7 +49,7 @@ class ChannelCatalogTest {
     }
 
     @Test
-    fun `skips malformed duplicate and non HTTP entries`() {
+    fun `skips malformed duplicate and unsupported scheme entries`() {
         val catalog = ChannelCatalogJsonParser.parse(
             """
             {
