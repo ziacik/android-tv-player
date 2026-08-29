@@ -8,7 +8,12 @@ import sk.ziacik.androidtvplayer.resolver.ProgramMetadata
 
 enum class PlayerOverlayStateIndicator { LIVE, SWITCHING, RETRYING }
 
-internal fun formatStreamInfoLabel(width: Int?, height: Int?, bitrate: Int?): String? {
+internal fun formatStreamInfoLabel(
+    width: Int?,
+    height: Int?,
+    bitrate: Int?,
+    streamHost: String? = null,
+): String? {
     val resolution = if (width != null && width > 0 && height != null && height > 0) {
         "${width}×${height}"
     } else {
@@ -17,9 +22,11 @@ internal fun formatStreamInfoLabel(width: Int?, height: Int?, bitrate: Int?): St
     val bitrateLabel = bitrate
         ?.takeIf { it > 0 }
         ?.let { String.format(Locale.US, "%.1f Mbps", it / 1_000_000.0) }
-    return listOfNotNull(resolution, bitrateLabel)
+    val streamInfo = listOfNotNull(resolution, bitrateLabel)
         .takeIf { it.isNotEmpty() }
-        ?.joinToString(" · ")
+        ?: return null
+    return (streamInfo + listOfNotNull(streamHost?.takeIf { it.isNotBlank() }))
+        .joinToString(" · ")
 }
 
 data class PlayerOverlayModel(
@@ -97,6 +104,7 @@ data class PlayerOverlayModel(
                     width = snapshot.videoWidth,
                     height = snapshot.videoHeight,
                     bitrate = snapshot.videoBitrate,
+                    streamHost = snapshot.streamHost,
                 )
             }
 
