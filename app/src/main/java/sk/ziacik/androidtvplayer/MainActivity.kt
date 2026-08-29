@@ -11,6 +11,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import sk.ziacik.androidtvplayer.acestream.AceEngineController
+import sk.ziacik.androidtvplayer.acestream.AcePlaybackGate
 import sk.ziacik.androidtvplayer.channel.SharedPreferencesChannelStore
 import sk.ziacik.androidtvplayer.channel.ChannelCatalogRepository
 import sk.ziacik.androidtvplayer.channel.ChannelCatalog
@@ -40,6 +42,7 @@ import sk.ziacik.androidtvplayer.ui.PlayerScreen
 class MainActivity : ComponentActivity() {
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private lateinit var playerController: PlayerController
+    private lateinit var aceEngineController: AceEngineController
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -62,6 +65,8 @@ class MainActivity : ComponentActivity() {
             resolveSweetTv = SweetTvResolver(freeviewHttpClient)::resolve,
             resolveDirect = DirectResolver()::resolve,
         )
+        aceEngineController = AceEngineController(this)
+        val acePlaybackGate = AcePlaybackGate(aceEngineController::ensureReady)
         val catalogRepository = ChannelCatalogRepository(
             seed = { assets.open("channels.json").bufferedReader().use { it.readText() } },
             cacheFile = File(filesDir, "channels.json"),
@@ -95,7 +100,10 @@ class MainActivity : ComponentActivity() {
         playerController = PlayerController(
             scope = appScope,
             initialChannel = channelStore.load(catalog),
-            resolve = resolver::resolve,
+            resolve = { channel ->
+                acePlaybackGate.prepare(channel.providerValue)
+                resolver.resolve(channel)
+            },
             playerPort = playerPort,
             epgRepository = epgRepository,
             onChannelSelected = channelStore::save,
@@ -137,10 +145,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         playerController.stop()
+        aceEngineController.stop()
         super.onStop()
     }
 
     override fun onDestroy() {
+        aceEngineController.stop()
         playerController.release()
         appScope.cancel()
         super.onDestroy()
