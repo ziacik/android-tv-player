@@ -14,7 +14,7 @@ import sk.ziacik.androidtvplayer.resolver.StreamSource
 @OptIn(ExperimentalCoroutinesApi::class)
 class StreamHostStateTest {
     @Test
-    fun `preparing state exposes playlist host before media is ready`() = runTest {
+    fun `playlist host is available before media is ready`() = runTest {
         val player = FakePlayerPort()
         val controller = PlayerController(
             scope = this,
@@ -26,15 +26,12 @@ class StreamHostStateTest {
         controller.start()
         advanceUntilIdle()
 
-        assertEquals(
-            "media.example.com",
-            (controller.state.value as PlayerUiState.Preparing).streamHost,
-        )
+        assertEquals("media.example.com", controller.streamHost.value)
         controller.release()
     }
 
     @Test
-    fun `playback error keeps playlist host visible`() = runTest {
+    fun `playback error keeps playlist host available`() = runTest {
         val player = FakePlayerPort()
         val controller = PlayerController(
             scope = this,
@@ -48,10 +45,7 @@ class StreamHostStateTest {
         player.listener.onError(player.latestLoadId, "ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT")
         runCurrent()
 
-        assertEquals(
-            "185.188.188.237",
-            (controller.state.value as PlayerUiState.Error).streamHost,
-        )
+        assertEquals("185.188.188.237", controller.streamHost.value)
         controller.release()
     }
 
