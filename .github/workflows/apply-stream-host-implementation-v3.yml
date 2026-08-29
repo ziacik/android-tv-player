@@ -1,0 +1,27 @@
+name: Apply stream host implementation v3
+
+on:
+  push:
+    branches:
+      - feature/stream-host-in-osd
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: "${{ github.event.head_commit.message == 'ci: apply stream host implementation v3' }}"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply implementation
+        run: python3 .github/scripts/apply_stream_host.py
+      - name: Commit implementation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/java
+          git commit -m "fix: keep playlist host visible while loading"
+          git push origin HEAD:feature/stream-host-in-osd
