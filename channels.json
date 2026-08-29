@@ -1,7 +1,8 @@
 {
-  "version": 4,
+  "version": 5,
   "channels": [
     { "id": "jednotka", "name": "JEDNOTKA", "url": "https://sktv.mxnticek.eu/new/stream.php?ch=Jednotka", "epg": { "openEpg": "Jednotka HD.sk", "skylink": "7a55634018be710a62bbf1750443a199" } },
+    { "id": "jednotka-ace", "name": "JEDNOTKA ACE", "url": "acestream://e72b5c0d4ab0a0b906b5866b81551e929643339f", "epg": { "openEpg": "Jednotka HD.sk", "skylink": "7a55634018be710a62bbf1750443a199" } },
     { "id": "dvojka", "name": "DVOJKA", "url": "https://sktv.mxnticek.eu/new/stream.php?ch=Dvojka", "epg": { "openEpg": "Dvojka HD.sk", "skylink": "584c86a108172efc9c27af06eb3d4652" } },
     { "id": "markiza", "name": "MARKÍZA", "url": "https://sktv.mxnticek.eu/new/stream.php?ch=Markiza", "epg": { "openEpg": "Markíza HD.sk", "skylink": "336e46bf4276e77a716e494c6285d5db" } },
     { "id": "doma", "name": "DOMA", "url": "https://sktv.mxnticek.eu/new/stream.php?ch=Doma", "epg": { "openEpg": "Doma HD.sk" } },
