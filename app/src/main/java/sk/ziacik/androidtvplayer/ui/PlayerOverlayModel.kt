@@ -22,11 +22,13 @@ internal fun formatStreamInfoLabel(
     val bitrateLabel = bitrate
         ?.takeIf { it > 0 }
         ?.let { String.format(Locale.US, "%.1f Mbps", it / 1_000_000.0) }
-    val streamInfo = listOfNotNull(resolution, bitrateLabel)
+    return listOfNotNull(
+        resolution,
+        bitrateLabel,
+        streamHost?.takeIf { it.isNotBlank() },
+    )
         .takeIf { it.isNotEmpty() }
-        ?: return null
-    return (streamInfo + listOfNotNull(streamHost?.takeIf { it.isNotBlank() }))
-        .joinToString(" · ")
+        ?.joinToString(" · ")
 }
 
 data class PlayerOverlayModel(
@@ -48,10 +50,12 @@ data class PlayerOverlayModel(
         fun from(
             state: PlayerUiState.Ready,
             nowMs: Long,
+            streamHost: String? = null,
         ): PlayerOverlayModel = from(
             channel = state.channel,
             program = state.program,
             playback = state.playback,
+            streamHost = streamHost,
             statusText = null,
             nowMs = nowMs,
         )
@@ -60,6 +64,7 @@ data class PlayerOverlayModel(
             channel: TvChannel,
             program: ProgramMetadata?,
             playback: PlaybackSnapshot?,
+            streamHost: String? = null,
             statusText: String?,
             nowMs: Long,
         ): PlayerOverlayModel {
@@ -99,14 +104,12 @@ data class PlayerOverlayModel(
                 else -> PlayerOverlayStateIndicator.RETRYING
             }
             val baseChannelLabel = "${channel.ordinal + 1} · ${channel.displayName}"
-            val streamInfoLabel = playback?.let { snapshot ->
-                formatStreamInfoLabel(
-                    width = snapshot.videoWidth,
-                    height = snapshot.videoHeight,
-                    bitrate = snapshot.videoBitrate,
-                    streamHost = snapshot.streamHost,
-                )
-            }
+            val streamInfoLabel = formatStreamInfoLabel(
+                width = playback?.videoWidth,
+                height = playback?.videoHeight,
+                bitrate = playback?.videoBitrate,
+                streamHost = streamHost,
+            )
 
             return PlayerOverlayModel(
                 channelLabel = listOfNotNull(baseChannelLabel, streamInfoLabel).joinToString("    "),

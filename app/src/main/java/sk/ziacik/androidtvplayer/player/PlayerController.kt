@@ -1,6 +1,7 @@
 package sk.ziacik.androidtvplayer.player
 
 import java.io.IOException
+import java.net.URI
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -30,6 +31,8 @@ class PlayerController(
         PlayerUiState.Resolving(initialChannel),
     )
     val state: StateFlow<PlayerUiState> = mutableState.asStateFlow()
+    private val mutableStreamHost = MutableStateFlow<String?>(null)
+    val streamHost: StateFlow<String?> = mutableStreamHost.asStateFlow()
 
     private var currentChannel = initialChannel
     private var activeProgram: ProgramMetadata? = null
@@ -106,6 +109,7 @@ class PlayerController(
         activeProgram = null
         activePlaybackChannel = null
         activeLoadId = null
+        mutableStreamHost.value = null
         playerPort.stop()
     }
 
@@ -129,6 +133,7 @@ class PlayerController(
         activeProgram = null
         activePlaybackChannel = null
         activeLoadId = null
+        mutableStreamHost.value = null
         cancelEpgLookup()
         playerPort.pause()
         resolveCurrentChannel()
@@ -274,6 +279,7 @@ class PlayerController(
         activeProgram = null
         activePlaybackChannel = null
         activeLoadId = null
+        mutableStreamHost.value = null
         playerPort.release()
     }
 
@@ -281,6 +287,7 @@ class PlayerController(
         when (resolution) {
             is StreamResolution.Playable -> {
                 val program = resolution.program.withEpgLookupPending(channel)
+                mutableStreamHost.value = streamHost(resolution.source.url)
                 activeProgram = program
                 activePlaybackChannel = channel
                 val loadId = ++nextLoadId
@@ -306,6 +313,7 @@ class PlayerController(
                 }
             }
             is StreamResolution.Unavailable -> {
+                mutableStreamHost.value = null
                 activeProgram = null
                 activePlaybackChannel = null
                 activeLoadId = null
@@ -317,6 +325,7 @@ class PlayerController(
                 )
             }
             is StreamResolution.RequiresCredentials -> {
+                mutableStreamHost.value = null
                 activeProgram = null
                 activePlaybackChannel = null
                 activeLoadId = null
@@ -431,6 +440,11 @@ class PlayerController(
 
     private fun ProgramMetadata.hasProgrammeInterval(): Boolean =
         startsAtMs != null && endsAtMs != null && endsAtMs > startsAtMs
+
+    private fun streamHost(url: String): String? =
+        runCatching { URI(url).host }
+            .getOrNull()
+            ?.takeIf { it.isNotBlank() }
 
     private fun resolverFailureReason(error: Exception): String = when (error) {
         is StreamResolveException -> error.message ?: "Zdroj vysielania neodpovedal"
