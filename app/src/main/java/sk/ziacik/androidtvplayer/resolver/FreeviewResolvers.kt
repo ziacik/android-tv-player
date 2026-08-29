@@ -9,6 +9,8 @@ import sk.ziacik.androidtvplayer.channel.TvChannel
 private const val FREEVIEW_USER_AGENT =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
         "Chrome/143.0.0.0 Safari/537.36"
+private const val ACESTREAM_SCHEME = "acestream://"
+private const val ACESTREAM_HLS_ENDPOINT = "http://127.0.0.1:6878/ace/manifest.m3u8?content_id="
 
 private fun playable(
     channel: TvChannel,
@@ -137,8 +139,17 @@ class CnnPrimaNewsResolver(private val http: FreeviewHttpClient) {
 }
 
 class DirectResolver {
-    suspend fun resolve(channel: TvChannel): StreamResolution =
-        playable(channel, requireNotNull(channel.providerValue))
+    suspend fun resolve(channel: TvChannel): StreamResolution {
+        val source = requireNotNull(channel.providerValue)
+        val resolved = if (source.startsWith(ACESTREAM_SCHEME)) {
+            val contentId = source.removePrefix(ACESTREAM_SCHEME)
+            require(contentId.isNotBlank()) { "Ace Stream content ID is missing" }
+            "$ACESTREAM_HLS_ENDPOINT$contentId"
+        } else {
+            source
+        }
+        return playable(channel, resolved)
+    }
 }
 
 private suspend fun protect(provider: String, block: suspend () -> StreamResolution): StreamResolution = try {
