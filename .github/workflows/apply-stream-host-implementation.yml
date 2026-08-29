@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   apply:
-    if: github.event.head_commit.message == 'ci: apply stream host implementation'
+    if: "${{ github.event.head_commit.message == 'ci: apply stream host implementation' }}"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
