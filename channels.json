@@ -1,5 +1,5 @@
 {
-  "version": 5,
+  "version": 7,
   "channels": [
     { "id": "jednotka", "name": "JEDNOTKA", "url": "http://212.102.38.45/live/test_jednotka_25p/playlist.m3u8", "epg": { "openEpg": "Jednotka HD.sk", "skylink": "7a55634018be710a62bbf1750443a199" } },
     { "id": "dvojka", "name": "DVOJKA", "url": "http://212.102.38.45/live/test_dvojka_25p/playlist.m3u8", "epg": { "openEpg": "Dvojka HD.sk", "skylink": "584c86a108172efc9c27af06eb3d4652" } },
