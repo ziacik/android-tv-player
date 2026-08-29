@@ -34,6 +34,7 @@ class Media3PlayerPort(context: Context) : PlayerPort {
             videoWidth = videoFormat?.width?.takeIf { it > 0 },
             videoHeight = videoFormat?.height?.takeIf { it > 0 },
             videoBitrate = videoFormat?.bitrate?.takeIf { it > 0 },
+            streamHost = player.currentMediaItem?.localConfiguration?.uri?.host,
         )
     }
 
