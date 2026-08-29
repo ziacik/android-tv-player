@@ -25,6 +25,35 @@ class ChannelCatalogTest {
     }
 
     @Test
+    fun `parses direct channel request headers`() {
+        val catalog = ChannelCatalogJsonParser.parse(
+            """
+            {
+              "channels": [
+                {
+                  "id": "joj-24",
+                  "name": "JOJ 24",
+                  "url": "https://example.com/joj24.m3u8",
+                  "headers": {
+                    "Referer": "https://media.joj.sk/",
+                    "Origin": "https://media.joj.sk"
+                  }
+                }
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(
+            mapOf(
+                "Referer" to "https://media.joj.sk/",
+                "Origin" to "https://media.joj.sk",
+            ),
+            catalog.channels.single().requestHeaders,
+        )
+    }
+
+    @Test
     fun `parses Open EPG channel identifier`() {
         val catalog = ChannelCatalogJsonParser.parse(
             """{"channels":[{"id":"markiza","name":"MARKÍZA","url":"https://example.com/live.m3u8","epg":{"openEpg":"Markíza HD.sk","skylink":"skylink-id","iptvOrg":"obsolete"}}]}""",

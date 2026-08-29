@@ -138,7 +138,7 @@ class CnnPrimaNewsResolver(private val http: FreeviewHttpClient) {
 
 class DirectResolver {
     suspend fun resolve(channel: TvChannel): StreamResolution =
-        playable(channel, requireNotNull(channel.providerValue))
+        playable(channel, requireNotNull(channel.providerValue), channel.requestHeaders)
 }
 
 private suspend fun protect(provider: String, block: suspend () -> StreamResolution): StreamResolution = try {

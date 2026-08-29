@@ -9,6 +9,7 @@ data class TvChannel(
     val provider: ChannelProvider,
     val providerValue: String? = null,
     val epgIds: Map<EpgSourceId, String> = emptyMap(),
+    val requestHeaders: Map<String, String> = emptyMap(),
 ) {
     fun next(): TvChannel {
         val index = entries.indexOfFirst { it.storageKey == storageKey }
