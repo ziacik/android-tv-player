@@ -47,7 +47,11 @@ object ChannelCatalogJsonParser {
                 val id = value.optString("id").trim()
                 val name = value.optString("name").trim()
                 val url = value.optString("url").trim()
-                if (id.isBlank() || name.isBlank() || !(url.startsWith("http://") || url.startsWith("https://")) || this@buildList.any { it.storageKey == id }) return@repeat
+                val supportedScheme =
+                    url.startsWith("http://") ||
+                        url.startsWith("https://") ||
+                        url.startsWith("acestream://")
+                if (id.isBlank() || name.isBlank() || !supportedScheme || this@buildList.any { it.storageKey == id }) return@repeat
                 val epg = value.optJSONObject("epg")
                 val epgIds = buildMap {
                     epg?.optString("openEpg")?.takeIf { it.isNotBlank() }?.let { put(EpgSourceId.OPEN_EPG, it) }
