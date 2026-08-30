@@ -94,7 +94,7 @@ class RemoteCommandMapper {
                 RemoteCommand.OpenMiniEpg
             } else {
                 when (focusedControl) {
-                    FocusedControl.TIMELINE -> RemoteCommand.FocusTimeline
+                    FocusedControl.TIMELINE -> RemoteCommand.OpenMiniEpg
                     FocusedControl.PLAY_PAUSE,
                     FocusedControl.LIVE,
                     -> RemoteCommand.FocusTimeline
