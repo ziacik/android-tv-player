@@ -7,6 +7,7 @@ on:
   push:
     branches:
       - master
+      - chore/ci-baseline
 
 permissions:
   contents: read
