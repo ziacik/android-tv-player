@@ -79,12 +79,20 @@ class CachedXmltvEpgRepository(
         val now = clockMs()
         cachedFeeds[source.id]
             ?.takeIf { now - it.loadedAtMs < CACHE_FRESHNESS_MS }
-            ?.let { return parseCurrentProgram(it.bytes, source, channelId, nowMs) }
+            ?.let { cachedFeed ->
+                val indexedFeed = ensureChannelIndexed(source, cachedFeed, channelId)
+                return indexedFeed.currentProgram(channelId, nowMs)
+            }
 
         if (source.cacheFile.isFile && now - source.cacheFile.lastModified() < CACHE_FRESHNESS_MS) {
             val cachedBytes = source.cacheFile.readBytes()
-            return parseCurrentProgram(cachedBytes, source, channelId, nowMs)
-                .also { remember(source, cachedBytes, source.cacheFile.lastModified()) }
+            val cachedFeed = remember(
+                source = source,
+                bytes = cachedBytes,
+                loadedAtMs = source.cacheFile.lastModified(),
+                requiredChannelIds = setOf(channelId),
+            )
+            return cachedFeed.currentProgram(channelId, nowMs)
         }
 
         val downloaded = try {
@@ -97,10 +105,15 @@ class CachedXmltvEpgRepository(
         }
         if (downloaded != null) {
             try {
-                val programme = parseCurrentProgram(downloaded, source, channelId, nowMs)
+                val downloadedFeed = buildCachedFeed(
+                    source = source,
+                    bytes = downloaded,
+                    loadedAtMs = now,
+                    requiredChannelIds = setOf(channelId),
+                )
                 writeCacheAtomically(source, downloaded)
-                remember(source, downloaded, now)
-                return programme
+                cachedFeeds[source.id] = downloadedFeed
+                return downloadedFeed.currentProgram(channelId, nowMs)
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
@@ -110,6 +123,20 @@ class CachedXmltvEpgRepository(
         return parseCachedProgram(source, channelId, nowMs, source.cacheFile.lastModified())
     }
 
+    private fun ensureChannelIndexed(
+        source: XmltvEpgSource,
+        cachedFeed: CachedFeed,
+        channelId: String,
+    ): CachedFeed {
+        if (channelId in cachedFeed.indexedChannelIds) return cachedFeed
+        return buildCachedFeed(
+            source = source,
+            bytes = cachedFeed.bytes,
+            loadedAtMs = cachedFeed.loadedAtMs,
+            requiredChannelIds = cachedFeed.indexedChannelIds + channelId,
+        ).also { cachedFeeds[source.id] = it }
+    }
+
     private fun parseCachedProgram(
         source: XmltvEpgSource,
         channelId: String,
@@ -117,26 +144,51 @@ class CachedXmltvEpgRepository(
         loadedAtMs: Long,
     ): EpgProgramme? = runCatching {
         val cachedBytes = source.cacheFile.readBytes()
-        parseCurrentProgram(cachedBytes, source, channelId, nowMs)
-            .also { remember(source, cachedBytes, loadedAtMs) }
+        remember(
+            source = source,
+            bytes = cachedBytes,
+            loadedAtMs = loadedAtMs,
+            requiredChannelIds = setOf(channelId),
+        ).currentProgram(channelId, nowMs)
     }.getOrNull()
-
-    private fun parseCurrentProgram(
-        bytes: ByteArray,
-        source: XmltvEpgSource,
-        channelId: String,
-        nowMs: Long,
-    ): EpgProgramme? = bytes.openXmlStream().use { stream ->
-        parser.currentProgram(stream, channelId, nowMs)
-    }
 
     private fun remember(
         source: XmltvEpgSource,
         bytes: ByteArray,
-        now: Long,
-    ) {
-        cachedFeeds[source.id] = CachedFeed(bytes, now)
+        loadedAtMs: Long,
+        requiredChannelIds: Set<String>,
+    ): CachedFeed = buildCachedFeed(
+        source = source,
+        bytes = bytes,
+        loadedAtMs = loadedAtMs,
+        requiredChannelIds = requiredChannelIds,
+    ).also { cachedFeeds[source.id] = it }
+
+    private fun buildCachedFeed(
+        source: XmltvEpgSource,
+        bytes: ByteArray,
+        loadedAtMs: Long,
+        requiredChannelIds: Set<String>,
+    ): CachedFeed {
+        val channelIds = configuredChannelIds(source.id) + requiredChannelIds
+        val programmes = bytes.openXmlStream().use { stream ->
+            parser.parse(stream, channelIds)
+        }
+        return CachedFeed(
+            bytes = bytes,
+            loadedAtMs = loadedAtMs,
+            indexedChannelIds = channelIds,
+            programmes = programmes,
+        )
     }
+
+    private fun configuredChannelIds(sourceId: EpgSourceId): Set<String> =
+        TvChannel.entries.mapNotNull { channel -> channel.epgIds[sourceId] }.toSet()
+
+    private fun CachedFeed.currentProgram(channelId: String, nowMs: Long): EpgProgramme? =
+        programmes[channelId]?.firstOrNull { programme ->
+            programme.startsAtMs <= nowMs && nowMs < programme.endsAtMs
+        }
 
     private fun writeCacheAtomically(source: XmltvEpgSource, bytes: ByteArray) {
         source.cacheFile.parentFile?.mkdirs()
@@ -161,6 +213,8 @@ class CachedXmltvEpgRepository(
     private data class CachedFeed(
         val bytes: ByteArray,
         val loadedAtMs: Long,
+        val indexedChannelIds: Set<String>,
+        val programmes: Map<String, List<EpgProgramme>>,
     )
 
     private data class ProgrammeKey(
