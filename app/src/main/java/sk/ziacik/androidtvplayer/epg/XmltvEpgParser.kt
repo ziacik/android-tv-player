@@ -10,8 +10,8 @@ import org.xml.sax.Attributes
 import org.xml.sax.InputSource
 import org.xml.sax.helpers.DefaultHandler
 
-class XmltvEpgParser {
-    fun currentProgram(
+open class XmltvEpgParser {
+    open fun currentProgram(
         xml: InputStream,
         channelId: String,
         nowMs: Long,
@@ -43,7 +43,7 @@ class XmltvEpgParser {
         }
     }
 
-    fun parse(
+    open fun parse(
         xml: InputStream,
         channelIds: Set<String>,
     ): Map<String, List<EpgProgramme>> {
