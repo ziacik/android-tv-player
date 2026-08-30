@@ -98,6 +98,14 @@ class RemoteCommandMapperTest {
     }
 
     @Test
+    fun `up opens mini EPG from timeline while OSD is visible`() {
+        assertEquals(
+            RemoteCommand.OpenMiniEpg,
+            mapper.map(KeyEvent.KEYCODE_DPAD_UP, true, FocusedControl.TIMELINE),
+        )
+    }
+
+    @Test
     fun `mini EPG consumes vertical navigation center and back`() {
         assertEquals(
             RemoteCommand.MiniEpgUp,
