@@ -20,6 +20,10 @@ android {
         compose = true
     }
 
+    lint {
+        baseline = file("lint-baseline.xml")
+    }
+
     sourceSets.named("main") {
         assets.srcDir(layout.buildDirectory.dir("generated/assets/channels").get().asFile)
     }
