@@ -29,9 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -186,11 +184,16 @@ fun PlayerScreen(
             .background(Color.Black)
             .focusRequester(focusRequester)
             .onPreviewKeyEvent { event ->
-                if (event.type != KeyEventType.KeyUp) {
+                val keyCode = event.nativeKeyEvent.keyCode
+                if (!shouldHandleRemoteKeyEvent(
+                        action = event.nativeKeyEvent.action,
+                        keyCode = keyCode,
+                        miniEpgVisible = miniEpgVisible,
+                    )
+                ) {
                     return@onPreviewKeyEvent false
                 }
 
-                val keyCode = event.nativeKeyEvent.keyCode
                 val command = commandMapper.map(
                     keyCode = keyCode,
                     overlayVisible = overlayVisible,
@@ -528,6 +531,21 @@ private fun PlayerUiState.currentProgramOrNull(): ProgramMetadata? = when (this)
     is PlayerUiState.Unavailable -> program
     is PlayerUiState.Error -> program
     is PlayerUiState.CredentialsRequired -> null
+}
+
+internal fun shouldHandleRemoteKeyEvent(
+    action: Int,
+    keyCode: Int,
+    miniEpgVisible: Boolean,
+): Boolean {
+    val miniEpgVerticalNavigation = miniEpgVisible &&
+        (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN)
+
+    return if (miniEpgVerticalNavigation) {
+        action == KeyEvent.ACTION_DOWN
+    } else {
+        action == KeyEvent.ACTION_UP
+    }
 }
 
 private fun Int.isCenterKey(): Boolean =
