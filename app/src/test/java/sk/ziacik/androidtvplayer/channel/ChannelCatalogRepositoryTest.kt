@@ -3,6 +3,7 @@ package sk.ziacik.androidtvplayer.channel
 import java.io.File
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -10,6 +11,17 @@ import org.junit.rules.TemporaryFolder
 class ChannelCatalogRepositoryTest {
     @get:Rule
     val temporaryFolder = TemporaryFolder()
+
+    @Test
+    fun `missing bundled catalog and cache returns no initial catalog`() {
+        val repository = ChannelCatalogRepository(
+            seed = { null },
+            cacheFile = File(temporaryFolder.root, "channels.json"),
+            download = { error("download must not run") },
+        )
+
+        assertNull(repository.loadOrNull())
+    }
 
     @Test
     fun `refresh returns downloaded catalog and updates cache`() = runTest {
