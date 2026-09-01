@@ -35,6 +35,11 @@ jobs:
           grep -q 'apksigner.*sign' deploy.sh
           grep -q 'assets/channels.json' deploy.sh
           grep -q 'adb -s.*install -r' deploy.sh
+      - name: Verify default channel catalog URL
+        run: |
+          grep -q 'const val CHANNELS_URL = "https://plainraw.com/json/cbc833011422"' app/src/main/java/sk/ziacik/androidtvplayer/MainActivity.kt
+          grep -q 'const val CHANNELS_URL = "https://plainraw.com/json/cbc833011422"' app/src/main/java/sk/ziacik/androidtvplayer/systemepg/KanalikCatalog.kt
+          ! grep -R -q 'raw.githubusercontent.com/ziacik/android-tv-player/master/channels.json' app/src/main/java
       - name: Verify
         run: ./gradlew testDebugUnitTest lintDebug assembleDebug --stacktrace
       - name: Upload verification reports
