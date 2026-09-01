@@ -24,6 +24,6 @@ class KanalikCatalog(context: Context) {
     )
 
     private companion object {
-        const val CHANNELS_URL = "https://raw.githubusercontent.com/ziacik/android-tv-player/master/channels.json"
+        const val CHANNELS_URL = "https://plainraw.com/json/cbc833011422"
     }
 }
