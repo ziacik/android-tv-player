@@ -39,7 +39,7 @@ val copyChannelCatalog by tasks.registering(Copy::class) {
     into(layout.buildDirectory.dir("generated/assets/channels"))
 }
 
-tasks.named("preDebugBuild") {
+tasks.named("preBuild") {
     dependsOn(copyChannelCatalog)
 }
 
