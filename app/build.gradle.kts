@@ -24,7 +24,7 @@ android {
         baseline = file("lint-baseline.xml")
     }
 
-    sourceSets.named("main") {
+    sourceSets.named("debug") {
         assets.srcDir(layout.buildDirectory.dir("generated/assets/channels").get().asFile)
     }
 
@@ -39,7 +39,7 @@ val copyChannelCatalog by tasks.registering(Copy::class) {
     into(layout.buildDirectory.dir("generated/assets/channels"))
 }
 
-tasks.named("preBuild") {
+tasks.named("preDebugBuild") {
     dependsOn(copyChannelCatalog)
 }
 
