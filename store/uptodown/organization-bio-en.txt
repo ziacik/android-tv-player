@@ -1,0 +1,1 @@
+Kanálik is an independent Android TV project focused on a simple, remote-first live television experience with useful programme guide integration.
