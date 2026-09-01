@@ -35,8 +35,36 @@ jobs:
           grep -q 'apksigner.*sign' deploy.sh
           grep -q 'assets/channels.json' deploy.sh
           grep -q 'adb -s.*install -r' deploy.sh
-      - name: Verify
+      - name: Verify debug build
         run: ./gradlew testDebugUnitTest lintDebug assembleDebug --stacktrace
+      - name: Verify signed release build
+        env:
+          KANALIK_KEYSTORE_FILE: ${{ runner.temp }}/kanalik-ci-release.jks
+          KANALIK_KEYSTORE_PASSWORD: android
+          KANALIK_KEY_ALIAS: kanalik-ci
+          KANALIK_KEY_PASSWORD: android
+          KANALIK_VERSION_NAME: 0.1.0-ci
+          KANALIK_VERSION_CODE: '1'
+        run: |
+          keytool -genkeypair \
+            -keystore "$KANALIK_KEYSTORE_FILE" \
+            -storepass "$KANALIK_KEYSTORE_PASSWORD" \
+            -alias "$KANALIK_KEY_ALIAS" \
+            -keypass "$KANALIK_KEY_PASSWORD" \
+            -dname 'CN=Kanálik CI,O=Kanálik,C=SK' \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 1
+          ./gradlew assembleRelease --stacktrace
+          apk='app/build/outputs/apk/release/app-release.apk'
+          test -f "$apk"
+          if unzip -l "$apk" | grep -q 'assets/channels.json'; then
+            echo 'Release APK unexpectedly contains assets/channels.json' >&2
+            exit 1
+          fi
+          apksigner="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)"
+          test -x "$apksigner"
+          "$apksigner" verify --verbose "$apk"
       - name: Upload verification reports
         if: failure()
         uses: actions/upload-artifact@v7
