@@ -26,6 +26,14 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v5
+      - name: Verify release deploy script
+        run: |
+          test -x deploy.sh
+          sh -n deploy.sh
+          grep -q './gradlew assembleRelease' deploy.sh
+          grep -q 'zipalign' deploy.sh
+          grep -q 'apksigner sign' deploy.sh
+          grep -q 'adb -s.*install -r' deploy.sh
       - name: Verify
         run: ./gradlew testDebugUnitTest lintDebug assembleDebug --stacktrace
       - name: Upload verification reports
