@@ -1,0 +1,16 @@
+app_name: Kanálik
+package_name: sk.ziacik.androidtvplayer
+platform: Android
+device_focus: Android TV
+version_name: 0.1.0
+version_code: 1
+minimum_android: Android 8.0 / API 26
+price: Free
+ads: No
+in_app_purchases: No
+public_developer_name: Kanálik
+recommended_category: Multimedia
+listing_language: English
+official_website: optional / not set
+support_email: set in Uptodown Developers Console
+organization_nationality: set in Uptodown Developers Console
