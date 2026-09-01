@@ -1,0 +1,9 @@
+Initial public release.
+
+- Android TV live-stream playback
+- Remote-friendly channel navigation and numeric channel selection
+- Programme information and timeline in the on-screen display
+- Mini EPG for browsing channels and current programmes
+- Android TV system TV input / EPG integration on supported devices
+- Remote channel catalog updates
+- No ads or in-app purchases
