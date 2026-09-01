@@ -63,12 +63,16 @@ class MainActivity : ComponentActivity() {
             resolveDirect = DirectResolver()::resolve,
         )
         val catalogRepository = ChannelCatalogRepository(
-            seed = { assets.open("channels.json").bufferedReader().use { it.readText() } },
+            seed = {
+                runCatching {
+                    assets.open("channels.json").bufferedReader().use { it.readText() }
+                }.getOrNull()
+            },
             cacheFile = File(filesDir, "channels.json"),
             download = OkHttpChannelCatalogDownloader(CHANNELS_URL)::download,
         )
         val catalog = ChannelCatalog(
-            catalogRepository.load().channels + TvChannel.sweetTvChannels,
+            catalogRepository.loadOrNull()?.channels.orEmpty() + TvChannel.sweetTvChannels,
         )
         TvChannel.setRuntimeEntries(catalog.channels)
         val channelStore = SharedPreferencesChannelStore(this)
