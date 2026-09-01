@@ -32,7 +32,8 @@ jobs:
           sh -n deploy.sh
           grep -q './gradlew assembleRelease' deploy.sh
           grep -q 'zipalign' deploy.sh
-          grep -q 'apksigner sign' deploy.sh
+          grep -q 'apksigner.*sign' deploy.sh
+          grep -q 'assets/channels.json' deploy.sh
           grep -q 'adb -s.*install -r' deploy.sh
       - name: Verify
         run: ./gradlew testDebugUnitTest lintDebug assembleDebug --stacktrace
