@@ -4,8 +4,8 @@ This directory contains the material prepared for the Kanálik Uptodown listing.
 
 ## Ready to upload
 
-- `icon-512.png` — 512×512 store icon
-- `feature-1024x500.png` — exact Uptodown featured-image size
+- `icon-512.png` — 512×512 store icon using the current Kanálik yellow/purple slash branding
+- `feature-1024x500.png` — exact 1024×500 feature image using the current Kanálik banner/wordmark branding
 - `short-description.txt` — under 70 characters
 - `full-description-en.txt` — English store description
 - `changelog-0.1.0.txt` — initial release notes
