@@ -40,7 +40,7 @@ For every later Uptodown update, increase `version_code`. Never reuse a lower or
 
 ## Uptodown Developers Console
 
-Upload the signed APK and copy values from `metadata.yml`. Upload `icon-512.png` and `feature-1024x500.png`, add the English description and changelog, then add at least four real screenshots.
+Upload the signed APK and copy values from `metadata.yml`. Upload the committed current-brand assets `icon-512.png` and `feature-1024x500.png`, add the English description and changelog, then add at least four real screenshots.
 
 The remaining account-specific values cannot safely be filled in by the repository:
 
