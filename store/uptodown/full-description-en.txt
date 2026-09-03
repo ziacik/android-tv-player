@@ -1,0 +1,9 @@
+Kanálik is a lightweight live TV player designed specifically for Android TV and television remotes. Its interface keeps the video front and center while making channel changes, programme information and navigation quick to access from a standard D-pad remote.
+
+The app can play supported internet TV streams and keeps its channel catalog up to date remotely. Availability of individual channels can depend on the source, broadcaster and region. Kanálik is intended for freely available or otherwise authorized streams and requires an internet connection.
+
+Programme information is integrated directly into the viewing experience. The on-screen display can show the current programme, timeline and playback information, while the mini EPG makes it possible to browse what is on without leaving playback. Where supported by the device, Kanálik can also publish channels and programme data to the Android TV system TV input and programme guide.
+
+Remote control interaction is a core part of the app. You can move between channels with the D-pad, select channels by number, browse the mini guide and use playback controls without needing a touchscreen. The interface is optimized for a living-room display rather than a phone-sized UI.
+
+Kanálik is free, contains no ads and has no in-app purchases. It is an independent Android TV project focused on fast access to live television, a clean viewing interface and useful EPG integration without unnecessary account setup or clutter.

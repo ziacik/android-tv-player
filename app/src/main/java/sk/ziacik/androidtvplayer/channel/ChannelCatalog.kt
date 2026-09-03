@@ -78,19 +78,25 @@ object ChannelCatalogJsonParser {
 }
 
 class ChannelCatalogRepository(
-    private val seed: () -> String,
+    private val seed: () -> String?,
     private val cacheFile: File,
     private val download: suspend () -> String,
 ) {
     private val seedJson by lazy(seed)
-    private val seedCatalog by lazy { ChannelCatalogJsonParser.parse(seedJson) }
+    private val seedCatalog by lazy { seedJson?.let(ChannelCatalogJsonParser::parse) }
 
-    fun load(): ChannelCatalog {
+    fun loadOrNull(): ChannelCatalog? {
         val cached = runCatching { ChannelCatalogJsonParser.parse(cacheFile.readText()) }.getOrNull()
-        cached?.takeIf { it.version >= seedCatalog.version }?.let { return it }
-        runCatching { writeCache(seedJson) }
-        return seedCatalog
+        val bundled = seedCatalog
+        cached?.takeIf { bundled == null || it.version >= bundled.version }?.let { return it }
+        if (bundled != null) {
+            seedJson?.let { runCatching { writeCache(it) } }
+            return bundled
+        }
+        return cached
     }
+
+    fun load(): ChannelCatalog = checkNotNull(loadOrNull()) { "No channel catalog available" }
 
     suspend fun refresh(): ChannelCatalog = withContext(Dispatchers.IO) {
         val json = try {
@@ -99,8 +105,8 @@ class ChannelCatalogRepository(
             throw error
         }
         val catalog = ChannelCatalogJsonParser.parse(json)
-        val current = load()
-        if (catalog.version < current.version) return@withContext current
+        val current = loadOrNull()
+        if (current != null && catalog.version < current.version) return@withContext current
         writeCache(json)
         catalog
     }

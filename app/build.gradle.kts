@@ -3,6 +3,13 @@ plugins {
     alias(libs.plugins.compose.compiler)
 }
 
+val releaseKeystoreFile = System.getenv("KANALIK_KEYSTORE_FILE")
+val releaseKeystorePassword = System.getenv("KANALIK_KEYSTORE_PASSWORD")
+val releaseKeyAlias = System.getenv("KANALIK_KEY_ALIAS")
+val releaseKeyPassword = System.getenv("KANALIK_KEY_PASSWORD")
+val releaseVersionCode = System.getenv("KANALIK_VERSION_CODE")?.toIntOrNull()
+val releaseVersionName = System.getenv("KANALIK_VERSION_NAME")
+
 android {
     namespace = "sk.ziacik.androidtvplayer"
     compileSdk = 36
@@ -11,9 +18,30 @@ android {
         applicationId = "sk.ziacik.androidtvplayer"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = releaseVersionCode ?: 1
+        versionName = releaseVersionName ?: "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    if (releaseKeystoreFile != null) {
+        signingConfigs {
+            create("release") {
+                storeFile = file(releaseKeystoreFile)
+                storePassword = requireNotNull(releaseKeystorePassword) {
+                    "KANALIK_KEYSTORE_PASSWORD is required when KANALIK_KEYSTORE_FILE is set"
+                }
+                keyAlias = requireNotNull(releaseKeyAlias) {
+                    "KANALIK_KEY_ALIAS is required when KANALIK_KEYSTORE_FILE is set"
+                }
+                keyPassword = requireNotNull(releaseKeyPassword) {
+                    "KANALIK_KEY_PASSWORD is required when KANALIK_KEYSTORE_FILE is set"
+                }
+            }
+        }
+
+        buildTypes.getByName("release") {
+            signingConfig = signingConfigs.getByName("release")
+        }
     }
 
     buildFeatures {
@@ -24,7 +52,7 @@ android {
         baseline = file("lint-baseline.xml")
     }
 
-    sourceSets.named("main") {
+    sourceSets.named("debug") {
         assets.srcDir(layout.buildDirectory.dir("generated/assets/channels").get().asFile)
     }
 

@@ -5,5 +5,9 @@ local.properties
 build/
 **/build/
 *.iml
+*.jks
+*.keystore
+keystore.properties
+signing.properties
 
 .superpowers/

@@ -63,12 +63,16 @@ class MainActivity : ComponentActivity() {
             resolveDirect = DirectResolver()::resolve,
         )
         val catalogRepository = ChannelCatalogRepository(
-            seed = { assets.open("channels.json").bufferedReader().use { it.readText() } },
+            seed = {
+                runCatching {
+                    assets.open("channels.json").bufferedReader().use { it.readText() }
+                }.getOrNull()
+            },
             cacheFile = File(filesDir, "channels.json"),
             download = OkHttpChannelCatalogDownloader(CHANNELS_URL)::download,
         )
         val catalog = ChannelCatalog(
-            catalogRepository.load().channels + TvChannel.sweetTvChannels,
+            catalogRepository.loadOrNull()?.channels.orEmpty() + TvChannel.sweetTvChannels,
         )
         TvChannel.setRuntimeEntries(catalog.channels)
         val channelStore = SharedPreferencesChannelStore(this)
@@ -150,6 +154,6 @@ class MainActivity : ComponentActivity() {
         const val SKYLINK_EPG_URL =
             "https://raw.githubusercontent.com/370network/skylink-xmltv/refs/heads/main/a3b_a1.xml"
         const val OPEN_EPG_URL = "https://www.open-epg.com/generate/jnapkTB7Wq.xml.gz"
-        const val CHANNELS_URL = "https://raw.githubusercontent.com/ziacik/android-tv-player/master/channels.json"
+        const val CHANNELS_URL = "https://plainraw.com/json/cbc833011422"
     }
 }
