@@ -64,6 +64,10 @@ class RemoteCommandMapper {
             KeyEvent.KEYCODE_CHANNEL_DOWN,
             KeyEvent.KEYCODE_PAGE_DOWN,
             -> return RemoteCommand.ChannelDown
+            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+            KeyEvent.KEYCODE_MEDIA_PLAY,
+            KeyEvent.KEYCODE_MEDIA_PAUSE,
+            -> return RemoteCommand.TogglePlayback
         }
 
         if (miniEpgVisible) {
