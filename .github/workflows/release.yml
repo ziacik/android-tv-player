@@ -2,15 +2,6 @@ name: Release APK
 
 on:
   workflow_dispatch:
-    inputs:
-      version_name:
-        description: Version name, e.g. 0.1.1
-        required: true
-        default: '0.1.1'
-      version_code:
-        description: Monotonically increasing Android version code
-        required: true
-        default: '2'
 
 permissions:
   contents: write
@@ -26,6 +17,17 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v5
+
+      - name: Read version from source
+        id: version
+        shell: bash
+        run: |
+          version_name="$(sed -nE 's/^\s*versionName\s*=\s*"([^"]+)"\s*$/\1/p' app/build.gradle.kts | head -n1)"
+          version_code="$(sed -nE 's/^\s*versionCode\s*=\s*([0-9]+)\s*$/\1/p' app/build.gradle.kts | head -n1)"
+          test -n "$version_name"
+          test -n "$version_code"
+          echo "name=$version_name" >> "$GITHUB_OUTPUT"
+          echo "code=$version_code" >> "$GITHUB_OUTPUT"
 
       - name: Restore release keystore
         env:
@@ -43,13 +45,11 @@ jobs:
           KANALIK_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KANALIK_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KANALIK_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          KANALIK_VERSION_NAME: ${{ inputs.version_name }}
-          KANALIK_VERSION_CODE: ${{ inputs.version_code }}
         run: ./gradlew assembleRelease --stacktrace
 
       - name: Verify release APK
         env:
-          VERSION_NAME: ${{ inputs.version_name }}
+          VERSION_NAME: ${{ steps.version.outputs.name }}
         run: |
           apk='app/build/outputs/apk/release/app-release.apk'
           test -f "$apk"
@@ -65,15 +65,15 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v7
         with:
-          name: kanalik-${{ inputs.version_name }}
-          path: kanalik-${{ inputs.version_name }}.apk
+          name: kanalik-${{ steps.version.outputs.name }}
+          path: kanalik-${{ steps.version.outputs.name }}.apk
           if-no-files-found: error
           retention-days: 30
 
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION_NAME: ${{ inputs.version_name }}
+          VERSION_NAME: ${{ steps.version.outputs.name }}
         run: |
           tag="v${VERSION_NAME}"
           apk="kanalik-${VERSION_NAME}.apk"
