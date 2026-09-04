@@ -18,8 +18,8 @@ android {
         applicationId = "sk.ziacik.androidtvplayer"
         minSdk = 26
         targetSdk = 36
-        versionCode = releaseVersionCode ?: 1
-        versionName = releaseVersionName ?: "0.1.0"
+        versionCode = releaseVersionCode ?: 2
+        versionName = releaseVersionName ?: "0.1.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
