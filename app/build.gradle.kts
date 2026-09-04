@@ -7,8 +7,6 @@ val releaseKeystoreFile = System.getenv("KANALIK_KEYSTORE_FILE")
 val releaseKeystorePassword = System.getenv("KANALIK_KEYSTORE_PASSWORD")
 val releaseKeyAlias = System.getenv("KANALIK_KEY_ALIAS")
 val releaseKeyPassword = System.getenv("KANALIK_KEY_PASSWORD")
-val releaseVersionCode = System.getenv("KANALIK_VERSION_CODE")?.toIntOrNull()
-val releaseVersionName = System.getenv("KANALIK_VERSION_NAME")
 
 android {
     namespace = "sk.ziacik.androidtvplayer"
@@ -18,8 +16,8 @@ android {
         applicationId = "sk.ziacik.androidtvplayer"
         minSdk = 26
         targetSdk = 36
-        versionCode = releaseVersionCode ?: 3
-        versionName = releaseVersionName ?: "0.1.2"
+        versionCode = 4
+        versionName = "0.1.3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
