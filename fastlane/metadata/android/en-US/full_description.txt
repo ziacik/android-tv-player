@@ -1,0 +1,9 @@
+Kanálik is a simple live TV app for Android TV, built around straightforward and intuitive controls.
+
+There are no complicated menus, unnecessary features or clutter getting in the way. Open the app, choose a channel and watch.
+
+Switching channels, browsing what is on and getting to the information you need is quick and predictable, so you do not have to fight with the interface just to watch TV.
+
+Kanálik also integrates with Android TV itself, including the system TV input and programme guide on supported devices, so channels can feel like a natural part of your television rather than just another standalone app.
+
+Kanálik is free, contains no ads and has no in-app purchases.

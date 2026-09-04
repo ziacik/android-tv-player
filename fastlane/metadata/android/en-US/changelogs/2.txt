@@ -1,0 +1,1 @@
+F-Droid-ready release with open-source licensing and store metadata.
