@@ -4,6 +4,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import sk.ziacik.androidtvplayer.channel.ArchiveConfig
+import sk.ziacik.androidtvplayer.channel.ArchiveProvider
 import sk.ziacik.androidtvplayer.channel.ChannelProvider
 import sk.ziacik.androidtvplayer.channel.TvChannel
 import sk.ziacik.androidtvplayer.resolver.ProgramMetadata
@@ -33,15 +35,16 @@ class MiniEpgProgrammeNavigationTest {
     }
 
     @Test
-    fun `past STVR programme is archiveable even when live stream provider is direct`() {
+    fun `past programme is archiveable when channel declares archive metadata`() {
         val directJednotka = TvChannel(
             storageKey = "jednotka",
-            stvrId = "1",
             displayName = "JEDNOTKA",
             provider = ChannelProvider.DIRECT,
             providerValue = "https://example.com/live.m3u8",
+            archive = ArchiveConfig(ArchiveProvider.STVR, channelId = "1"),
         )
 
-        assertTrue(canPlayStvrArchive(directJednotka, programme, nowMs = 20_000L))
+        assertTrue(canPlayArchive(directJednotka, programme, nowMs = 20_000L))
+        assertFalse(canPlayArchive(directJednotka.copy(archive = null), programme, nowMs = 20_000L))
     }
 }
