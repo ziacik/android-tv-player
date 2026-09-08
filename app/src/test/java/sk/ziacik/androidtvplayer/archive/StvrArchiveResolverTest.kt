@@ -2,12 +2,15 @@ package sk.ziacik.androidtvplayer.archive
 
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Test
 import sk.ziacik.androidtvplayer.channel.ArchiveConfig
 import sk.ziacik.androidtvplayer.channel.ArchiveProvider
 import sk.ziacik.androidtvplayer.channel.ChannelProvider
 import sk.ziacik.androidtvplayer.channel.TvChannel
 import sk.ziacik.androidtvplayer.resolver.StvrHttpClient
+import sk.ziacik.androidtvplayer.resolver.StreamResolveException
 
 class StvrArchiveResolverTest {
     @Test
@@ -75,6 +78,37 @@ class StvrArchiveResolverTest {
         )
 
         assertEquals("https://cdn.example/duel.m3u8", result.url)
+    }
+
+    @Test
+    fun `reports useful diagnostics when archive HTML cannot be parsed`() = runTest {
+        val client = FakeStvrHttpClient(
+            responses = mapOf(
+                "https://www.stvr.sk/televizia/archiv?date=2026-09-08&ord=dt" to """
+                    <h2>Jednotka</h2>
+                    <div class="media media--archive">
+                        <a class="media__image" href="/televizia/archiv/14126/618007">Duel</a>
+                    </div>
+                    <h2>Dvojka</h2>
+                """.trimIndent(),
+            ),
+        )
+
+        try {
+            StvrArchiveResolver(client).resolve(
+                channel = directJednotka(),
+                startsAtMs = 1_788_882_000_000L,
+                title = "Duel",
+            )
+            fail("Expected archive lookup to fail")
+        } catch (error: StreamResolveException) {
+            val message = error.message.orEmpty()
+            assertTrue(message.contains("expectedTime=17:40"))
+            assertTrue(message.contains("expectedTitle=duel"))
+            assertTrue(message.contains("archiveLinks=1"))
+            assertTrue(message.contains("parsedCandidates=0"))
+            assertTrue(message.contains("archiveIds=618007"))
+        }
     }
 
     @Test
