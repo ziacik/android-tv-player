@@ -64,6 +64,12 @@ internal fun nextProgrammeLookupTime(programme: ProgramMetadata): Long? =
 internal fun isPastProgramme(programme: ProgramMetadata, nowMs: Long): Boolean =
     programme.endsAtMs?.let { it <= nowMs } == true
 
+internal fun canPlayArchive(
+    channel: TvChannel,
+    programme: ProgramMetadata,
+    nowMs: Long,
+): Boolean = channel.archive != null && isPastProgramme(programme, nowMs)
+
 private fun programmeProgress(programme: ProgramMetadata?, nowMs: Long): Float? {
     val start = programme?.startsAtMs ?: return null
     val end = programme.endsAtMs ?: return null
