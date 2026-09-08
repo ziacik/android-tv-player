@@ -63,9 +63,9 @@ class StvrArchiveResolver(
         val nearbyCandidates = ARCHIVE_ITEM_REGEX.findAll(listing.channelSection(channel))
             .mapNotNull { match ->
                 val candidate = ArchiveItem(
-                    id = match.groups["id"]!!.value,
-                    time = match.groups["time"]!!.value.trim(),
-                    title = match.groups["title"]!!.value.normalizedTitle(),
+                    id = requireNotNull(match.groups["id"]).value,
+                    time = requireNotNull(match.groups["time"]).value.trim(),
+                    title = requireNotNull(match.groups["title"]).value.normalizedTitle(),
                 )
                 val candidateMinutes = candidate.time.minutesOfDay() ?: return@mapNotNull null
                 candidate to minuteDistance(expectedMinutes, candidateMinutes)
@@ -187,7 +187,7 @@ class StvrArchiveResolver(
             RegexOption.IGNORE_CASE,
         )
         val ARCHIVE_ITEM_REGEX = Regex(
-            """<div\s+class=["']media["'][^>]*>.*?<a\s+href=["'][^"']*/televizia/archiv/[^/"']+/(?<id>\d+)["'][^>]*>.*?<div\s+class=["']program\s+time--start["'][^>]*>\s*(?<time>\d{2}:\d{2}).*?<a\s+class=["']link["'][^>]*title=["'](?<title>[^"']+)["']""",
+            """<div\b[^>]*class=["'][^"']*time--start[^"']*["'][^>]*>\s*(?<time>\d{2}:\d{2}).*?<a\b[^>]*href=["'][^"']*/televizia/archiv/[^/"']+/(?<id>\d+)["'][^>]*>.*?<a\b[^>]*title=["'](?<title>[^"']+)["'][^>]*>""",
             setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
         )
     }
