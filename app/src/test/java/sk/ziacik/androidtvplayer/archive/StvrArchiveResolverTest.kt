@@ -29,13 +29,7 @@ class StvrArchiveResolverTest {
             ),
         )
         val resolver = StvrArchiveResolver(client)
-        val directJednotka = TvChannel(
-            storageKey = "jednotka",
-            displayName = "JEDNOTKA",
-            provider = ChannelProvider.DIRECT,
-            providerValue = "https://example.com/live.m3u8",
-            archive = ArchiveConfig(ArchiveProvider.STVR, channelId = "1"),
-        )
+        val directJednotka = directJednotka()
 
         val result = resolver.resolve(
             channel = directJednotka,
@@ -51,6 +45,36 @@ class StvrArchiveResolverTest {
             ),
             client.requestedUrls,
         )
+    }
+
+    @Test
+    fun `matches archive programme when actual STVR start is shifted from EPG`() = runTest {
+        val client = FakeStvrHttpClient(
+            responses = mapOf(
+                "https://www.stvr.sk/televizia/archiv?date=2026-09-08&ord=dt" to """
+                    <h2>Jednotka</h2>
+                    <div class="media">
+                        <a href="/televizia/archiv/14126/618007"><img src="duel.jpg"></a>
+                        <div class="media__body">
+                            <div class="program time--start">17:44 <span>- 18:12</span></div>
+                            <h5><a class="link" title="Duel">Duel</a></h5>
+                        </div>
+                    </div>
+                    <h2>Dvojka</h2>
+                """.trimIndent(),
+                "https://www.rtvs.sk/json/archive5f.json?id=618007" to """
+                    {"clip":{"sources":[{"src":"https://cdn.example/duel.m3u8","type":"application/x-mpegurl"}]}}
+                """.trimIndent(),
+            ),
+        )
+
+        val result = StvrArchiveResolver(client).resolve(
+            channel = directJednotka(),
+            startsAtMs = 1_788_882_000_000L,
+            title = "Duel",
+        )
+
+        assertEquals("https://cdn.example/duel.m3u8", result.url)
     }
 
     @Test
@@ -87,16 +111,9 @@ class StvrArchiveResolverTest {
                 """.trimIndent(),
             ),
         )
-        val directJednotka = TvChannel(
-            storageKey = "jednotka",
-            displayName = "JEDNOTKA",
-            provider = ChannelProvider.DIRECT,
-            providerValue = "https://example.com/live.m3u8",
-            archive = ArchiveConfig(ArchiveProvider.STVR, channelId = "1"),
-        )
 
         val result = StvrArchiveResolver(client).resolve(
-            channel = directJednotka,
+            channel = directJednotka(),
             startsAtMs = 1_788_843_600_000L,
             title = "Ranné správy",
         )
@@ -107,6 +124,14 @@ class StvrArchiveResolverTest {
             client.requestedUrls.last(),
         )
     }
+
+    private fun directJednotka() = TvChannel(
+        storageKey = "jednotka",
+        displayName = "JEDNOTKA",
+        provider = ChannelProvider.DIRECT,
+        providerValue = "https://example.com/live.m3u8",
+        archive = ArchiveConfig(ArchiveProvider.STVR, channelId = "1"),
+    )
 }
 
 private class FakeStvrHttpClient(
