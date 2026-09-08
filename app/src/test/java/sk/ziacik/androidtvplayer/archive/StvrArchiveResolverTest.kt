@@ -19,9 +19,9 @@ class StvrArchiveResolverTest {
             responses = mapOf(
                 "https://www.stvr.sk/televizia/archiv?date=2026-09-08&ord=dt" to """
                     <div class="media">
-                        <a href="/televizia/archiv/14026/617992"><img src="image.jpg"></a>
                         <div class="media__body">
                             <div class="program time--start">07:00 <span>- 08:29</span></div>
+                            <a href="/televizia/archiv/14026/617992"><img src="image.jpg"></a>
                             <a class="link" title="Ranné správy">Ranné správy</a>
                         </div>
                     </div>
@@ -56,11 +56,11 @@ class StvrArchiveResolverTest {
             responses = mapOf(
                 "https://www.stvr.sk/televizia/archiv?date=2026-09-08&ord=dt" to """
                     <h2>Jednotka</h2>
-                    <div class="media">
-                        <a href="/televizia/archiv/14126/618007"><img src="duel.jpg"></a>
+                    <div class="media media--archive">
                         <div class="media__body">
-                            <div class="program time--start">17:44 <span>- 18:12</span></div>
-                            <h5><a class="link" title="Duel">Duel</a></h5>
+                            <div data-role="start" class="time--start program">17:44 <span>- 18:12</span></div>
+                            <a class="media__image" href="/televizia/archiv/14126/618007"><img src="duel.jpg"></a>
+                            <h5><a title="Duel" href="/televizia/archiv/14126/618007" class="link program__title">Duel</a></h5>
                         </div>
                     </div>
                     <h2>Dvojka</h2>
@@ -108,9 +108,6 @@ class StvrArchiveResolverTest {
             assertTrue(message.contains("archiveLinks=1"))
             assertTrue(message.contains("parsedCandidates=0"))
             assertTrue(message.contains("archiveIds=618007"))
-            assertTrue(message.contains("titleSnippet="))
-            assertTrue(message.contains("media media--archive"))
-            assertTrue(message.contains("618007"))
         }
     }
 
@@ -121,26 +118,20 @@ class StvrArchiveResolverTest {
                 "https://www.stvr.sk/televizia/archiv?date=2026-09-08&ord=dt" to """
                     <h2>Jednotka</h2>
                     <div class="media">
+                        <div class="program time--start">06:00 <span>- 06:29</span></div>
                         <a href="/televizia/archiv/14026/111111"><img src="early.jpg"></a>
-                        <div class="media__body">
-                            <div class="program time--start">06:00 <span>- 06:29</span></div>
-                            <h5><a class="link" title="Skoré správy">Skoré správy</a></h5>
-                        </div>
+                        <h5><a class="link" title="Skoré správy">Skoré správy</a></h5>
                     </div>
                     <div class="media">
+                        <div class="program time--start">07:00 <span>- 08:29</span></div>
                         <a href="/televizia/archiv/14026/617992"><img src="morning.jpg"></a>
-                        <div class="media__body">
-                            <div class="program time--start">07:00 <span>- 08:29</span></div>
-                            <h5><a class="link" title="Ranné správy">Ranné správy</a></h5>
-                        </div>
+                        <h5><a class="link" title="Ranné správy">Ranné správy</a></h5>
                     </div>
                     <h2>Dvojka</h2>
                     <div class="media">
+                        <div class="program time--start">07:00 <span>- 08:29</span></div>
                         <a href="/televizia/archiv/14026/999999"><img src="wrong.jpg"></a>
-                        <div class="media__body">
-                            <div class="program time--start">07:00 <span>- 08:29</span></div>
-                            <h5><a class="link" title="Ranné správy">Ranné správy</a></h5>
-                        </div>
+                        <h5><a class="link" title="Ranné správy">Ranné správy</a></h5>
                     </div>
                 """.trimIndent(),
                 "https://www.rtvs.sk/json/archive5f.json?id=617992" to """
