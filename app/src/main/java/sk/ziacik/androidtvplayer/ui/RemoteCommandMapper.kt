@@ -15,6 +15,8 @@ sealed interface RemoteCommand {
     data object OpenMiniEpg : RemoteCommand
     data object MiniEpgUp : RemoteCommand
     data object MiniEpgDown : RemoteCommand
+    data object MiniEpgPreviousProgramme : RemoteCommand
+    data object MiniEpgNextProgramme : RemoteCommand
     data object SelectMiniEpgChannel : RemoteCommand
     data object CloseMiniEpg : RemoteCommand
     data object ShowOverlay : RemoteCommand
@@ -74,6 +76,8 @@ class RemoteCommandMapper {
             return when (keyCode) {
                 KeyEvent.KEYCODE_DPAD_UP -> RemoteCommand.MiniEpgUp
                 KeyEvent.KEYCODE_DPAD_DOWN -> RemoteCommand.MiniEpgDown
+                KeyEvent.KEYCODE_DPAD_LEFT -> RemoteCommand.MiniEpgPreviousProgramme
+                KeyEvent.KEYCODE_DPAD_RIGHT -> RemoteCommand.MiniEpgNextProgramme
                 KeyEvent.KEYCODE_DPAD_CENTER,
                 KeyEvent.KEYCODE_ENTER,
                 KeyEvent.KEYCODE_NUMPAD_ENTER,
