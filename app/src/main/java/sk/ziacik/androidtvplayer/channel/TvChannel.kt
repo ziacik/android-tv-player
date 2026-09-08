@@ -2,6 +2,13 @@ package sk.ziacik.androidtvplayer.channel
 
 enum class EpgSourceId { OPEN_EPG, SKYLINK }
 
+enum class ArchiveProvider { STVR }
+
+data class ArchiveConfig(
+    val provider: ArchiveProvider,
+    val channelId: String,
+)
+
 data class TvChannel(
     val storageKey: String,
     val stvrId: String? = null,
@@ -10,6 +17,7 @@ data class TvChannel(
     val providerValue: String? = null,
     val epgIds: Map<EpgSourceId, String> = emptyMap(),
     val requestHeaders: Map<String, String> = emptyMap(),
+    val archive: ArchiveConfig? = null,
 ) {
     fun next(): TvChannel {
         val index = entries.indexOfFirst { it.storageKey == storageKey }
@@ -25,11 +33,39 @@ data class TvChannel(
         get() = entries.indexOfFirst { it.storageKey == storageKey }.takeIf { it >= 0 } ?: 0
 
     companion object {
-        val JEDNOTKA = TvChannel("jednotka", "1", "JEDNOTKA", ChannelProvider.STVR, epgIds = mapOf(EpgSourceId.SKYLINK to "7a55634018be710a62bbf1750443a199"))
-        val DVOJKA = TvChannel("dvojka", "2", "DVOJKA", ChannelProvider.STVR, epgIds = mapOf(EpgSourceId.SKYLINK to "584c86a108172efc9c27af06eb3d4652"))
+        val JEDNOTKA = TvChannel(
+            "jednotka",
+            "1",
+            "JEDNOTKA",
+            ChannelProvider.STVR,
+            epgIds = mapOf(EpgSourceId.SKYLINK to "7a55634018be710a62bbf1750443a199"),
+            archive = ArchiveConfig(ArchiveProvider.STVR, "1"),
+        )
+        val DVOJKA = TvChannel(
+            "dvojka",
+            "2",
+            "DVOJKA",
+            ChannelProvider.STVR,
+            epgIds = mapOf(EpgSourceId.SKYLINK to "584c86a108172efc9c27af06eb3d4652"),
+            archive = ArchiveConfig(ArchiveProvider.STVR, "2"),
+        )
         val MARKIZA = TvChannel("markiza", displayName = "MARKÍZA", provider = ChannelProvider.MARKIZA, epgIds = mapOf(EpgSourceId.SKYLINK to "336e46bf4276e77a716e494c6285d5db"))
-        val STVR_24 = TvChannel("stvr-24", "3", "STVR :24", ChannelProvider.STVR, epgIds = mapOf(EpgSourceId.SKYLINK to "6a5461ba82cabcb95db5b344e6440e15"))
-        val STVR_SPORT = TvChannel("stvr-sport", "15", "STVR ŠPORT", ChannelProvider.STVR, epgIds = mapOf(EpgSourceId.SKYLINK to "09fc492d319c8813389e11c167b3a053"))
+        val STVR_24 = TvChannel(
+            "stvr-24",
+            "3",
+            "STVR :24",
+            ChannelProvider.STVR,
+            epgIds = mapOf(EpgSourceId.SKYLINK to "6a5461ba82cabcb95db5b344e6440e15"),
+            archive = ArchiveConfig(ArchiveProvider.STVR, "3"),
+        )
+        val STVR_SPORT = TvChannel(
+            "stvr-sport",
+            "15",
+            "STVR ŠPORT",
+            ChannelProvider.STVR,
+            epgIds = mapOf(EpgSourceId.SKYLINK to "09fc492d319c8813389e11c167b3a053"),
+            archive = ArchiveConfig(ArchiveProvider.STVR, "15"),
+        )
         val JOJ = TvChannel("joj", displayName = "JOJ", provider = ChannelProvider.JOJ, providerValue = "joj", epgIds = mapOf(EpgSourceId.SKYLINK to "84a2364ade7443e6d6afe03f9aa2361a"))
         val JOJ_PLUS = TvChannel("joj-plus", displayName = "JOJ PLUS", provider = ChannelProvider.JOJ, providerValue = "plus", epgIds = mapOf(EpgSourceId.SKYLINK to "2aa59e1b0cb34399f6ffc387e52a437b"))
         val JOJ_KRIMI = TvChannel("joj-krimi", displayName = "JOJ KRIMI", provider = ChannelProvider.JOJ, providerValue = "wau", epgIds = mapOf(EpgSourceId.SKYLINK to "d4bf459e0c7e39dff6a5dbf3c7c76432"))
