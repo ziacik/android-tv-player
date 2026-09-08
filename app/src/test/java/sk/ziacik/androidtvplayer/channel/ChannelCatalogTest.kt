@@ -25,6 +25,25 @@ class ChannelCatalogTest {
     }
 
     @Test
+    fun `direct STVR channels keep archive identity from their storage key`() {
+        val catalog = ChannelCatalogJsonParser.parse(
+            """
+            {
+              "channels": [
+                { "id": "jednotka", "name": "JEDNOTKA", "url": "https://example.com/jednotka.m3u8" },
+                { "id": "dvojka", "name": "DVOJKA", "url": "https://example.com/dvojka.m3u8" },
+                { "id": "stvr-24", "name": "STVR :24", "url": "https://example.com/24.m3u8" },
+                { "id": "stvr-sport", "name": "STVR ŠPORT", "url": "https://example.com/sport.m3u8" }
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(listOf("1", "2", "3", "15"), catalog.channels.map(TvChannel::stvrId))
+        assertEquals(listOf(ChannelProvider.DIRECT), catalog.channels.map(TvChannel::provider).distinct())
+    }
+
+    @Test
     fun `parses direct channel request headers`() {
         val catalog = ChannelCatalogJsonParser.parse(
             """
