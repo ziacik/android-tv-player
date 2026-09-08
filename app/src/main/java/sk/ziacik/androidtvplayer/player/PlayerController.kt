@@ -16,12 +16,16 @@ import sk.ziacik.androidtvplayer.epg.EpgRepository
 import sk.ziacik.androidtvplayer.resolver.ProgramMetadata
 import sk.ziacik.androidtvplayer.resolver.StreamResolution
 import sk.ziacik.androidtvplayer.resolver.StreamResolveException
+import sk.ziacik.androidtvplayer.resolver.StreamSource
 
 class PlayerController(
     private val scope: CoroutineScope,
     private val initialChannel: TvChannel,
     private val resolve: suspend (TvChannel) -> StreamResolution,
     private val playerPort: PlayerPort,
+    private val resolveArchive: suspend (TvChannel, ProgramMetadata) -> StreamSource = { _, _ ->
+        throw StreamResolveException("Archive playback is not configured")
+    },
     private val nowMs: () -> Long = System::currentTimeMillis,
     private val epgRepository: EpgRepository = EpgRepository { _, _ -> null },
     private val onChannelSelected: (TvChannel) -> Unit = {},
@@ -46,6 +50,7 @@ class PlayerController(
     private var refreshedProgrammeEndMs: Long? = null
     private var resolveGeneration = 0L
     private var nextLoadId = 0L
+    private var archivePlayback = false
     private var started = false
     private var released = false
 
@@ -74,11 +79,15 @@ class PlayerController(
                     activeProgram = null
                     activePlaybackChannel = null
                     activeLoadId = null
-                    if (currentChannel.provider == ChannelProvider.SWEET_TV) {
+                    if (!archivePlayback && currentChannel.provider == ChannelProvider.SWEET_TV) {
                         resolveCurrentChannel()
                         return
                     }
-                    val nextRetryAtMs = scheduleOrdinaryRetry(currentChannel)
+                    val nextRetryAtMs = if (archivePlayback) {
+                        null
+                    } else {
+                        scheduleOrdinaryRetry(currentChannel)
+                    }
                     mutableState.value = PlayerUiState.Error(
                         channel = currentChannel,
                         message = ERROR_MESSAGE,
@@ -100,6 +109,7 @@ class PlayerController(
     fun stop() {
         if (released || !started) return
         started = false
+        archivePlayback = false
         resolveGeneration += 1
         resolveJob?.cancel()
         resolveJob = null
@@ -125,9 +135,62 @@ class PlayerController(
 
     fun selectChannel(channel: TvChannel) = switchTo(channel)
 
+    fun playArchive(channel: TvChannel, program: ProgramMetadata) {
+        if (released || !started) return
+        val selectedChannel = TvChannel.entries
+            .firstOrNull { it.storageKey == channel.storageKey }
+            ?: channel
+        if (selectedChannel.storageKey != currentChannel.storageKey) {
+            onChannelSelected(selectedChannel)
+        }
+        currentChannel = selectedChannel
+        resolveJob?.cancel()
+        retryJob?.cancel()
+        retryJob = null
+        cancelEpgLookup()
+        activeProgram = null
+        activePlaybackChannel = null
+        activeLoadId = null
+        mutableStreamHost.value = null
+        playerPort.pause()
+        archivePlayback = true
+        val archiveProgram = program.copy(isEpgLookupPending = false)
+        val generation = ++resolveGeneration
+
+        resolveJob = scope.launch {
+            if (!acceptsResolve(generation, selectedChannel)) return@launch
+            mutableState.value = PlayerUiState.Resolving(selectedChannel, archiveProgram)
+            try {
+                val source = resolveArchive(selectedChannel, archiveProgram)
+                if (!acceptsResolve(generation, selectedChannel)) return@launch
+                applyResolution(
+                    selectedChannel,
+                    StreamResolution.Playable(
+                        program = archiveProgram,
+                        source = source,
+                    ),
+                )
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                if (!acceptsResolve(generation, selectedChannel)) return@launch
+                diagnostics("Archive resolve failed for ${selectedChannel.displayName}", error)
+                mutableState.value = PlayerUiState.Error(
+                    channel = selectedChannel,
+                    message = ARCHIVE_ERROR_MESSAGE,
+                    reason = resolverFailureReason(error),
+                    program = archiveProgram,
+                )
+            }
+        }
+    }
+
     private fun switchTo(channel: TvChannel) {
         if (released) return
-        if (channel.storageKey == currentChannel.storageKey) return
+        if (channel.storageKey == currentChannel.storageKey) {
+            if (archivePlayback) goLive()
+            return
+        }
         currentChannel = channel
         onChannelSelected(channel)
         activeProgram = null
@@ -145,6 +208,7 @@ class PlayerController(
             mutableState.value = PlayerUiState.Resolving(currentChannel)
             return
         }
+        archivePlayback = false
         resolveJob?.cancel()
         retryJob?.cancel()
         retryJob = null
@@ -155,37 +219,16 @@ class PlayerController(
         val channel = currentChannel
         val generation = ++resolveGeneration
         resolveJob = scope.launch {
-            if (
-                released ||
-                !started ||
-                generation != resolveGeneration ||
-                channel != currentChannel
-            ) {
-                return@launch
-            }
+            if (!acceptsResolve(generation, channel)) return@launch
             mutableState.value = PlayerUiState.Resolving(channel)
             try {
                 val resolution = resolve(channel)
-                if (
-                    released ||
-                    !started ||
-                    generation != resolveGeneration ||
-                    channel != currentChannel
-                ) {
-                    return@launch
-                }
+                if (!acceptsResolve(generation, channel)) return@launch
                 applyResolution(channel, resolution)
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
-                if (
-                    released ||
-                    !started ||
-                    generation != resolveGeneration ||
-                    channel != currentChannel
-                ) {
-                    return@launch
-                }
+                if (!acceptsResolve(generation, channel)) return@launch
                 diagnostics("Stream resolve failed for ${channel.displayName}", error)
                 val nextRetryAtMs = scheduleOrdinaryRetry(channel)
                 mutableState.value = PlayerUiState.Error(
@@ -203,17 +246,19 @@ class PlayerController(
         val current = mutableState.value
         if (current is PlayerUiState.Ready) {
             mutableState.value = current.copy(playback = playerPort.snapshot())
-            activeProgram?.endsAtMs
-                ?.takeIf { nowMs() >= it && refreshedProgrammeEndMs != it }
-                ?.let { endedAtMs ->
-                    refreshedProgrammeEndMs = endedAtMs
-                    if (current.channel.provider == ChannelProvider.STVR) {
-                        refreshStvrProgramme()
-                    } else {
-                        epgLoadId = null
-                        requestEpgProgrammeIfNeeded(current.program, force = true)
+            if (!archivePlayback) {
+                activeProgram?.endsAtMs
+                    ?.takeIf { nowMs() >= it && refreshedProgrammeEndMs != it }
+                    ?.let { endedAtMs ->
+                        refreshedProgrammeEndMs = endedAtMs
+                        if (current.channel.provider == ChannelProvider.STVR) {
+                            refreshStvrProgramme()
+                        } else {
+                            epgLoadId = null
+                            requestEpgProgrammeIfNeeded(current.program, force = true)
+                        }
                     }
-                }
+            }
         }
     }
 
@@ -247,6 +292,9 @@ class PlayerController(
     }
 
     private fun seekClockTime(snapshot: PlaybackSnapshot, targetPositionMs: Long): Long? {
+        if (archivePlayback) {
+            return activeProgram?.startsAtMs?.plus(targetPositionMs)
+        }
         val playbackOffsetMs = snapshot.liveOffsetMs
             ?: snapshot.durationMs
                 ?.minus(snapshot.currentPositionMs)
@@ -263,13 +311,25 @@ class PlayerController(
 
     fun goLive() {
         if (released) return
-        playerPort.goLive()
+        if (!archivePlayback) {
+            playerPort.goLive()
+            return
+        }
+        archivePlayback = false
+        activeProgram = null
+        activePlaybackChannel = null
+        activeLoadId = null
+        mutableStreamHost.value = null
+        cancelEpgLookup()
+        playerPort.stop()
+        resolveCurrentChannel()
     }
 
     fun release() {
         if (released) return
         released = true
         started = false
+        archivePlayback = false
         resolveGeneration += 1
         resolveJob?.cancel()
         resolveJob = null
@@ -302,10 +362,14 @@ class PlayerController(
                     activePlaybackChannel = null
                     activeLoadId = null
                     diagnostics("Media3 load failed", null)
-                    val nextRetryAtMs = scheduleOrdinaryRetry(channel)
+                    val nextRetryAtMs = if (archivePlayback) {
+                        null
+                    } else {
+                        scheduleOrdinaryRetry(channel)
+                    }
                     mutableState.value = PlayerUiState.Error(
                         channel = channel,
-                        message = ERROR_MESSAGE,
+                        message = if (archivePlayback) ARCHIVE_ERROR_MESSAGE else ERROR_MESSAGE,
                         reason = "Prehrávač nedokázal pripraviť stream",
                         nextRetryAtMs = nextRetryAtMs,
                         program = resolution.program,
@@ -362,6 +426,12 @@ class PlayerController(
         retryAttempt += 1
         return delayMs
     }
+
+    private fun acceptsResolve(generation: Long, channel: TvChannel): Boolean =
+        !released &&
+            started &&
+            generation == resolveGeneration &&
+            channel.storageKey == currentChannel.storageKey
 
     private fun acceptsPlaybackCallback(loadId: Long): Boolean =
         !released &&
@@ -467,5 +537,6 @@ class PlayerController(
         const val RETRY_AFTER_END_PADDING_MS = 2_000L
         val RETRY_DELAYS_MS = longArrayOf(1_000L, 2_000L, 4_000L, 8_000L, 16_000L, 32_000L, 60_000L)
         const val ERROR_MESSAGE = "Stream sa nepodarilo načítať"
+        const val ARCHIVE_ERROR_MESSAGE = "Archív sa nepodarilo načítať"
     }
 }
