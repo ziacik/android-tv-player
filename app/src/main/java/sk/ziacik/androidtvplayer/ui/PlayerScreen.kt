@@ -47,7 +47,6 @@ import java.util.Locale
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import sk.ziacik.androidtvplayer.channel.ChannelProvider
 import sk.ziacik.androidtvplayer.channel.TvChannel
 import sk.ziacik.androidtvplayer.epg.EpgRepository
 import sk.ziacik.androidtvplayer.player.PlayerController
@@ -296,8 +295,9 @@ fun PlayerScreen(
                     RemoteCommand.SelectMiniEpgChannel -> {
                         val selected = miniEpgSelectedChannel ?: state.channel
                         val selectedProgram = miniEpgProgrammes[selected.storageKey]
-                        val playArchive = selected.provider == ChannelProvider.STVR &&
-                            selectedProgram?.let { isPastProgramme(it, System.currentTimeMillis()) } == true
+                        val playArchive = selectedProgram?.let {
+                            canPlayArchive(selected, it, System.currentTimeMillis())
+                        } == true
                         miniEpgVisible = false
                         miniEpgSelectedChannel = null
                         overlayController.showUntilProgramTitleReady()
