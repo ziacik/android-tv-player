@@ -55,6 +55,15 @@ internal fun adjacentMiniEpgChannel(
     return channels[floorMod(currentIndex + direction, channels.size)]
 }
 
+internal fun previousProgrammeLookupTime(programme: ProgramMetadata): Long? =
+    programme.startsAtMs?.takeIf { it > Long.MIN_VALUE }?.minus(1L)
+
+internal fun nextProgrammeLookupTime(programme: ProgramMetadata): Long? =
+    programme.endsAtMs
+
+internal fun isPastProgramme(programme: ProgramMetadata, nowMs: Long): Boolean =
+    programme.endsAtMs?.let { it <= nowMs } == true
+
 private fun programmeProgress(programme: ProgramMetadata?, nowMs: Long): Float? {
     val start = programme?.startsAtMs ?: return null
     val end = programme.endsAtMs ?: return null
