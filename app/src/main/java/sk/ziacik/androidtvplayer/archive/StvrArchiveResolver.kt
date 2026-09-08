@@ -4,6 +4,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlin.math.abs
 import sk.ziacik.androidtvplayer.channel.ArchiveProvider
 import sk.ziacik.androidtvplayer.channel.TvChannel
 import sk.ziacik.androidtvplayer.resolver.STVR_USER_AGENT
@@ -49,24 +50,34 @@ class StvrArchiveResolver(
         startTime: String,
         title: String,
     ): String? {
-        val channelListing = listing.channelSection(channel)
+        val expectedMinutes = startTime.minutesOfDay() ?: return null
         val expectedTitle = title.normalizedTitle()
-        val candidates = ARCHIVE_ITEM_REGEX.findAll(channelListing)
-            .map { match ->
-                ArchiveItem(
+        val nearbyCandidates = ARCHIVE_ITEM_REGEX.findAll(listing.channelSection(channel))
+            .mapNotNull { match ->
+                val candidate = ArchiveItem(
                     id = match.groups["id"]!!.value,
                     time = match.groups["time"]!!.value.trim(),
                     title = match.groups["title"]!!.value.normalizedTitle(),
                 )
+                val candidateMinutes = candidate.time.minutesOfDay() ?: return@mapNotNull null
+                candidate to minuteDistance(expectedMinutes, candidateMinutes)
             }
-            .filter { it.time == startTime }
+            .filter { (_, distance) -> distance <= ARCHIVE_TIME_TOLERANCE_MINUTES }
             .toList()
 
-        return candidates.firstOrNull { it.title == expectedTitle }?.id
-            ?: candidates.firstOrNull { candidate ->
-                candidate.title.contains(expectedTitle) || expectedTitle.contains(candidate.title)
-            }?.id
-            ?: candidates.singleOrNull()?.id
+        return nearbyCandidates
+            .filter { (candidate, _) -> candidate.title == expectedTitle }
+            .minByOrNull { (_, distance) -> distance }
+            ?.first
+            ?.id
+            ?: nearbyCandidates
+                .filter { (candidate, _) ->
+                    candidate.title.contains(expectedTitle) || expectedTitle.contains(candidate.title)
+                }
+                .minByOrNull { (_, distance) -> distance }
+                ?.first
+                ?.id
+            ?: nearbyCandidates.singleOrNull()?.first?.id
     }
 
     private fun String.channelSection(channel: TvChannel): String {
@@ -104,9 +115,24 @@ class StvrArchiveResolver(
             .replace("&quot;", "\"", ignoreCase = true)
             .replace("&#39;", "'", ignoreCase = true)
             .replace("&nbsp;", " ", ignoreCase = true)
+            .lowercase(Locale.ROOT)
+            .replace(NON_ALPHANUMERIC_REGEX, " ")
             .replace(WHITESPACE_REGEX, " ")
             .trim()
-            .lowercase(Locale.ROOT)
+
+    private fun String.minutesOfDay(): Int? {
+        val parts = split(':')
+        if (parts.size != 2) return null
+        val hours = parts[0].toIntOrNull() ?: return null
+        val minutes = parts[1].toIntOrNull() ?: return null
+        if (hours !in 0..23 || minutes !in 0..59) return null
+        return hours * 60 + minutes
+    }
+
+    private fun minuteDistance(first: Int, second: Int): Int {
+        val direct = abs(first - second)
+        return minOf(direct, MINUTES_PER_DAY - direct)
+    }
 
     private data class ArchiveItem(
         val id: String,
@@ -117,8 +143,11 @@ class StvrArchiveResolver(
     private companion object {
         const val STVR_ARCHIVE_URL = "https://www.stvr.sk/televizia/archiv"
         const val STVR_ARCHIVE_JSON_URL = "https://www.rtvs.sk/json/archive5f.json"
+        const val ARCHIVE_TIME_TOLERANCE_MINUTES = 30
+        const val MINUTES_PER_DAY = 24 * 60
         val TIME_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
         val HTML_TAG_REGEX = Regex("<[^>]+>")
+        val NON_ALPHANUMERIC_REGEX = Regex("[^\\p{L}\\p{N}]+")
         val WHITESPACE_REGEX = Regex("\\s+")
         val ARCHIVE_ITEM_REGEX = Regex(
             """<div\s+class=["']media["'][^>]*>.*?<a\s+href=["'][^"']*/televizia/archiv/[^/"']+/(?<id>\d+)["'][^>]*>.*?<div\s+class=["']program\s+time--start["'][^>]*>\s*(?<time>\d{2}:\d{2}).*?<a\s+class=["']link["'][^>]*title=["'](?<title>[^"']+)["']""",
