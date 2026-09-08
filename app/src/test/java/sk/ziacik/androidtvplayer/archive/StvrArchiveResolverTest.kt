@@ -108,6 +108,9 @@ class StvrArchiveResolverTest {
             assertTrue(message.contains("archiveLinks=1"))
             assertTrue(message.contains("parsedCandidates=0"))
             assertTrue(message.contains("archiveIds=618007"))
+            assertTrue(message.contains("titleSnippet="))
+            assertTrue(message.contains("media media--archive"))
+            assertTrue(message.contains("618007"))
         }
     }
 
