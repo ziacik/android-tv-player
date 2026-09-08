@@ -25,22 +25,39 @@ class ChannelCatalogTest {
     }
 
     @Test
-    fun `direct STVR channels keep archive identity from their storage key`() {
+    fun `parses archive metadata without changing direct live provider`() {
         val catalog = ChannelCatalogJsonParser.parse(
             """
             {
               "channels": [
-                { "id": "jednotka", "name": "JEDNOTKA", "url": "https://example.com/jednotka.m3u8" },
-                { "id": "dvojka", "name": "DVOJKA", "url": "https://example.com/dvojka.m3u8" },
-                { "id": "stvr-24", "name": "STVR :24", "url": "https://example.com/24.m3u8" },
-                { "id": "stvr-sport", "name": "STVR ŠPORT", "url": "https://example.com/sport.m3u8" }
+                {
+                  "id": "jednotka",
+                  "name": "JEDNOTKA",
+                  "url": "https://example.com/jednotka.m3u8",
+                  "archive": {
+                    "provider": "stvr",
+                    "channelId": "1"
+                  }
+                }
               ]
             }
             """.trimIndent(),
         )
 
-        assertEquals(listOf("1", "2", "3", "15"), catalog.channels.map(TvChannel::stvrId))
-        assertEquals(listOf(ChannelProvider.DIRECT), catalog.channels.map(TvChannel::provider).distinct())
+        val channel = catalog.channels.single()
+        assertEquals(ChannelProvider.DIRECT, channel.provider)
+        assertEquals("https://example.com/jednotka.m3u8", channel.providerValue)
+        assertEquals(ArchiveProvider.STVR, channel.archive?.provider)
+        assertEquals("1", channel.archive?.channelId)
+    }
+
+    @Test
+    fun `channel without archive metadata has no archive`() {
+        val catalog = ChannelCatalogJsonParser.parse(
+            """{"channels":[{"id":"jednotka","name":"JEDNOTKA","url":"https://example.com/live.m3u8"}]}""",
+        )
+
+        assertNull(catalog.channels.single().archive)
     }
 
     @Test
