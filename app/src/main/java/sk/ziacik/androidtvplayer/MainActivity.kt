@@ -12,6 +12,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import sk.ziacik.androidtvplayer.archive.StvrArchiveResolver
+import sk.ziacik.androidtvplayer.channel.ArchiveProvider
 import sk.ziacik.androidtvplayer.channel.SharedPreferencesChannelStore
 import sk.ziacik.androidtvplayer.channel.ChannelCatalogRepository
 import sk.ziacik.androidtvplayer.channel.ChannelCatalog
@@ -32,6 +33,7 @@ import sk.ziacik.androidtvplayer.resolver.OkHttpFreeviewClient
 import sk.ziacik.androidtvplayer.resolver.OkHttpStvrClient
 import sk.ziacik.androidtvplayer.resolver.NovaResolver
 import sk.ziacik.androidtvplayer.resolver.StvrResolver
+import sk.ziacik.androidtvplayer.resolver.StreamResolveException
 import sk.ziacik.androidtvplayer.resolver.SweetTvResolver
 import sk.ziacik.androidtvplayer.resolver.Ta3Resolver
 import sk.ziacik.androidtvplayer.ui.AndroidTvPlayerTheme
@@ -105,11 +107,14 @@ class MainActivity : ComponentActivity() {
             resolve = resolver::resolve,
             playerPort = playerPort,
             resolveArchive = { channel, program ->
-                stvrArchiveResolver.resolve(
-                    channel = channel,
-                    startsAtMs = requireNotNull(program.startsAtMs),
-                    title = program.title,
-                )
+                when (channel.archive?.provider) {
+                    ArchiveProvider.STVR -> stvrArchiveResolver.resolve(
+                        channel = channel,
+                        startsAtMs = requireNotNull(program.startsAtMs),
+                        title = program.title,
+                    )
+                    null -> throw StreamResolveException("Archive playback is not configured")
+                }
             },
             epgRepository = epgRepository,
             onChannelSelected = channelStore::save,
