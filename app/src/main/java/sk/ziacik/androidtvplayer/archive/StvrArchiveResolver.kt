@@ -4,6 +4,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import sk.ziacik.androidtvplayer.channel.ArchiveProvider
 import sk.ziacik.androidtvplayer.channel.TvChannel
 import sk.ziacik.androidtvplayer.resolver.STVR_USER_AGENT
 import sk.ziacik.androidtvplayer.resolver.StvrHttpClient
@@ -69,7 +70,8 @@ class StvrArchiveResolver(
     }
 
     private fun String.channelSection(channel: TvChannel): String {
-        val heading = channel.archiveHeading() ?: return this
+        val heading = channel.archiveHeading()
+            ?: throw StreamResolveException("STVR archive is not configured for channel")
         val headingMatch = Regex(
             "<h(?<level>[1-6])[^>]*>\\s*${Regex.escape(heading)}\\s*</h[1-6]>",
             setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
@@ -85,12 +87,15 @@ class StvrArchiveResolver(
         )
     }
 
-    private fun TvChannel.archiveHeading(): String? = when (stvrId) {
-        "1" -> "Jednotka"
-        "2" -> "Dvojka"
-        "3" -> ":24"
-        "15" -> "Šport"
-        else -> null
+    private fun TvChannel.archiveHeading(): String? {
+        val archiveConfig = archive?.takeIf { it.provider == ArchiveProvider.STVR } ?: return null
+        return when (archiveConfig.channelId) {
+            "1" -> "Jednotka"
+            "2" -> "Dvojka"
+            "3" -> ":24"
+            "15" -> "Šport"
+            else -> null
+        }
     }
 
     private fun String.normalizedTitle(): String =
