@@ -71,16 +71,17 @@ class StvrArchiveResolver(
     private fun String.channelSection(channel: TvChannel): String {
         val heading = channel.archiveHeading() ?: return this
         val headingMatch = Regex(
-            "<h[1-6][^>]*>\\s*${Regex.escape(heading)}\\s*</h[1-6]>",
+            "<h(?<level>[1-6])[^>]*>\\s*${Regex.escape(heading)}\\s*</h[1-6]>",
             setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
         ).find(this) ?: return this
-        val nextHeading = Regex(
-            "<h[1-6][^>]*>.*?</h[1-6]>",
+        val headingLevel = requireNotNull(headingMatch.groups["level"]).value
+        val nextChannelHeading = Regex(
+            "<h$headingLevel[^>]*>.*?</h$headingLevel>",
             setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
         ).find(this, headingMatch.range.last + 1)
         return substring(
             headingMatch.range.last + 1,
-            nextHeading?.range?.first ?: length,
+            nextChannelHeading?.range?.first ?: length,
         )
     }
 
