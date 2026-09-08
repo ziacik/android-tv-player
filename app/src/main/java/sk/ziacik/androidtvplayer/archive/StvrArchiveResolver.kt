@@ -24,15 +24,23 @@ class StvrArchiveResolver(
         title: String,
     ): StreamSource {
         val start = Instant.ofEpochMilli(startsAtMs).atZone(zoneId)
+        val startTime = start.format(TIME_FORMAT)
         val listingUrl = "$STVR_ARCHIVE_URL?date=${start.toLocalDate()}&ord=dt"
         val headers = mapOf("User-Agent" to STVR_USER_AGENT)
         val listing = httpClient.get(listingUrl, headers)
         val archiveId = findArchiveId(
             listing = listing,
             channel = channel,
-            startTime = start.format(TIME_FORMAT),
+            startTime = startTime,
             title = title,
-        ) ?: throw StreamResolveException("STVR archive item was not found")
+        ) ?: throw StreamResolveException(
+            archiveLookupFailureMessage(
+                listing = listing,
+                channel = channel,
+                expectedTime = startTime,
+                expectedTitle = title,
+            ),
+        )
 
         val body = httpClient.get("$STVR_ARCHIVE_JSON_URL?id=$archiveId", headers)
         val hlsUrl = parser.parse(body).hlsUrl
@@ -78,6 +86,30 @@ class StvrArchiveResolver(
                 ?.first
                 ?.id
             ?: nearbyCandidates.singleOrNull()?.first?.id
+    }
+
+    private fun archiveLookupFailureMessage(
+        listing: String,
+        channel: TvChannel,
+        expectedTime: String,
+        expectedTitle: String,
+    ): String {
+        val channelListing = listing.channelSection(channel)
+        val archiveIds = ARCHIVE_LINK_ID_REGEX.findAll(channelListing)
+            .map { match -> requireNotNull(match.groups["id"]).value }
+            .distinct()
+            .toList()
+        val parsedCandidates = ARCHIVE_ITEM_REGEX.findAll(channelListing).count()
+        return buildString {
+            append("STVR archive item was not found")
+            append("; expectedTime=").append(expectedTime)
+            append("; expectedTitle=").append(expectedTitle.normalizedTitle())
+            append("; archiveLinks=").append(archiveIds.size)
+            append("; parsedCandidates=").append(parsedCandidates)
+            append("; archiveIds=").append(archiveIds.take(MAX_DIAGNOSTIC_IDS).joinToString(","))
+            append("; sectionChars=").append(channelListing.length)
+            append("; listingChars=").append(listing.length)
+        }
     }
 
     private fun String.channelSection(channel: TvChannel): String {
@@ -145,10 +177,15 @@ class StvrArchiveResolver(
         const val STVR_ARCHIVE_JSON_URL = "https://www.rtvs.sk/json/archive5f.json"
         const val ARCHIVE_TIME_TOLERANCE_MINUTES = 30
         const val MINUTES_PER_DAY = 24 * 60
+        const val MAX_DIAGNOSTIC_IDS = 12
         val TIME_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
         val HTML_TAG_REGEX = Regex("<[^>]+>")
         val NON_ALPHANUMERIC_REGEX = Regex("[^\\p{L}\\p{N}]+")
         val WHITESPACE_REGEX = Regex("\\s+")
+        val ARCHIVE_LINK_ID_REGEX = Regex(
+            """/televizia/archiv/[^/"']+/(?<id>\d+)""",
+            RegexOption.IGNORE_CASE,
+        )
         val ARCHIVE_ITEM_REGEX = Regex(
             """<div\s+class=["']media["'][^>]*>.*?<a\s+href=["'][^"']*/televizia/archiv/[^/"']+/(?<id>\d+)["'][^>]*>.*?<div\s+class=["']program\s+time--start["'][^>]*>\s*(?<time>\d{2}:\d{2}).*?<a\s+class=["']link["'][^>]*title=["'](?<title>[^"']+)["']""",
             setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
