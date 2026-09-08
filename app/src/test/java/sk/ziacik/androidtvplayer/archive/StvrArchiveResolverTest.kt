@@ -3,12 +3,15 @@ package sk.ziacik.androidtvplayer.archive
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import sk.ziacik.androidtvplayer.channel.ArchiveConfig
+import sk.ziacik.androidtvplayer.channel.ArchiveProvider
+import sk.ziacik.androidtvplayer.channel.ChannelProvider
 import sk.ziacik.androidtvplayer.channel.TvChannel
 import sk.ziacik.androidtvplayer.resolver.StvrHttpClient
 
 class StvrArchiveResolverTest {
     @Test
-    fun `resolves archive id from STVR date listing and requests archive stream`() = runTest {
+    fun `resolves archive id from metadata on a direct live channel`() = runTest {
         val client = FakeStvrHttpClient(
             responses = mapOf(
                 "https://www.stvr.sk/televizia/archiv?date=2026-09-08&ord=dt" to """
@@ -26,9 +29,16 @@ class StvrArchiveResolverTest {
             ),
         )
         val resolver = StvrArchiveResolver(client)
+        val directJednotka = TvChannel(
+            storageKey = "jednotka",
+            displayName = "JEDNOTKA",
+            provider = ChannelProvider.DIRECT,
+            providerValue = "https://example.com/live.m3u8",
+            archive = ArchiveConfig(ArchiveProvider.STVR, channelId = "1"),
+        )
 
         val result = resolver.resolve(
-            channel = TvChannel.JEDNOTKA,
+            channel = directJednotka,
             startsAtMs = 1_788_843_600_000L,
             title = "Ranné správy",
         )
@@ -77,9 +87,16 @@ class StvrArchiveResolverTest {
                 """.trimIndent(),
             ),
         )
+        val directJednotka = TvChannel(
+            storageKey = "jednotka",
+            displayName = "JEDNOTKA",
+            provider = ChannelProvider.DIRECT,
+            providerValue = "https://example.com/live.m3u8",
+            archive = ArchiveConfig(ArchiveProvider.STVR, channelId = "1"),
+        )
 
         val result = StvrArchiveResolver(client).resolve(
-            channel = TvChannel.JEDNOTKA,
+            channel = directJednotka,
             startsAtMs = 1_788_843_600_000L,
             title = "Ranné správy",
         )
