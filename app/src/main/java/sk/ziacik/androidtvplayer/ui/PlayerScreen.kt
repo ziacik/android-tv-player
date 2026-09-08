@@ -46,6 +46,8 @@ import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import sk.ziacik.androidtvplayer.channel.ChannelProvider
 import sk.ziacik.androidtvplayer.channel.TvChannel
 import sk.ziacik.androidtvplayer.epg.EpgRepository
 import sk.ziacik.androidtvplayer.player.PlayerController
@@ -93,6 +95,26 @@ fun PlayerScreen(
             if (DateFormat.is24HourFormat(context)) "HH:mm:ss" else "h:mm:ss a",
             Locale.getDefault(),
         )
+    }
+
+    fun loadMiniEpgProgramme(channel: TvChannel, atMs: Long) {
+        numericInputScope.launch {
+            val programme = try {
+                epgRepository.currentProgram(channel, atMs)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                null
+            }
+            if (
+                miniEpgVisible &&
+                (miniEpgSelectedChannel ?: state.channel).storageKey == channel.storageKey &&
+                programme != null &&
+                programme.title.isNotBlank()
+            ) {
+                miniEpgProgrammes = miniEpgProgrammes + (channel.storageKey to programme)
+            }
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -258,12 +280,30 @@ fun PlayerScreen(
                             direction = 1,
                         )
                     }
+                    RemoteCommand.MiniEpgPreviousProgramme -> {
+                        val selected = miniEpgSelectedChannel ?: state.channel
+                        miniEpgProgrammes[selected.storageKey]
+                            ?.let(::previousProgrammeLookupTime)
+                            ?.let { lookupMs -> loadMiniEpgProgramme(selected, lookupMs) }
+                    }
+                    RemoteCommand.MiniEpgNextProgramme -> {
+                        val selected = miniEpgSelectedChannel ?: state.channel
+                        miniEpgProgrammes[selected.storageKey]
+                            ?.let(::nextProgrammeLookupTime)
+                            ?.takeIf { it <= miniEpgNowMs }
+                            ?.let { lookupMs -> loadMiniEpgProgramme(selected, lookupMs) }
+                    }
                     RemoteCommand.SelectMiniEpgChannel -> {
                         val selected = miniEpgSelectedChannel ?: state.channel
+                        val selectedProgram = miniEpgProgrammes[selected.storageKey]
+                        val playArchive = selected.provider == ChannelProvider.STVR &&
+                            selectedProgram?.let { isPastProgramme(it, System.currentTimeMillis()) } == true
                         miniEpgVisible = false
                         miniEpgSelectedChannel = null
-                        if (selected.storageKey != state.channel.storageKey) {
-                            overlayController.showUntilProgramTitleReady()
+                        overlayController.showUntilProgramTitleReady()
+                        if (playArchive) {
+                            controller.playArchive(selected, requireNotNull(selectedProgram))
+                        } else {
                             controller.selectChannel(selected)
                         }
                     }
