@@ -105,6 +105,10 @@ fun PlayerOverlay(
                 .padding(horizontal = 56.dp, vertical = 34.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            model.noticeText?.let { notice ->
+                ArchiveNoticeBanner(notice)
+            }
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -175,6 +179,32 @@ fun PlayerOverlay(
                 focusedControl = focusedControl,
             )
         }
+    }
+}
+
+@Composable
+private fun ArchiveNoticeBanner(text: String) {
+    val shape = RoundedCornerShape(10.dp)
+    Row(
+        modifier = Modifier
+            .background(Color(0xFF24161A).copy(alpha = 0.96f), shape)
+            .border(1.dp, LiveRed.copy(alpha = 0.72f), shape)
+            .padding(horizontal = 14.dp, vertical = 9.dp)
+            .testTag("archive-error-banner"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(9.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(7.dp)
+                .background(LiveRed, CircleShape),
+        )
+        Text(
+            text = text,
+            color = Color.White,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
 }
 
