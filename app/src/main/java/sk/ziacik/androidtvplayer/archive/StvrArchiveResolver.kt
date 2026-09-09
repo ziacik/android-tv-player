@@ -2,6 +2,7 @@ package sk.ziacik.androidtvplayer.archive
 
 import java.time.Instant
 import java.time.ZoneId
+import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.abs
@@ -22,23 +23,42 @@ class StvrArchiveResolver(
         channel: TvChannel,
         startsAtMs: Long,
         title: String,
+        originalStartsAtMs: Long? = null,
     ): StreamSource {
         val start = Instant.ofEpochMilli(startsAtMs).atZone(zoneId)
         val startTime = start.format(TIME_FORMAT)
-        val listingUrl = "$STVR_ARCHIVE_URL?date=${start.toLocalDate()}&ord=dt"
+        val listingUrl = start.archiveListingUrl()
         val headers = mapOf("User-Agent" to STVR_USER_AGENT)
         val listing = httpClient.get(listingUrl, headers)
-        val archiveId = findArchiveId(
+        val directArchiveId = findArchiveId(
             listing = listing,
             channel = channel,
             startTime = startTime,
             title = title,
-        ) ?: throw StreamResolveException(
+        )
+        val originalStart = originalStartsAtMs
+            ?.takeIf { it != startsAtMs }
+            ?.let { Instant.ofEpochMilli(it).atZone(zoneId) }
+        val archiveId = directArchiveId ?: originalStart?.let { original ->
+            val originalListingUrl = original.archiveListingUrl()
+            val originalListing = if (originalListingUrl == listingUrl) {
+                listing
+            } else {
+                httpClient.get(originalListingUrl, headers)
+            }
+            findArchiveId(
+                listing = originalListing,
+                channel = channel,
+                startTime = original.format(TIME_FORMAT),
+                title = title,
+            )
+        } ?: throw StreamResolveException(
             archiveLookupFailureMessage(
                 listing = listing,
                 channel = channel,
                 expectedTime = startTime,
                 expectedTitle = title,
+                originalStart = originalStart,
             ),
         )
 
@@ -93,6 +113,7 @@ class StvrArchiveResolver(
         channel: TvChannel,
         expectedTime: String,
         expectedTitle: String,
+        originalStart: ZonedDateTime? = null,
     ): String {
         val channelListing = listing.channelSection(channel)
         val archiveIds = ARCHIVE_LINK_ID_REGEX.findAll(channelListing)
@@ -109,8 +130,15 @@ class StvrArchiveResolver(
             append("; archiveIds=").append(archiveIds.take(MAX_DIAGNOSTIC_IDS).joinToString(","))
             append("; sectionChars=").append(channelListing.length)
             append("; listingChars=").append(listing.length)
+            originalStart?.let {
+                append("; originalDate=").append(it.toLocalDate())
+                append("; originalTime=").append(it.format(TIME_FORMAT))
+            }
         }
     }
+
+    private fun ZonedDateTime.archiveListingUrl(): String =
+        "$STVR_ARCHIVE_URL?date=${toLocalDate()}&ord=dt"
 
     private fun String.channelSection(channel: TvChannel): String {
         val heading = channel.archiveHeading()
