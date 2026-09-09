@@ -112,6 +112,7 @@ class MainActivity : ComponentActivity() {
                         channel = channel,
                         startsAtMs = requireNotNull(program.startsAtMs),
                         title = program.title,
+                        originalStartsAtMs = program.archiveOriginalStartsAtMs,
                     )
                     null -> throw StreamResolveException("Archive playback is not configured")
                 }
