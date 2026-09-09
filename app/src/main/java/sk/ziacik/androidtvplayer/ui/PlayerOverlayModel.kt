@@ -52,14 +52,20 @@ data class PlayerOverlayModel(
             state: PlayerUiState.Ready,
             nowMs: Long,
             streamHost: String? = null,
-        ): PlayerOverlayModel = from(
-            channel = state.channel,
-            program = state.program,
-            playback = state.playback,
-            streamHost = streamHost,
-            statusText = null,
-            nowMs = nowMs,
-        ).copy(noticeText = state.noticeText)
+        ): PlayerOverlayModel {
+            val model = from(
+                channel = state.channel,
+                program = state.program,
+                playback = state.playback,
+                streamHost = streamHost,
+                statusText = null,
+                nowMs = nowMs,
+            )
+            return model.copy(
+                programTitle = state.noticeText ?: model.programTitle,
+                noticeText = state.noticeText,
+            )
+        }
 
         fun from(
             channel: TvChannel,
