@@ -6,6 +6,8 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.abs
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import sk.ziacik.androidtvplayer.channel.ArchiveProvider
 import sk.ziacik.androidtvplayer.channel.TvChannel
 import sk.ziacik.androidtvplayer.resolver.STVR_USER_AGENT
@@ -19,6 +21,9 @@ class StvrArchiveResolver(
     private val parser: StvrJsonParser = StvrJsonParser(),
     private val zoneId: ZoneId = ZoneId.of("Europe/Bratislava"),
 ) {
+    private val archiveListingMutex = Mutex()
+    private val archiveListings = mutableMapOf<String, String>()
+
     suspend fun resolve(
         channel: TvChannel,
         startsAtMs: Long,
@@ -27,9 +32,8 @@ class StvrArchiveResolver(
     ): StreamSource {
         val start = Instant.ofEpochMilli(startsAtMs).atZone(zoneId)
         val startTime = start.format(TIME_FORMAT)
-        val listingUrl = start.archiveListingUrl()
         val headers = mapOf("User-Agent" to STVR_USER_AGENT)
-        val listing = httpClient.get(listingUrl, headers)
+        val listing = archiveListing(start, headers)
         val directArchiveId = findArchiveId(
             listing = listing,
             channel = channel,
@@ -40,12 +44,7 @@ class StvrArchiveResolver(
             ?.takeIf { it != startsAtMs }
             ?.let { Instant.ofEpochMilli(it).atZone(zoneId) }
         val archiveId = directArchiveId ?: originalStart?.let { original ->
-            val originalListingUrl = original.archiveListingUrl()
-            val originalListing = if (originalListingUrl == listingUrl) {
-                listing
-            } else {
-                httpClient.get(originalListingUrl, headers)
-            }
+            val originalListing = archiveListing(original, headers)
             findArchiveId(
                 listing = originalListing,
                 channel = channel,
@@ -70,6 +69,18 @@ class StvrArchiveResolver(
             url = hlsUrl,
             userAgent = STVR_USER_AGENT,
         )
+    }
+
+    private suspend fun archiveListing(
+        start: ZonedDateTime,
+        headers: Map<String, String>,
+    ): String {
+        val url = start.archiveListingUrl()
+        return archiveListingMutex.withLock {
+            archiveListings[url] ?: httpClient.get(url, headers).also { listing ->
+                archiveListings[url] = listing
+            }
+        }
     }
 
     private fun findArchiveId(
