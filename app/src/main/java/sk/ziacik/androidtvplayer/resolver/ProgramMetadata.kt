@@ -8,6 +8,7 @@ data class ProgramMetadata(
     val endsAtMs: Long?,
     val internetAllowed: Boolean?,
     val isEpgLookupPending: Boolean = false,
+    val archiveOriginalStartsAtMs: Long? = null,
 )
 
 sealed interface StreamResolution {
