@@ -20,6 +20,7 @@ sealed interface PlayerUiState {
         override val channel: TvChannel,
         val program: ProgramMetadata,
         val playback: PlaybackSnapshot,
+        val noticeText: String? = null,
     ) : PlayerUiState
 
     data class Unavailable(
