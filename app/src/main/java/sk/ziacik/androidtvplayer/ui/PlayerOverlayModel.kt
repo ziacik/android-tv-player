@@ -61,10 +61,7 @@ data class PlayerOverlayModel(
                 statusText = null,
                 nowMs = nowMs,
             )
-            return model.copy(
-                programTitle = state.noticeText ?: model.programTitle,
-                noticeText = state.noticeText,
-            )
+            return model.copy(noticeText = state.noticeText)
         }
 
         fun from(
