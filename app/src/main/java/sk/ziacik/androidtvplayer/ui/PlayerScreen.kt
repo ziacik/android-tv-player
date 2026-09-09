@@ -60,6 +60,7 @@ fun PlayerScreen(
     player: Player,
     overlayController: OverlayController,
     epgRepository: EpgRepository = EpgRepository { _, _ -> null },
+    archiveAvailable: suspend (TvChannel, ProgramMetadata) -> Boolean = { _, _ -> false },
     onSaveMarkizaCredentials: (String, String) -> Unit = { _, _ -> },
     onExit: () -> Unit,
     modifier: Modifier = Modifier,
@@ -73,6 +74,9 @@ fun PlayerScreen(
     var miniEpgSelectedChannel by remember { mutableStateOf<TvChannel?>(null) }
     var miniEpgProgrammes by remember { mutableStateOf<Map<String, ProgramMetadata>>(emptyMap()) }
     var miniEpgAttemptedChannels by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var miniEpgArchiveStates by remember {
+        mutableStateOf<Map<MiniEpgProgrammeKey, MiniEpgArchiveState>>(emptyMap())
+    }
     var miniEpgNowMs by remember { mutableStateOf(System.currentTimeMillis()) }
     val focusRequester = remember { FocusRequester() }
     val commandMapper = remember { RemoteCommandMapper() }
@@ -165,6 +169,7 @@ fun PlayerScreen(
             selectedChannel = selected,
             programmes = miniEpgProgrammes,
             nowMs = miniEpgNowMs,
+            archiveStates = miniEpgArchiveStates,
         ).map { it.channel }
         val missingChannels = visibleChannels.filter { channel ->
             channel.storageKey !in miniEpgAttemptedChannels
@@ -182,6 +187,43 @@ fun PlayerScreen(
             if (programme != null && programme.title.isNotBlank()) {
                 miniEpgProgrammes = miniEpgProgrammes + (channel.storageKey to programme)
             }
+        }
+    }
+
+    LaunchedEffect(
+        miniEpgVisible,
+        miniEpgSelectedChannel?.storageKey,
+        state.channel.storageKey,
+        miniEpgProgrammes,
+    ) {
+        if (!miniEpgVisible) return@LaunchedEffect
+        val rows = buildMiniEpgRows(
+            channels = TvChannel.entries,
+            currentChannel = state.channel,
+            selectedChannel = miniEpgSelectedChannel ?: state.channel,
+            programmes = miniEpgProgrammes,
+            nowMs = miniEpgNowMs,
+            archiveStates = miniEpgArchiveStates,
+        )
+        for (row in rows.filter { it.archiveState == MiniEpgArchiveState.LOADING }) {
+            val programme = miniEpgProgrammes[row.channel.storageKey] ?: continue
+            val key = miniEpgProgrammeKey(row.channel, programme)
+            if (key in miniEpgArchiveStates) continue
+            val available = try {
+                archiveAvailable(row.channel, programme)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                false
+            }
+            if (!miniEpgVisible) return@LaunchedEffect
+            miniEpgArchiveStates = miniEpgArchiveStates + (
+                key to if (available) {
+                    MiniEpgArchiveState.AVAILABLE
+                } else {
+                    MiniEpgArchiveState.UNAVAILABLE
+                }
+            )
         }
     }
 
@@ -260,6 +302,7 @@ fun PlayerScreen(
                         miniEpgAttemptedChannels = currentProgramme
                             ?.let { setOf(state.channel.storageKey) }
                             ?: emptySet()
+                        miniEpgArchiveStates = emptyMap()
                         miniEpgNowMs = System.currentTimeMillis()
                         miniEpgVisible = true
                         seekPreviewMs = null
@@ -295,16 +338,41 @@ fun PlayerScreen(
                     RemoteCommand.SelectMiniEpgChannel -> {
                         val selected = miniEpgSelectedChannel ?: state.channel
                         val selectedProgram = miniEpgProgrammes[selected.storageKey]
-                        val playArchive = selectedProgram?.let {
-                            canPlayArchive(selected, it, System.currentTimeMillis())
-                        } == true
-                        miniEpgVisible = false
-                        miniEpgSelectedChannel = null
-                        overlayController.showUntilProgramTitleReady()
-                        if (playArchive) {
-                            controller.playArchive(selected, requireNotNull(selectedProgram))
-                        } else {
-                            controller.selectChannel(selected)
+                        val knownArchiveState = selectedProgram?.let { programme ->
+                            miniEpgArchiveStates[miniEpgProgrammeKey(selected, programme)]
+                        }
+                        val archiveState = selectedProgram?.let { programme ->
+                            miniEpgArchiveState(
+                                channel = selected,
+                                programme = programme,
+                                nowMs = System.currentTimeMillis(),
+                                available = when (knownArchiveState) {
+                                    MiniEpgArchiveState.AVAILABLE -> true
+                                    MiniEpgArchiveState.UNAVAILABLE -> false
+                                    else -> null
+                                },
+                            )
+                        } ?: MiniEpgArchiveState.NOT_APPLICABLE
+                        when (
+                            miniEpgSelectionAction(
+                                programme = selectedProgram,
+                                nowMs = System.currentTimeMillis(),
+                                archiveState = archiveState,
+                            )
+                        ) {
+                            MiniEpgSelectionAction.PLAY_ARCHIVE -> {
+                                miniEpgVisible = false
+                                miniEpgSelectedChannel = null
+                                overlayController.showUntilProgramTitleReady()
+                                controller.playArchive(selected, requireNotNull(selectedProgram))
+                            }
+                            MiniEpgSelectionAction.SELECT_LIVE -> {
+                                miniEpgVisible = false
+                                miniEpgSelectedChannel = null
+                                overlayController.showUntilProgramTitleReady()
+                                controller.selectChannel(selected)
+                            }
+                            MiniEpgSelectionAction.IGNORE -> return@onPreviewKeyEvent true
                         }
                     }
                     RemoteCommand.CloseMiniEpg -> {
@@ -387,6 +455,7 @@ fun PlayerScreen(
                     selectedChannel = miniEpgSelectedChannel ?: state.channel,
                     programmes = miniEpgProgrammes,
                     nowMs = miniEpgNowMs,
+                    archiveStates = miniEpgArchiveStates,
                 ),
             )
         }
