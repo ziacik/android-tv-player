@@ -2,6 +2,7 @@ package sk.ziacik.androidtvplayer.ui
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import sk.ziacik.androidtvplayer.channel.ArchiveConfig
@@ -87,6 +88,20 @@ class MiniEpgProgrammeNavigationTest {
         assertEquals(
             MiniEpgSelectionAction.SELECT_LIVE,
             miniEpgSelectionAction(programme, nowMs = 19_999L, archiveState = MiniEpgArchiveState.NOT_APPLICABLE),
+        )
+    }
+
+    @Test
+    fun `available archive has badge and unavailable selection explains why OK is disabled`() {
+        assertEquals("↺", miniEpgArchiveBadge(MiniEpgArchiveState.AVAILABLE))
+        assertNull(miniEpgArchiveBadge(MiniEpgArchiveState.UNAVAILABLE))
+        assertEquals(
+            "↑ ↓ kanál    ← → program    Nedostupné v archíve    BACK zavrieť",
+            miniEpgFooterText(MiniEpgArchiveState.UNAVAILABLE),
+        )
+        assertEquals(
+            "↑ ↓ kanál    ← → program    Overujem archív…    BACK zavrieť",
+            miniEpgFooterText(MiniEpgArchiveState.LOADING),
         )
     }
 }
