@@ -10,6 +10,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import sk.ziacik.androidtvplayer.channel.ArchiveProvider
 import sk.ziacik.androidtvplayer.channel.TvChannel
+import sk.ziacik.androidtvplayer.resolver.ProgramMetadata
 import sk.ziacik.androidtvplayer.resolver.STVR_USER_AGENT
 import sk.ziacik.androidtvplayer.resolver.StvrHttpClient
 import sk.ziacik.androidtvplayer.resolver.StvrJsonParser
@@ -30,9 +31,58 @@ class StvrArchiveResolver(
         title: String,
         originalStartsAtMs: Long? = null,
     ): StreamSource {
+        val headers = mapOf("User-Agent" to STVR_USER_AGENT)
+        val lookup = findArchive(
+            channel = channel,
+            startsAtMs = startsAtMs,
+            title = title,
+            originalStartsAtMs = originalStartsAtMs,
+            headers = headers,
+        )
+        val archiveId = lookup.archiveId ?: throw StreamResolveException(
+            archiveLookupFailureMessage(
+                listing = lookup.listing,
+                channel = channel,
+                expectedTime = lookup.expectedTime,
+                expectedTitle = title,
+                originalStart = lookup.originalStart,
+            ),
+        )
+
+        val body = httpClient.get("$STVR_ARCHIVE_JSON_URL?id=$archiveId", headers)
+        val hlsUrl = parser.parse(body).hlsUrl
+            ?: throw StreamResolveException("STVR archive response does not contain an HLS source")
+
+        return StreamSource(
+            url = hlsUrl,
+            userAgent = STVR_USER_AGENT,
+        )
+    }
+
+    suspend fun isAvailable(
+        channel: TvChannel,
+        program: ProgramMetadata,
+    ): Boolean {
+        if (channel.archive?.provider != ArchiveProvider.STVR) return false
+        val startsAtMs = program.startsAtMs ?: return false
+        return findArchive(
+            channel = channel,
+            startsAtMs = startsAtMs,
+            title = program.title,
+            originalStartsAtMs = program.archiveOriginalStartsAtMs,
+            headers = mapOf("User-Agent" to STVR_USER_AGENT),
+        ).archiveId != null
+    }
+
+    private suspend fun findArchive(
+        channel: TvChannel,
+        startsAtMs: Long,
+        title: String,
+        originalStartsAtMs: Long?,
+        headers: Map<String, String>,
+    ): ArchiveLookup {
         val start = Instant.ofEpochMilli(startsAtMs).atZone(zoneId)
         val startTime = start.format(TIME_FORMAT)
-        val headers = mapOf("User-Agent" to STVR_USER_AGENT)
         val listing = archiveListing(start, headers)
         val directArchiveId = findArchiveId(
             listing = listing,
@@ -51,23 +101,12 @@ class StvrArchiveResolver(
                 startTime = original.format(TIME_FORMAT),
                 title = title,
             )
-        } ?: throw StreamResolveException(
-            archiveLookupFailureMessage(
-                listing = listing,
-                channel = channel,
-                expectedTime = startTime,
-                expectedTitle = title,
-                originalStart = originalStart,
-            ),
-        )
-
-        val body = httpClient.get("$STVR_ARCHIVE_JSON_URL?id=$archiveId", headers)
-        val hlsUrl = parser.parse(body).hlsUrl
-            ?: throw StreamResolveException("STVR archive response does not contain an HLS source")
-
-        return StreamSource(
-            url = hlsUrl,
-            userAgent = STVR_USER_AGENT,
+        }
+        return ArchiveLookup(
+            archiveId = archiveId,
+            listing = listing,
+            expectedTime = startTime,
+            originalStart = originalStart,
         )
     }
 
@@ -204,6 +243,13 @@ class StvrArchiveResolver(
         val direct = abs(first - second)
         return minOf(direct, MINUTES_PER_DAY - direct)
     }
+
+    private data class ArchiveLookup(
+        val archiveId: String?,
+        val listing: String,
+        val expectedTime: String,
+        val originalStart: ZonedDateTime?,
+    )
 
     private data class ArchiveItem(
         val id: String,
