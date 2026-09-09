@@ -6,6 +6,7 @@ import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption.ATOMIC_MOVE
 import java.nio.file.StandardCopyOption.REPLACE_EXISTING
+import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.zip.GZIPInputStream
 import kotlinx.coroutines.CancellationException
@@ -49,7 +50,14 @@ class CachedXmltvEpgRepository(
                 val programmeKey = ProgrammeKey(channel.storageKey, channel.epgIds)
                 cachedProgrammes[programmeKey]
                     ?.takeIf { it.startsAtMs <= nowMs && nowMs < it.endsAtMs }
-                    ?.let { return@withLock it.toProgramMetadata() }
+                    ?.let { cachedProgramme ->
+                        return@withLock cachedProgramme.toProgramMetadata(
+                            archiveOriginalStartsAtMs = findArchiveOriginalStartsAtMs(
+                                channel = channel,
+                                programme = cachedProgramme,
+                            ),
+                        )
+                    }
                 cachedProgrammes.remove(programmeKey)
                 for (source in sources) {
                     val channelId = channel.epgIds[source.id] ?: continue
@@ -63,12 +71,45 @@ class CachedXmltvEpgRepository(
                     }
                     if (programme != null) {
                         cachedProgrammes[programmeKey] = programme
-                        return@withLock programme.toProgramMetadata()
+                        return@withLock programme.toProgramMetadata(
+                            archiveOriginalStartsAtMs = findArchiveOriginalStartsAtMs(
+                                channel = channel,
+                                programme = programme,
+                            ),
+                        )
                     }
                 }
                 null
             }
         }
+    }
+
+    private suspend fun findArchiveOriginalStartsAtMs(
+        channel: TvChannel,
+        programme: EpgProgramme,
+    ): Long? {
+        val lookupMs = programme.startsAtMs + (programme.endsAtMs - programme.startsAtMs) / 2L
+        for (source in sources) {
+            val channelId = channel.epgIds[source.id] ?: continue
+            val sourceProgramme = try {
+                loadCurrentProgram(source, channelId, lookupMs)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                diagnostics("EPG repeat lookup failed for ${source.id}", error)
+                null
+            } ?: continue
+            val identity = sourceProgramme.numberedEpisodeIdentity() ?: continue
+            val previous = cachedFeeds[source.id]
+                ?.programmes
+                ?.get(channelId)
+                ?.asSequence()
+                ?.filter { candidate -> candidate.startsAtMs < sourceProgramme.startsAtMs }
+                ?.filter { candidate -> candidate.numberedEpisodeIdentity() == identity }
+                ?.maxByOrNull(EpgProgramme::startsAtMs)
+            if (previous != null) return previous.startsAtMs
+        }
+        return null
     }
 
     private suspend fun loadCurrentProgram(
@@ -190,6 +231,16 @@ class CachedXmltvEpgRepository(
             programme.startsAtMs <= nowMs && nowMs < programme.endsAtMs
         }
 
+    private fun EpgProgramme.numberedEpisodeIdentity(): String? {
+        val match = NUMBERED_EPISODE_TITLE.matchEntire(title.trim()) ?: return null
+        val baseTitle = match.groupValues[1]
+            .trim()
+            .lowercase(Locale.ROOT)
+            .replace(WHITESPACE_REGEX, " ")
+        val episodeNumber = match.groupValues[2]
+        return "$baseTitle#$episodeNumber"
+    }
+
     private fun writeCacheAtomically(source: XmltvEpgSource, bytes: ByteArray) {
         source.cacheFile.parentFile?.mkdirs()
         val temporaryFile = File(source.cacheFile.parentFile, "${source.cacheFile.name}.tmp")
@@ -226,6 +277,8 @@ class CachedXmltvEpgRepository(
         const val CACHE_FRESHNESS_MS = 6L * 60L * 60L * 1_000L
         const val GZIP_MAGIC_FIRST_BYTE: Byte = 0x1f
         const val GZIP_MAGIC_SECOND_BYTE: Byte = 0x8b.toByte()
+        val NUMBERED_EPISODE_TITLE = Regex("""^(.*\S)\s*\((\d+)\)\s*$""")
+        val WHITESPACE_REGEX = Regex("\\s+")
     }
 }
 
