@@ -41,7 +41,7 @@ class CachedXmltvEpgRepository(
     private val diagnostics: (String, Throwable?) -> Unit = { _, _ -> },
 ) : EpgRepository {
     private val cachedFeeds = mutableMapOf<EpgSourceId, CachedFeed>()
-    private val cachedProgrammes = mutableMapOf<ProgrammeKey, EpgProgramme>()
+    private val cachedProgrammes = mutableMapOf<ProgrammeKey, CachedProgramme>()
     private val lookupMutex = Mutex()
 
     override suspend fun currentProgram(channel: TvChannel, nowMs: Long): ProgramMetadata? {
@@ -49,18 +49,14 @@ class CachedXmltvEpgRepository(
             lookupMutex.withLock {
                 val programmeKey = ProgrammeKey(channel.storageKey, channel.epgIds)
                 cachedProgrammes[programmeKey]
-                    ?.takeIf { it.startsAtMs <= nowMs && nowMs < it.endsAtMs }
-                    ?.let { cachedProgramme ->
-                        return@withLock cachedProgramme.toProgramMetadata(
-                            archiveOriginalStartsAtMs = findArchiveOriginalStartsAtMs(
-                                channel = channel,
-                                programme = cachedProgramme,
-                            ),
-                        )
-                    }
+                    ?.takeIf { cached -> cached.programme.contains(nowMs) }
+                    ?.let { return@withLock it.toProgramMetadata() }
                 cachedProgrammes.remove(programmeKey)
+
+                val attemptedSourceIds = mutableSetOf<EpgSourceId>()
                 for (source in sources) {
                     val channelId = channel.epgIds[source.id] ?: continue
+                    attemptedSourceIds += source.id
                     val programme = try {
                         loadCurrentProgram(source, channelId, nowMs)
                     } catch (error: CancellationException) {
@@ -70,13 +66,18 @@ class CachedXmltvEpgRepository(
                         null
                     }
                     if (programme != null) {
-                        cachedProgrammes[programmeKey] = programme
-                        return@withLock programme.toProgramMetadata(
+                        val cachedProgramme = CachedProgramme(
+                            programme = programme,
                             archiveOriginalStartsAtMs = findArchiveOriginalStartsAtMs(
                                 channel = channel,
                                 programme = programme,
+                                resolvedSource = source,
+                                resolvedChannelId = channelId,
+                                attemptedSourceIds = attemptedSourceIds,
                             ),
                         )
+                        cachedProgrammes[programmeKey] = cachedProgramme
+                        return@withLock cachedProgramme.toProgramMetadata()
                     }
                 }
                 null
@@ -87,9 +88,22 @@ class CachedXmltvEpgRepository(
     private suspend fun findArchiveOriginalStartsAtMs(
         channel: TvChannel,
         programme: EpgProgramme,
+        resolvedSource: XmltvEpgSource,
+        resolvedChannelId: String,
+        attemptedSourceIds: Set<EpgSourceId>,
     ): Long? {
+        if (channel.archive == null) return null
+
+        findPreviousAiring(
+            sourceId = resolvedSource.id,
+            channelId = resolvedChannelId,
+            sourceProgramme = programme,
+            displayTitle = programme.title,
+        )?.let { return it }
+
         val lookupMs = programme.startsAtMs + (programme.endsAtMs - programme.startsAtMs) / 2L
         for (source in sources) {
+            if (source.id in attemptedSourceIds) continue
             val channelId = channel.epgIds[source.id] ?: continue
             val sourceProgramme = try {
                 loadCurrentProgram(source, channelId, lookupMs)
@@ -99,17 +113,32 @@ class CachedXmltvEpgRepository(
                 diagnostics("EPG repeat lookup failed for ${source.id}", error)
                 null
             } ?: continue
-            val identity = sourceProgramme.numberedEpisodeIdentity() ?: continue
-            val previous = cachedFeeds[source.id]
-                ?.programmes
-                ?.get(channelId)
-                ?.asSequence()
-                ?.filter { candidate -> candidate.startsAtMs < sourceProgramme.startsAtMs }
-                ?.filter { candidate -> candidate.numberedEpisodeIdentity() == identity }
-                ?.maxByOrNull(EpgProgramme::startsAtMs)
-            if (previous != null) return previous.startsAtMs
+            findPreviousAiring(
+                sourceId = source.id,
+                channelId = channelId,
+                sourceProgramme = sourceProgramme,
+                displayTitle = programme.title,
+            )?.let { return it }
         }
         return null
+    }
+
+    private fun findPreviousAiring(
+        sourceId: EpgSourceId,
+        channelId: String,
+        sourceProgramme: EpgProgramme,
+        displayTitle: String,
+    ): Long? {
+        val identity = sourceProgramme.numberedEpisodeIdentity() ?: return null
+        if (identity.baseTitle != displayTitle.normalizedProgrammeTitle()) return null
+        return cachedFeeds[sourceId]
+            ?.programmes
+            ?.get(channelId)
+            ?.asSequence()
+            ?.filter { candidate -> candidate.startsAtMs < sourceProgramme.startsAtMs }
+            ?.filter { candidate -> candidate.numberedEpisodeIdentity() == identity }
+            ?.maxByOrNull(EpgProgramme::startsAtMs)
+            ?.startsAtMs
     }
 
     private suspend fun loadCurrentProgram(
@@ -227,19 +256,28 @@ class CachedXmltvEpgRepository(
         TvChannel.entries.mapNotNull { channel -> channel.epgIds[sourceId] }.toSet()
 
     private fun CachedFeed.currentProgram(channelId: String, nowMs: Long): EpgProgramme? =
-        programmes[channelId]?.firstOrNull { programme ->
-            programme.startsAtMs <= nowMs && nowMs < programme.endsAtMs
-        }
+        programmes[channelId]?.firstOrNull { programme -> programme.contains(nowMs) }
 
-    private fun EpgProgramme.numberedEpisodeIdentity(): String? {
+    private fun EpgProgramme.contains(nowMs: Long): Boolean =
+        startsAtMs <= nowMs && nowMs < endsAtMs
+
+    private fun CachedProgramme.toProgramMetadata(): ProgramMetadata =
+        programme.toProgramMetadata(archiveOriginalStartsAtMs)
+
+    private fun EpgProgramme.numberedEpisodeIdentity(): NumberedEpisodeIdentity? {
         val match = NUMBERED_EPISODE_TITLE.matchEntire(title.trim()) ?: return null
-        val baseTitle = match.groupValues[1]
-            .trim()
-            .lowercase(Locale.ROOT)
-            .replace(WHITESPACE_REGEX, " ")
-        val episodeNumber = match.groupValues[2]
-        return "$baseTitle#$episodeNumber"
+        return NumberedEpisodeIdentity(
+            baseTitle = match.groupValues[1].normalizedProgrammeTitle(),
+            episodeNumber = match.groupValues[2],
+        )
     }
+
+    private fun String.normalizedProgrammeTitle(): String =
+        trim()
+            .lowercase(Locale.ROOT)
+            .replace(NON_ALPHANUMERIC_REGEX, " ")
+            .replace(WHITESPACE_REGEX, " ")
+            .trim()
 
     private fun writeCacheAtomically(source: XmltvEpgSource, bytes: ByteArray) {
         source.cacheFile.parentFile?.mkdirs()
@@ -268,6 +306,16 @@ class CachedXmltvEpgRepository(
         val programmes: Map<String, List<EpgProgramme>>,
     )
 
+    private data class CachedProgramme(
+        val programme: EpgProgramme,
+        val archiveOriginalStartsAtMs: Long?,
+    )
+
+    private data class NumberedEpisodeIdentity(
+        val baseTitle: String,
+        val episodeNumber: String,
+    )
+
     private data class ProgrammeKey(
         val channelStorageKey: String,
         val epgIds: Map<EpgSourceId, String>,
@@ -278,6 +326,7 @@ class CachedXmltvEpgRepository(
         const val GZIP_MAGIC_FIRST_BYTE: Byte = 0x1f
         const val GZIP_MAGIC_SECOND_BYTE: Byte = 0x8b.toByte()
         val NUMBERED_EPISODE_TITLE = Regex("""^(.*\S)\s*\((\d+)\)\s*$""")
+        val NON_ALPHANUMERIC_REGEX = Regex("[^\\p{L}\\p{N}]+")
         val WHITESPACE_REGEX = Regex("\\s+")
     }
 }
