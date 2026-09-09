@@ -81,6 +81,54 @@ class StvrArchiveResolverTest {
     }
 
     @Test
+    fun `resolves a repeat from the original airing archive date`() = runTest {
+        val client = FakeStvrHttpClient(
+            responses = mapOf(
+                "https://www.stvr.sk/televizia/archiv?date=2026-09-09&ord=dt" to """
+                    <h2>Jednotka</h2>
+                    <div class="media">
+                        <div class="program time--start">07:00 <span>- 08:29</span></div>
+                        <a href="/televizia/archiv/14126/618025"><img src="morning.jpg"></a>
+                        <h5><a class="link" title="Ranné správy">Ranné správy</a></h5>
+                    </div>
+                    <h2>Dvojka</h2>
+                """.trimIndent(),
+                "https://www.stvr.sk/televizia/archiv?date=2026-09-08&ord=dt" to """
+                    <h2>Jednotka</h2>
+                    <div class="media media--archive">
+                        <div class="media__body">
+                            <div class="program time--start">17:44 <span>- 18:12</span></div>
+                            <a href="/televizia/archiv/14126/618007"><img src="duel.jpg"></a>
+                            <h5><a class="link" title="Duel">Duel</a></h5>
+                        </div>
+                    </div>
+                    <h2>Dvojka</h2>
+                """.trimIndent(),
+                "https://www.rtvs.sk/json/archive5f.json?id=618007" to """
+                    {"clip":{"sources":[{"src":"https://cdn.example/duel-repeat.m3u8","type":"application/x-mpegurl"}]}}
+                """.trimIndent(),
+            ),
+        )
+
+        val result = StvrArchiveResolver(client).resolve(
+            channel = directJednotka(),
+            startsAtMs = 1_788_943_500_000L,
+            title = "Duel",
+            originalStartsAtMs = 1_788_882_300_000L,
+        )
+
+        assertEquals("https://cdn.example/duel-repeat.m3u8", result.url)
+        assertEquals(
+            listOf(
+                "https://www.stvr.sk/televizia/archiv?date=2026-09-09&ord=dt",
+                "https://www.stvr.sk/televizia/archiv?date=2026-09-08&ord=dt",
+                "https://www.rtvs.sk/json/archive5f.json?id=618007",
+            ),
+            client.requestedUrls,
+        )
+    }
+
+    @Test
     fun `reports useful diagnostics when archive HTML cannot be parsed`() = runTest {
         val client = FakeStvrHttpClient(
             responses = mapOf(
