@@ -25,6 +25,42 @@ class ChannelCatalogTest {
     }
 
     @Test
+    fun `parses archive metadata without changing direct live provider`() {
+        val catalog = ChannelCatalogJsonParser.parse(
+            """
+            {
+              "channels": [
+                {
+                  "id": "jednotka",
+                  "name": "JEDNOTKA",
+                  "url": "https://example.com/jednotka.m3u8",
+                  "archive": {
+                    "provider": "stvr",
+                    "channelId": "1"
+                  }
+                }
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        val channel = catalog.channels.single()
+        assertEquals(ChannelProvider.DIRECT, channel.provider)
+        assertEquals("https://example.com/jednotka.m3u8", channel.providerValue)
+        assertEquals(ArchiveProvider.STVR, channel.archive?.provider)
+        assertEquals("1", channel.archive?.channelId)
+    }
+
+    @Test
+    fun `channel without archive metadata has no archive`() {
+        val catalog = ChannelCatalogJsonParser.parse(
+            """{"channels":[{"id":"jednotka","name":"JEDNOTKA","url":"https://example.com/live.m3u8"}]}""",
+        )
+
+        assertNull(catalog.channels.single().archive)
+    }
+
+    @Test
     fun `parses direct channel request headers`() {
         val catalog = ChannelCatalogJsonParser.parse(
             """

@@ -7,10 +7,11 @@ data class EpgProgramme(
     val startsAtMs: Long,
     val endsAtMs: Long,
 ) {
-    fun toProgramMetadata() = ProgramMetadata(
+    fun toProgramMetadata(archiveOriginalStartsAtMs: Long? = null) = ProgramMetadata(
         title = title,
         startsAtMs = startsAtMs,
         endsAtMs = endsAtMs,
         internetAllowed = true,
+        archiveOriginalStartsAtMs = archiveOriginalStartsAtMs,
     )
 }

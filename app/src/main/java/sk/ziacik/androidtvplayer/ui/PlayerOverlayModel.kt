@@ -43,6 +43,7 @@ data class PlayerOverlayModel(
     val isPlaying: Boolean,
     val isSeekable: Boolean,
     val liveActionText: String,
+    val noticeText: String? = null,
     val statusText: String? = null,
     val stateIndicator: PlayerOverlayStateIndicator = PlayerOverlayStateIndicator.LIVE,
 ) {
@@ -51,14 +52,17 @@ data class PlayerOverlayModel(
             state: PlayerUiState.Ready,
             nowMs: Long,
             streamHost: String? = null,
-        ): PlayerOverlayModel = from(
-            channel = state.channel,
-            program = state.program,
-            playback = state.playback,
-            streamHost = streamHost,
-            statusText = null,
-            nowMs = nowMs,
-        )
+        ): PlayerOverlayModel {
+            val model = from(
+                channel = state.channel,
+                program = state.program,
+                playback = state.playback,
+                streamHost = streamHost,
+                statusText = null,
+                nowMs = nowMs,
+            )
+            return model.copy(noticeText = state.noticeText)
+        }
 
         fun from(
             channel: TvChannel,
@@ -74,30 +78,52 @@ data class PlayerOverlayModel(
                 startsAtMs != null &&
                 endsAtMs != null &&
                 endsAtMs > startsAtMs
-            val offset = playback?.let { snapshot ->
-                snapshot.liveOffsetMs
-                    ?: snapshot.durationMs
-                        ?.minus(snapshot.currentPositionMs)
-                        ?.coerceAtLeast(0L)
+            val streamDurationMs = playback?.durationMs?.takeIf { it > 0L }
+            val streamProgress = streamDurationMs?.let { durationMs ->
+                (playback.currentPositionMs.toDouble() / durationMs.toDouble())
+                    .coerceIn(0.0, 1.0)
+                    .toFloat()
             }
-            val watchedNowMs = offset?.let(nowMs::minus) ?: nowMs
-            val timelineStartMs = startsAtMs?.coerceAtMost(watchedNowMs)
-            val streamProgress = playback
-                ?.durationMs
-                ?.takeIf { it > 0L }
-                ?.let { durationMs ->
-                    (playback.currentPositionMs.toDouble() / durationMs.toDouble())
+            val isArchiveVod =
+                hasProgrammeInterval &&
+                endsAtMs!! <= nowMs &&
+                playback?.liveOffsetMs == null &&
+                streamDurationMs != null
+            val offset = if (isArchiveVod) {
+                null
+            } else {
+                playback?.let { snapshot ->
+                    snapshot.liveOffsetMs
+                        ?: snapshot.durationMs
+                            ?.minus(snapshot.currentPositionMs)
+                            ?.coerceAtLeast(0L)
+                }
+            }
+            val watchedNowMs = if (isArchiveVod) {
+                startsAtMs!! + playback!!.currentPositionMs.coerceAtLeast(0L)
+            } else {
+                offset?.let(nowMs::minus) ?: nowMs
+            }
+            val timelineStartMs = if (isArchiveVod) {
+                startsAtMs
+            } else {
+                startsAtMs?.coerceAtMost(watchedNowMs)
+            }
+            val timelineEndMs = if (isArchiveVod) {
+                startsAtMs!! + streamDurationMs!!
+            } else {
+                endsAtMs
+            }
+            val progress = when {
+                isArchiveVod -> streamProgress
+                hasProgrammeInterval -> {
+                    ((watchedNowMs - timelineStartMs!!).toDouble() / (endsAtMs!! - timelineStartMs).toDouble())
                         .coerceIn(0.0, 1.0)
                         .toFloat()
                 }
-            val progress = if (hasProgrammeInterval) {
-                ((watchedNowMs - timelineStartMs!!).toDouble() / (endsAtMs - timelineStartMs).toDouble())
-                    .coerceIn(0.0, 1.0)
-                    .toFloat()
-            } else {
-                streamProgress
+                else -> streamProgress
             }
-            val isLive = offset != null && offset <= LIVE_THRESHOLD_MS
+            val isLive = !isArchiveVod && offset != null && offset <= LIVE_THRESHOLD_MS
             val stateIndicator = when (statusText) {
                 null -> PlayerOverlayStateIndicator.LIVE
                 "Prepínam…" -> PlayerOverlayStateIndicator.SWITCHING
@@ -118,7 +144,7 @@ data class PlayerOverlayModel(
                 displayNowMs = nowMs,
                 programmeStartMs = timelineStartMs.takeIf { hasProgrammeInterval },
                 programmeNowMs = watchedNowMs.takeIf { hasProgrammeInterval },
-                programmeEndMs = endsAtMs.takeIf { hasProgrammeInterval },
+                programmeEndMs = timelineEndMs.takeIf { hasProgrammeInterval },
                 isLive = stateIndicator == PlayerOverlayStateIndicator.LIVE && isLive,
                 isPlaying = playback?.isPlaying == true,
                 isSeekable = playback?.isSeekable == true,

@@ -11,6 +11,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import sk.ziacik.androidtvplayer.archive.StvrArchiveResolver
+import sk.ziacik.androidtvplayer.channel.ArchiveProvider
 import sk.ziacik.androidtvplayer.channel.SharedPreferencesChannelStore
 import sk.ziacik.androidtvplayer.channel.ChannelCatalogRepository
 import sk.ziacik.androidtvplayer.channel.ChannelCatalog
@@ -31,6 +33,7 @@ import sk.ziacik.androidtvplayer.resolver.OkHttpFreeviewClient
 import sk.ziacik.androidtvplayer.resolver.OkHttpStvrClient
 import sk.ziacik.androidtvplayer.resolver.NovaResolver
 import sk.ziacik.androidtvplayer.resolver.StvrResolver
+import sk.ziacik.androidtvplayer.resolver.StreamResolveException
 import sk.ziacik.androidtvplayer.resolver.SweetTvResolver
 import sk.ziacik.androidtvplayer.resolver.Ta3Resolver
 import sk.ziacik.androidtvplayer.ui.AndroidTvPlayerTheme
@@ -52,8 +55,10 @@ class MainActivity : ComponentActivity() {
 
         val playerPort = Media3PlayerPort(this)
         val freeviewHttpClient = OkHttpFreeviewClient()
+        val stvrHttpClient = OkHttpStvrClient()
+        val stvrArchiveResolver = StvrArchiveResolver(stvrHttpClient)
         val resolver = ChannelResolver(
-            resolveStvr = StvrResolver(OkHttpStvrClient())::resolve,
+            resolveStvr = StvrResolver(stvrHttpClient)::resolve,
             resolveJoj = JojResolver(freeviewHttpClient)::resolve,
             resolveCt = CtResolver(freeviewHttpClient)::resolve,
             resolveTa3 = Ta3Resolver(freeviewHttpClient)::resolve,
@@ -101,6 +106,17 @@ class MainActivity : ComponentActivity() {
             initialChannel = channelStore.load(catalog),
             resolve = resolver::resolve,
             playerPort = playerPort,
+            resolveArchive = { channel, program ->
+                when (channel.archive?.provider) {
+                    ArchiveProvider.STVR -> stvrArchiveResolver.resolve(
+                        channel = channel,
+                        startsAtMs = requireNotNull(program.startsAtMs),
+                        title = program.title,
+                        originalStartsAtMs = program.archiveOriginalStartsAtMs,
+                    )
+                    null -> throw StreamResolveException("Archive playback is not configured")
+                }
+            },
             epgRepository = epgRepository,
             onChannelSelected = channelStore::save,
             diagnostics = { message, cause ->

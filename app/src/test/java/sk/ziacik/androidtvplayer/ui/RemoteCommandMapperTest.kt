@@ -106,7 +106,7 @@ class RemoteCommandMapperTest {
     }
 
     @Test
-    fun `mini EPG consumes vertical navigation center and back`() {
+    fun `mini EPG consumes programme channel selection and back navigation`() {
         assertEquals(
             RemoteCommand.MiniEpgUp,
             mapper.map(KeyEvent.KEYCODE_DPAD_UP, false, FocusedControl.TIMELINE, miniEpgVisible = true),
@@ -116,16 +116,20 @@ class RemoteCommandMapperTest {
             mapper.map(KeyEvent.KEYCODE_DPAD_DOWN, false, FocusedControl.TIMELINE, miniEpgVisible = true),
         )
         assertEquals(
+            RemoteCommand.MiniEpgPreviousProgramme,
+            mapper.map(KeyEvent.KEYCODE_DPAD_LEFT, false, FocusedControl.TIMELINE, miniEpgVisible = true),
+        )
+        assertEquals(
+            RemoteCommand.MiniEpgNextProgramme,
+            mapper.map(KeyEvent.KEYCODE_DPAD_RIGHT, false, FocusedControl.TIMELINE, miniEpgVisible = true),
+        )
+        assertEquals(
             RemoteCommand.SelectMiniEpgChannel,
             mapper.map(KeyEvent.KEYCODE_DPAD_CENTER, false, FocusedControl.TIMELINE, miniEpgVisible = true),
         )
         assertEquals(
             RemoteCommand.CloseMiniEpg,
             mapper.map(KeyEvent.KEYCODE_BACK, false, FocusedControl.TIMELINE, miniEpgVisible = true),
-        )
-        assertEquals(
-            RemoteCommand.Ignore,
-            mapper.map(KeyEvent.KEYCODE_DPAD_LEFT, false, FocusedControl.TIMELINE, miniEpgVisible = true),
         )
     }
 

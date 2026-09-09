@@ -39,6 +39,19 @@ class PlayerOverlayModelTest {
     }
 
     @Test
+    fun `ready state exposes transient archive notice without changing live indicator`() {
+        val model = PlayerOverlayModel.from(
+            ready(position = 40_000L, duration = 100_000L, offset = 60_000L).copy(
+                noticeText = "Program nie je dostupný v archíve",
+            ),
+            nowMs = 100_000L,
+        )
+
+        assertEquals("Program nie je dostupný v archíve", model.noticeText)
+        assertEquals(PlayerOverlayStateIndicator.LIVE, model.stateIndicator)
+    }
+
+    @Test
     fun `uses watched programme progress and exposes its EPG times`() {
         val model = PlayerOverlayModel.from(
             ready(position = 40_000L, duration = 100_000L, offset = 60_000L),

@@ -59,7 +59,7 @@ fun MiniEpgOverlay(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                text = "TERAZ V TV",
+                text = "TV PROGRAM",
                 color = MiniEpgBrandYellow,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
@@ -70,7 +70,7 @@ fun MiniEpgOverlay(
                 MiniEpgRowItem(row)
             }
             Text(
-                text = "↑ ↓ vybrať    OK prepnúť    BACK zavrieť",
+                text = "↑ ↓ kanál    ← → program    OK prehrať    BACK zavrieť",
                 color = MiniEpgMuted,
                 fontSize = 11.sp,
                 modifier = Modifier.padding(start = 14.dp, top = 6.dp),

@@ -61,6 +61,7 @@ object ChannelCatalogJsonParser {
                         headers.optString(key).takeIf { it.isNotBlank() }?.let { put(key, it) }
                     }
                 }
+                val archive = value.optJSONObject("archive")?.let(::parseArchive)
                 add(
                     TvChannel(
                         id,
@@ -69,11 +70,22 @@ object ChannelCatalogJsonParser {
                         providerValue = url,
                         epgIds = epgIds,
                         requestHeaders = requestHeaders,
+                        archive = archive,
                     ),
                 )
             }
         }
         return ChannelCatalog(channels, version = root.optInt("version"))
+    }
+
+    private fun parseArchive(value: JSONObject): ArchiveConfig? {
+        val provider = when {
+            value.optString("provider").equals("stvr", ignoreCase = true) -> ArchiveProvider.STVR
+            else -> return null
+        }
+        val channelId = value.optString("channelId").trim()
+        if (channelId.isBlank()) return null
+        return ArchiveConfig(provider = provider, channelId = channelId)
     }
 }
 
