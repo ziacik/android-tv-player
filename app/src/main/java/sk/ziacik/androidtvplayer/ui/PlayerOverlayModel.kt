@@ -43,6 +43,7 @@ data class PlayerOverlayModel(
     val isPlaying: Boolean,
     val isSeekable: Boolean,
     val liveActionText: String,
+    val noticeText: String? = null,
     val statusText: String? = null,
     val stateIndicator: PlayerOverlayStateIndicator = PlayerOverlayStateIndicator.LIVE,
 ) {
@@ -58,7 +59,7 @@ data class PlayerOverlayModel(
             streamHost = streamHost,
             statusText = null,
             nowMs = nowMs,
-        )
+        ).copy(noticeText = state.noticeText)
 
         fun from(
             channel: TvChannel,
