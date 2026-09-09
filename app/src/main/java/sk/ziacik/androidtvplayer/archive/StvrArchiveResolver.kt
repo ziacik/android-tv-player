@@ -21,9 +21,10 @@ class StvrArchiveResolver(
     private val httpClient: StvrHttpClient,
     private val parser: StvrJsonParser = StvrJsonParser(),
     private val zoneId: ZoneId = ZoneId.of("Europe/Bratislava"),
+    private val nowMs: () -> Long = System::currentTimeMillis,
 ) {
     private val archiveListingMutex = Mutex()
-    private val archiveListings = mutableMapOf<String, String>()
+    private val archiveListings = mutableMapOf<String, ArchiveListingCacheEntry>()
 
     suspend fun resolve(
         channel: TvChannel,
@@ -116,10 +117,28 @@ class StvrArchiveResolver(
     ): String {
         val url = start.archiveListingUrl()
         return archiveListingMutex.withLock {
-            archiveListings[url] ?: httpClient.get(url, headers).also { listing ->
-                archiveListings[url] = listing
+            val currentNowMs = nowMs()
+            val cached = archiveListings[url]
+            if (cached != null && cached.isValidFor(start, currentNowMs)) {
+                return@withLock cached.listing
+            }
+
+            httpClient.get(url, headers).also { listing ->
+                archiveListings[url] = ArchiveListingCacheEntry(
+                    listing = listing,
+                    fetchedAtMs = currentNowMs,
+                )
             }
         }
+    }
+
+    private fun ArchiveListingCacheEntry.isValidFor(
+        start: ZonedDateTime,
+        currentNowMs: Long,
+    ): Boolean {
+        val today = Instant.ofEpochMilli(currentNowMs).atZone(zoneId).toLocalDate()
+        if (start.toLocalDate() != today) return true
+        return currentNowMs - fetchedAtMs < TODAY_ARCHIVE_LISTING_TTL_MS
     }
 
     private fun findArchiveId(
@@ -244,6 +263,11 @@ class StvrArchiveResolver(
         return minOf(direct, MINUTES_PER_DAY - direct)
     }
 
+    private data class ArchiveListingCacheEntry(
+        val listing: String,
+        val fetchedAtMs: Long,
+    )
+
     private data class ArchiveLookup(
         val archiveId: String?,
         val listing: String,
@@ -261,6 +285,7 @@ class StvrArchiveResolver(
         const val STVR_ARCHIVE_URL = "https://www.stvr.sk/televizia/archiv"
         const val STVR_ARCHIVE_JSON_URL = "https://www.rtvs.sk/json/archive5f.json"
         const val ARCHIVE_TIME_TOLERANCE_MINUTES = 30
+        const val TODAY_ARCHIVE_LISTING_TTL_MS = 5 * 60_000L
         const val MINUTES_PER_DAY = 24 * 60
         const val MAX_DIAGNOSTIC_IDS = 12
         val TIME_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
