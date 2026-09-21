@@ -138,8 +138,8 @@ class StvrArchiveAvailabilityTest {
 		<h2>Jednotka</h2>
 		<div class="media">
 			<div class="program time--start">$time <span>- 18:12</span></div>
-			<h5><a href="/televizia/program/14126/$id">$title</a></h5>
-			<a href="/televizia/archiv/14126/$id">Pozrieť v archíve</a>
+			<h5><a href="/televizia/archiv/14126/$id">$title</a></h5>
+			<a href="/televizia/program/14126/999999">O programe</a>
 		</div>
 		<h2>Dvojka</h2>
 	""".trimIndent()
