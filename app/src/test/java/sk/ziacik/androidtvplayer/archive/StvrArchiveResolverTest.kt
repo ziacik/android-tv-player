@@ -17,12 +17,11 @@ class StvrArchiveResolverTest {
     fun `resolves archive id from metadata on a direct live channel`() = runTest {
         val client = FakeStvrHttpClient(
             responses = mapOf(
-                "https://www.stvr.sk/televizia/archiv?date=2026-09-08&ord=dt" to """
+                "https://www.stvr.sk/televizia/program/?date=2026-09-08" to """
                     <div class="media">
                         <div class="media__body">
                             <div class="program time--start">07:00 <span>- 08:29</span></div>
-                            <a href="/televizia/archiv/14026/617992"><img src="image.jpg"></a>
-                            <a class="link" title="Ranné správy">Ranné správy</a>
+                            <a href="/televizia/program/14026/617992">Ranné správy</a>
                         </div>
                     </div>
                 """.trimIndent(),
@@ -43,7 +42,7 @@ class StvrArchiveResolverTest {
         assertEquals("https://cdn.example/archive.m3u8", result.url)
         assertEquals(
             listOf(
-                "https://www.stvr.sk/televizia/archiv?date=2026-09-08&ord=dt",
+                "https://www.stvr.sk/televizia/program/?date=2026-09-08",
                 "https://www.rtvs.sk/json/archive5f.json?id=617992",
             ),
             client.requestedUrls,
@@ -54,13 +53,12 @@ class StvrArchiveResolverTest {
     fun `matches archive programme when actual STVR start is shifted from EPG`() = runTest {
         val client = FakeStvrHttpClient(
             responses = mapOf(
-                "https://www.stvr.sk/televizia/archiv?date=2026-09-08&ord=dt" to """
+                "https://www.stvr.sk/televizia/program/?date=2026-09-08" to """
                     <h2>Jednotka</h2>
                     <div class="media media--archive">
                         <div class="media__body">
                             <div data-role="start" class="time--start program">17:44 <span>- 18:12</span></div>
-                            <a class="media__image" href="/televizia/archiv/14126/618007"><img src="duel.jpg"></a>
-                            <h5><a title="Duel" href="/televizia/archiv/14126/618007" class="link program__title">Duel</a></h5>
+                            <h5><a href="/televizia/program/14126/618007">Duel</a></h5>
                         </div>
                     </div>
                     <h2>Dvojka</h2>
@@ -84,22 +82,20 @@ class StvrArchiveResolverTest {
     fun `resolves a repeat from the original airing archive date`() = runTest {
         val client = FakeStvrHttpClient(
             responses = mapOf(
-                "https://www.stvr.sk/televizia/archiv?date=2026-09-09&ord=dt" to """
+                "https://www.stvr.sk/televizia/program/?date=2026-09-09" to """
                     <h2>Jednotka</h2>
                     <div class="media">
                         <div class="program time--start">07:00 <span>- 08:29</span></div>
-                        <a href="/televizia/archiv/14126/618025"><img src="morning.jpg"></a>
-                        <h5><a class="link" title="Ranné správy">Ranné správy</a></h5>
+                        <h5><a href="/televizia/program/14126/618025">Ranné správy</a></h5>
                     </div>
                     <h2>Dvojka</h2>
                 """.trimIndent(),
-                "https://www.stvr.sk/televizia/archiv?date=2026-09-08&ord=dt" to """
+                "https://www.stvr.sk/televizia/program/?date=2026-09-08" to """
                     <h2>Jednotka</h2>
                     <div class="media media--archive">
                         <div class="media__body">
                             <div class="program time--start">17:44 <span>- 18:12</span></div>
-                            <a href="/televizia/archiv/14126/618007"><img src="duel.jpg"></a>
-                            <h5><a class="link" title="Duel">Duel</a></h5>
+                            <h5><a href="/televizia/program/14126/618007">Duel</a></h5>
                         </div>
                     </div>
                     <h2>Dvojka</h2>
@@ -120,8 +116,8 @@ class StvrArchiveResolverTest {
         assertEquals("https://cdn.example/duel-repeat.m3u8", result.url)
         assertEquals(
             listOf(
-                "https://www.stvr.sk/televizia/archiv?date=2026-09-09&ord=dt",
-                "https://www.stvr.sk/televizia/archiv?date=2026-09-08&ord=dt",
+                "https://www.stvr.sk/televizia/program/?date=2026-09-09",
+                "https://www.stvr.sk/televizia/program/?date=2026-09-08",
                 "https://www.rtvs.sk/json/archive5f.json?id=618007",
             ),
             client.requestedUrls,
@@ -132,10 +128,10 @@ class StvrArchiveResolverTest {
     fun `reports useful diagnostics when archive HTML cannot be parsed`() = runTest {
         val client = FakeStvrHttpClient(
             responses = mapOf(
-                "https://www.stvr.sk/televizia/archiv?date=2026-09-08&ord=dt" to """
+                "https://www.stvr.sk/televizia/program/?date=2026-09-08" to """
                     <h2>Jednotka</h2>
                     <div class="media media--archive">
-                        <a class="media__image" href="/televizia/archiv/14126/618007">Duel</a>
+                        <a class="media__image" href="/televizia/program/14126/618007">Duel</a>
                     </div>
                     <h2>Dvojka</h2>
                 """.trimIndent(),
@@ -163,23 +159,20 @@ class StvrArchiveResolverTest {
     fun `keeps searching inside channel when programme titles use headings`() = runTest {
         val client = FakeStvrHttpClient(
             responses = mapOf(
-                "https://www.stvr.sk/televizia/archiv?date=2026-09-08&ord=dt" to """
+                "https://www.stvr.sk/televizia/program/?date=2026-09-08" to """
                     <h2>Jednotka</h2>
                     <div class="media">
                         <div class="program time--start">06:00 <span>- 06:29</span></div>
-                        <a href="/televizia/archiv/14026/111111"><img src="early.jpg"></a>
-                        <h5><a class="link" title="Skoré správy">Skoré správy</a></h5>
+                        <h5><a href="/televizia/program/14026/111111">Skoré správy</a></h5>
                     </div>
                     <div class="media">
                         <div class="program time--start">07:00 <span>- 08:29</span></div>
-                        <a href="/televizia/archiv/14026/617992"><img src="morning.jpg"></a>
-                        <h5><a class="link" title="Ranné správy">Ranné správy</a></h5>
+                        <h5><a href="/televizia/program/14026/617992">Ranné správy</a></h5>
                     </div>
                     <h2>Dvojka</h2>
                     <div class="media">
                         <div class="program time--start">07:00 <span>- 08:29</span></div>
-                        <a href="/televizia/archiv/14026/999999"><img src="wrong.jpg"></a>
-                        <h5><a class="link" title="Ranné správy">Ranné správy</a></h5>
+                        <h5><a href="/televizia/program/14026/999999">Ranné správy</a></h5>
                     </div>
                 """.trimIndent(),
                 "https://www.rtvs.sk/json/archive5f.json?id=617992" to """
