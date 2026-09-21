@@ -180,6 +180,73 @@ class StvrArchiveAvailabilityTest {
 	}
 
 	@Test
+	fun `reports archive episode without HLS as unavailable`() = runTest {
+		val programUrl = "https://www.stvr.sk/televizia/program/2117/620517"
+		val client = AvailabilityStvrHttpClient(
+			responses = mapOf(
+				"https://www.stvr.sk/televizia/program/?date=2026-09-21" to """
+					<h2>Jednotka</h2>
+					<div class="media">
+						<div class="program time--start">09:55 <span>- 10:45</span></div>
+						<h5><a href="/televizia/program/2117/620517">Profesionáli IV</a></h5>
+					</div>
+					<h2>Dvojka</h2>
+				""".trimIndent(),
+				"https://www.rtvs.sk/json/archive5f.json?id=620517" to
+					"""{"clip":{"sources":[]}}""",
+			),
+			finalUrls = mapOf(
+				programUrl to "https://www.stvr.sk/televizia/archiv/2117/620517",
+			),
+		)
+		val resolver = StvrArchiveResolver(client)
+
+		assertFalse(
+			resolver.isAvailable(
+				directJednotka(),
+				ProgramMetadata(
+					title = "Profesionáli IV",
+					startsAtMs = 1_789_977_300_000L,
+					endsAtMs = 1_789_980_300_000L,
+					internetAllowed = true,
+				),
+			),
+		)
+	}
+
+	@Test
+	fun `reports concrete Duel episode with HLS as available`() = runTest {
+		val programUrl = "https://www.stvr.sk/televizia/program/14126/620530"
+		val client = AvailabilityStvrHttpClient(
+			responses = mapOf(
+				"https://www.stvr.sk/televizia/program/?date=2026-09-21" to programOnlyListing(
+					time = "17:45",
+					id = "620530",
+					title = "Duel",
+				),
+				"https://www.rtvs.sk/json/archive5f.json?id=620530" to
+					"""{"clip":{"sources":[{"src":"https://cdn.example/duel.m3u8","type":"application/x-mpegurl"}]}}""",
+			),
+			finalUrls = mapOf(
+				programUrl to "https://www.stvr.sk/televizia/archiv/14126/620530",
+			),
+		)
+		val resolver = StvrArchiveResolver(client)
+
+		assertTrue(
+			resolver.isAvailable(
+				directJednotka(),
+				ProgramMetadata(
+					title = "Duel",
+					startsAtMs = 1_790_005_500_000L,
+					endsAtMs = 1_790_007_300_000L,
+					internetAllowed = true,
+				),
+			),
+		)
+	}
+
+	@Test
 	fun `reports repeat as available from original airing`() = runTest {
 		val client = AvailabilityStvrHttpClient(
 			mapOf(
@@ -253,7 +320,7 @@ private class AvailabilityStvrHttpClient(
 	override suspend fun get(
 		url: String,
 		headers: Map<String, String>,
-	): String = responses.getValue(url)
+	): String = responses[url] ?: DEFAULT_PLAYABLE_ARCHIVE_JSON
 
 	override suspend fun finalUrl(
 		url: String,
@@ -261,6 +328,9 @@ private class AvailabilityStvrHttpClient(
 	): String = finalUrls[url] ?: url.replace("/televizia/program/", "/televizia/archiv/")
 }
 
+
+private const val DEFAULT_PLAYABLE_ARCHIVE_JSON =
+	"""{"clip":{"sources":[{"src":"https://cdn.example/archive.m3u8","type":"application/x-mpegurl"}]}}"""
 
 private class SequentialRedirectStvrHttpClient(
 	private val listingUrl: String,
@@ -275,8 +345,11 @@ private class SequentialRedirectStvrHttpClient(
 		url: String,
 		headers: Map<String, String>,
 	): String {
-		check(url == listingUrl)
-		return listing
+		return if (url == listingUrl) {
+			listing
+		} else {
+			DEFAULT_PLAYABLE_ARCHIVE_JSON
+		}
 	}
 
 	override suspend fun finalUrl(
