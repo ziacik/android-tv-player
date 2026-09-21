@@ -59,8 +59,8 @@ class StvrArchiveResolverTest {
                     <div class="media media--archive">
                         <div class="media__body">
                             <div data-role="start" class="time--start program">17:44 <span>- 18:12</span></div>
-                            <h5><a href="/televizia/program/14126/618007">Duel</a></h5>
-                            <a href="/televizia/archiv/14126/618007">Pozrieť v archíve</a>
+                            <h5><a href="/televizia/archiv/14126/618007">Duel</a></h5>
+                            <a href="/televizia/program/14126/620518">O programe</a>
                         </div>
                     </div>
                     <h2>Dvojka</h2>
@@ -166,19 +166,19 @@ class StvrArchiveResolverTest {
                     <h2>Jednotka</h2>
                     <div class="media">
                         <div class="program time--start">06:00 <span>- 06:29</span></div>
-                        <h5><a href="/televizia/program/14026/111111">Skoré správy</a></h5>
-                        <a href="/televizia/archiv/14026/111111">Pozrieť v archíve</a>
+                        <h5><a href="/televizia/archiv/14026/111111">Skoré správy</a></h5>
+                        <a href="/televizia/program/14026/111110">O programe</a>
                     </div>
                     <div class="media">
                         <div class="program time--start">07:00 <span>- 08:29</span></div>
-                        <h5><a href="/televizia/program/14026/617992">Ranné správy</a></h5>
-                        <a href="/televizia/archiv/14026/617992">Pozrieť v archíve</a>
+                        <h5><a href="/televizia/archiv/14026/617992">Ranné správy</a></h5>
+                        <a href="/televizia/program/14026/617991">O programe</a>
                     </div>
                     <h2>Dvojka</h2>
                     <div class="media">
                         <div class="program time--start">07:00 <span>- 08:29</span></div>
-                        <h5><a href="/televizia/program/14026/999999">Ranné správy</a></h5>
-                        <a href="/televizia/archiv/14026/999999">Pozrieť v archíve</a>
+                        <h5><a href="/televizia/archiv/14026/999999">Ranné správy</a></h5>
+                        <a href="/televizia/program/14026/999998">O programe</a>
                     </div>
                 """.trimIndent(),
                 "https://www.rtvs.sk/json/archive5f.json?id=617992" to """
