@@ -25,6 +25,8 @@ class StvrArchiveResolver(
 ) {
     private val archiveListingMutex = Mutex()
     private val archiveListings = mutableMapOf<String, ArchiveListingCacheEntry>()
+    private val archiveRedirectMutex = Mutex()
+    private val archiveRedirects = mutableMapOf<String, String?>()
 
     suspend fun resolve(
         channel: TvChannel,
@@ -90,6 +92,7 @@ class StvrArchiveResolver(
             channel = channel,
             startTime = startTime,
             title = title,
+            headers = headers,
         )
         val originalStart = originalStartsAtMs
             ?.takeIf { it != startsAtMs }
@@ -101,6 +104,7 @@ class StvrArchiveResolver(
                 channel = channel,
                 startTime = original.format(TIME_FORMAT),
                 title = title,
+                headers = headers,
             )
         }
         return ArchiveLookup(
@@ -141,69 +145,97 @@ class StvrArchiveResolver(
         return currentNowMs - fetchedAtMs < TODAY_ARCHIVE_LISTING_TTL_MS
     }
 
-    private fun findArchiveId(
+    private suspend fun findArchiveId(
         listing: String,
         channel: TvChannel,
         startTime: String,
         title: String,
+        headers: Map<String, String>,
     ): String? {
         val expectedMinutes = startTime.minutesOfDay() ?: return null
         val expectedTitle = title.normalizedTitle()
-        val nearbyCandidates = parseArchiveItems(listing, channel)
+        val nearbyCandidates = parseProgrammeItems(listing, channel)
             .mapNotNull { candidate ->
                 val candidateMinutes = candidate.time.minutesOfDay() ?: return@mapNotNull null
                 candidate to minuteDistance(expectedMinutes, candidateMinutes)
             }
             .filter { (_, distance) -> distance <= ARCHIVE_TIME_TOLERANCE_MINUTES }
+            .toList()
 
-        return nearbyCandidates
+        val exact = nearbyCandidates
             .filter { (candidate, _) -> candidate.title == expectedTitle }
-            .minByOrNull { (_, distance) -> distance }
-            ?.first
-            ?.id
-            ?: nearbyCandidates
-                .filter { (candidate, _) ->
-                    candidate.title.contains(expectedTitle) || expectedTitle.contains(candidate.title)
-                }
-                .minByOrNull { (_, distance) -> distance }
-                ?.first
-                ?.id
-            ?: nearbyCandidates.singleOrNull()?.first?.id
+            .sortedBy { (_, distance) -> distance }
+        val partial = nearbyCandidates
+            .filter { (candidate, _) ->
+                candidate.title.contains(expectedTitle) || expectedTitle.contains(candidate.title)
+            }
+            .sortedBy { (_, distance) -> distance }
+        val fallback = nearbyCandidates.singleOrNull()?.let(::listOf).orEmpty()
+        val candidates = (exact + partial + fallback)
+            .map { (candidate, _) -> candidate }
+            .distinctBy { it.programUrl }
+
+        for (candidate in candidates) {
+            resolveArchiveId(candidate.programUrl, headers)?.let { return it }
+        }
+        return null
     }
 
-    private fun parseArchiveItems(
+    private fun parseProgrammeItems(
         listing: String,
         channel: TvChannel,
-    ): List<ArchiveItem> {
+    ): List<ProgrammeItem> {
         val channelListing = listing.channelSection(channel)
         val starts = PROGRAMME_START_REGEX.findAll(channelListing).toList()
         return starts.mapIndexedNotNull { index, match ->
             val blockEnd = starts.getOrNull(index + 1)?.range?.first ?: channelListing.length
             val block = channelListing.substring(match.range.first, blockEnd)
-            val archiveId = ARCHIVE_LINK_ID_REGEX.find(block)
-                ?.groups
-                ?.get("id")
-                ?.value
+            val programmeLink = PROGRAMME_LINK_REGEX.find(block)
                 ?: return@mapIndexedNotNull null
-            val title = PROGRAMME_TITLE_REGEX.find(block)
-                ?.groups
-                ?.get("title")
-                ?.value
-                ?: PROGRAMME_LINK_REGEX.findAll(block)
-                    .mapNotNull { link -> link.groups["title"]?.value }
-                    .firstOrNull { candidate ->
-                        val normalized = candidate.normalizedTitle()
-                        normalized.isNotBlank() && normalized !in PROGRAMME_ACTION_TITLES
-                    }
-                ?: return@mapNotNullIndexed null
+            val programUrl = requireNotNull(programmeLink.groups["url"]).value.absoluteStvrUrl()
+            val title = requireNotNull(programmeLink.groups["title"]).value.normalizedTitle()
+            if (title.isBlank()) return@mapIndexedNotNull null
 
-            ArchiveItem(
-                id = archiveId,
+            ProgrammeItem(
+                programUrl = programUrl,
                 time = requireNotNull(match.groups["time"]).value,
-                title = title.normalizedTitle(),
+                title = title,
             )
         }
     }
+
+    private suspend fun resolveArchiveId(
+        programUrl: String,
+        headers: Map<String, String>,
+    ): String? {
+        val cached = archiveRedirectMutex.withLock {
+            if (archiveRedirects.containsKey(programUrl)) {
+                true to archiveRedirects[programUrl]
+            } else {
+                false to null
+            }
+        }
+        if (cached.first) return cached.second
+
+        val finalUrl = runCatching {
+            httpClient.finalUrl(programUrl, headers)
+        }.getOrNull() ?: return null
+        val archiveId = ARCHIVE_FINAL_URL_REGEX.find(finalUrl)
+            ?.groups
+            ?.get("id")
+            ?.value
+        archiveRedirectMutex.withLock {
+            archiveRedirects[programUrl] = archiveId
+        }
+        return archiveId
+    }
+
+    private fun String.absoluteStvrUrl(): String =
+        if (startsWith("http://") || startsWith("https://")) {
+            this
+        } else {
+            "$STVR_ORIGIN${if (startsWith('/')) this else "/$this"}"
+        }
 
     private fun archiveLookupFailureMessage(
         listing: String,
@@ -213,18 +245,17 @@ class StvrArchiveResolver(
         originalStart: ZonedDateTime? = null,
     ): String {
         val channelListing = listing.channelSection(channel)
-        val archiveIds = ARCHIVE_LINK_ID_REGEX.findAll(channelListing)
-            .map { match -> requireNotNull(match.groups["id"]).value }
-            .distinct()
-            .toList()
-        val parsedCandidates = parseArchiveItems(listing, channel).size
+        val programmeItems = parseProgrammeItems(listing, channel)
+        val parsedCandidates = programmeItems.size
         return buildString {
             append("STVR archive item was not found")
             append("; expectedTime=").append(expectedTime)
             append("; expectedTitle=").append(expectedTitle.normalizedTitle())
-            append("; archiveLinks=").append(archiveIds.size)
+            append("; programmeLinks=").append(programmeItems.size)
             append("; parsedCandidates=").append(parsedCandidates)
-            append("; archiveIds=").append(archiveIds.take(MAX_DIAGNOSTIC_IDS).joinToString(","))
+            append("; programmeUrls=").append(
+                programmeItems.take(MAX_DIAGNOSTIC_IDS).joinToString(",") { it.programUrl },
+            )
             append("; sectionChars=").append(channelListing.length)
             append("; listingChars=").append(listing.length)
             originalStart?.let {
@@ -303,8 +334,8 @@ class StvrArchiveResolver(
         val originalStart: ZonedDateTime?,
     )
 
-    private data class ArchiveItem(
-        val id: String,
+    private data class ProgrammeItem(
+        val programUrl: String,
         val time: String,
         val title: String,
     )
@@ -320,22 +351,18 @@ class StvrArchiveResolver(
         val HTML_TAG_REGEX = Regex("<[^>]+>")
         val NON_ALPHANUMERIC_REGEX = Regex("[^\\p{L}\\p{N}]+")
         val WHITESPACE_REGEX = Regex("\\s+")
-        val ARCHIVE_LINK_ID_REGEX = Regex(
-            """/televizia/archiv/[^/"']+/(?<id>\d+)""",
-            RegexOption.IGNORE_CASE,
-        )
+        const val STVR_ORIGIN = "https://www.stvr.sk"
         val PROGRAMME_START_REGEX = Regex(
             """<[^>]*class=["'][^"']*time--start[^"']*["'][^>]*>\s*(?<time>\d{2}:\d{2})""",
             RegexOption.IGNORE_CASE,
         )
-        val PROGRAMME_TITLE_REGEX = Regex(
-            """<h[1-6]\b[^>]*>.*?<a\b[^>]*>(?<title>.*?)</a>.*?</h[1-6]>""",
-            setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
-        )
         val PROGRAMME_LINK_REGEX = Regex(
-            """<a\b[^>]*href=["'][^"']*/televizia/(?:program|archiv)/[^"']+["'][^>]*>(?<title>.*?)</a>""",
+            """<a\b[^>]*href=["'](?<url>(?:https?://[^"']+)?/televizia/program/[^/"']+/\d+)["'][^>]*>(?<title>.*?)</a>""",
             setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
         )
-        val PROGRAMME_ACTION_TITLES = setOf("o programe", "pozrieť v archíve")
+        val ARCHIVE_FINAL_URL_REGEX = Regex(
+            """/televizia/archiv/[^/?#]+/(?<id>\d+)(?:[/?#]|$)""",
+            RegexOption.IGNORE_CASE,
+        )
     }
 }
