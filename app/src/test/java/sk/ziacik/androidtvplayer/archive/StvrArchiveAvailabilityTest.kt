@@ -16,7 +16,7 @@ class StvrArchiveAvailabilityTest {
 	fun `reports direct archive item as available`() = runTest {
 		val client = AvailabilityStvrHttpClient(
 			mapOf(
-				"https://www.stvr.sk/televizia/archiv?date=2026-09-08&ord=dt" to listing(
+				"https://www.stvr.sk/televizia/program/?date=2026-09-08" to listing(
 					time = "07:00",
 					id = "617992",
 					title = "Ranné správy",
@@ -42,7 +42,7 @@ class StvrArchiveAvailabilityTest {
 	fun `reports missing archive item as unavailable`() = runTest {
 		val client = AvailabilityStvrHttpClient(
 			mapOf(
-				"https://www.stvr.sk/televizia/archiv?date=2026-09-08&ord=dt" to listing(
+				"https://www.stvr.sk/televizia/program/?date=2026-09-08" to listing(
 					time = "07:00",
 					id = "617992",
 					title = "Ranné správy",
@@ -68,12 +68,12 @@ class StvrArchiveAvailabilityTest {
 	fun `reports repeat as available from original airing`() = runTest {
 		val client = AvailabilityStvrHttpClient(
 			mapOf(
-				"https://www.stvr.sk/televizia/archiv?date=2026-09-09&ord=dt" to listing(
+				"https://www.stvr.sk/televizia/program/?date=2026-09-09" to listing(
 					time = "07:00",
 					id = "618025",
 					title = "Ranné správy",
 				),
-				"https://www.stvr.sk/televizia/archiv?date=2026-09-08&ord=dt" to listing(
+				"https://www.stvr.sk/televizia/program/?date=2026-09-08" to listing(
 					time = "17:44",
 					id = "618007",
 					title = "Duel",
@@ -112,8 +112,7 @@ class StvrArchiveAvailabilityTest {
 		<h2>Jednotka</h2>
 		<div class="media">
 			<div class="program time--start">$time <span>- 18:12</span></div>
-			<a href="/televizia/archiv/14126/$id"><img src="item.jpg"></a>
-			<h5><a class="link" title="$title">$title</a></h5>
+			<h5><a href="/televizia/program/14126/$id">$title</a></h5>
 		</div>
 		<h2>Dvojka</h2>
 	""".trimIndent()
