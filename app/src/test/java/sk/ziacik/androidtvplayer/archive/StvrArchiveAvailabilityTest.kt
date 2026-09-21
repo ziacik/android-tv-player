@@ -94,6 +94,41 @@ class StvrArchiveAvailabilityTest {
 	}
 
 	@Test
+	fun `refreshes unavailable programme redirect after ttl`() = runTest {
+		val listingUrl = "https://www.stvr.sk/televizia/program/?date=2026-09-21"
+		val programUrl = "https://www.stvr.sk/televizia/program/14126/620518"
+		val client = SequentialRedirectStvrHttpClient(
+			listingUrl = listingUrl,
+			listing = programOnlyListing(
+				time = "10:45",
+				id = "620518",
+				title = "Duel",
+			),
+			programUrl = programUrl,
+			finalUrls = listOf(
+				"https://www.stvr.sk/televizia/archiv/14126",
+				"https://www.stvr.sk/televizia/archiv/14126/620518",
+			),
+		)
+		var nowMs = 1_789_984_800_000L
+		val resolver = StvrArchiveResolver(
+			httpClient = client,
+			nowMs = { nowMs },
+		)
+		val programme = ProgramMetadata(
+			title = "Duel",
+			startsAtMs = 1_789_980_300_000L,
+			endsAtMs = 1_789_982_100_000L,
+			internetAllowed = true,
+		)
+
+		assertFalse(resolver.isAvailable(directJednotka(), programme))
+		nowMs += 6 * 60_000L
+		assertTrue(resolver.isAvailable(directJednotka(), programme))
+		assertTrue(client.finalUrlRequests == 2)
+	}
+
+	@Test
 	fun `treats different broadcasts as available when they redirect to the same archive episode`() = runTest {
 		val firstProgramUrl = "https://www.stvr.sk/televizia/program/14126/700001"
 		val secondProgramUrl = "https://www.stvr.sk/televizia/program/14126/700002"
@@ -224,4 +259,34 @@ private class AvailabilityStvrHttpClient(
 		url: String,
 		headers: Map<String, String>,
 	): String = finalUrls[url] ?: url.replace("/televizia/program/", "/televizia/archiv/")
+}
+
+
+private class SequentialRedirectStvrHttpClient(
+	private val listingUrl: String,
+	private val listing: String,
+	private val programUrl: String,
+	private val finalUrls: List<String>,
+) : StvrHttpClient {
+	var finalUrlRequests: Int = 0
+	private var finalUrlIndex: Int = 0
+
+	override suspend fun get(
+		url: String,
+		headers: Map<String, String>,
+	): String {
+		check(url == listingUrl)
+		return listing
+	}
+
+	override suspend fun finalUrl(
+		url: String,
+		headers: Map<String, String>,
+	): String {
+		check(url == programUrl)
+		finalUrlRequests += 1
+		return finalUrls[finalUrlIndex.coerceAtMost(finalUrls.lastIndex)].also {
+			finalUrlIndex += 1
+		}
+	}
 }
