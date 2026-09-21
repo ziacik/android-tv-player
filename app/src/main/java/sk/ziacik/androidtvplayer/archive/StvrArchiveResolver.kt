@@ -190,16 +190,24 @@ class StvrArchiveResolver(
         return starts.mapIndexedNotNull { index, match ->
             val blockEnd = starts.getOrNull(index + 1)?.range?.first ?: channelListing.length
             val block = channelListing.substring(match.range.first, blockEnd)
-            val programmeLink = PROGRAMME_LINK_REGEX.find(block)
+            val programmeLink = PROGRAMME_LINK_REGEX.findAll(block)
+                .mapNotNull { link ->
+                    val title = requireNotNull(link.groups["title"]).value.normalizedTitle()
+                    if (title.isBlank() || title in PROGRAMME_ACTION_TITLES) {
+                        null
+                    } else {
+                        link to title
+                    }
+                }
+                .firstOrNull()
                 ?: return@mapIndexedNotNull null
-            val programUrl = requireNotNull(programmeLink.groups["url"]).value.absoluteStvrUrl()
-            val title = requireNotNull(programmeLink.groups["title"]).value.normalizedTitle()
-            if (title.isBlank()) return@mapIndexedNotNull null
 
             ProgrammeItem(
-                programUrl = programUrl,
+                programUrl = requireNotNull(programmeLink.first.groups["url"])
+                    .value
+                    .absoluteStvrUrl(),
                 time = requireNotNull(match.groups["time"]).value,
-                title = title,
+                title = programmeLink.second,
             )
         }
     }
@@ -375,5 +383,6 @@ class StvrArchiveResolver(
             """/televizia/archiv/[^/?#]+/(?<id>\d+)(?:[/?#]|$)""",
             RegexOption.IGNORE_CASE,
         )
+        val PROGRAMME_ACTION_TITLES = setOf("o programe")
     }
 }
