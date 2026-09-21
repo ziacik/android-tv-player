@@ -27,6 +27,8 @@ class StvrArchiveResolver(
     private val archiveListings = mutableMapOf<String, ArchiveListingCacheEntry>()
     private val archiveRedirectMutex = Mutex()
     private val archiveRedirects = mutableMapOf<String, ArchiveRedirectCacheEntry>()
+    private val archiveSourceMutex = Mutex()
+    private val archiveSources = mutableMapOf<String, ArchiveSourceCacheEntry>()
 
     suspend fun resolve(
         channel: TvChannel,
@@ -52,14 +54,8 @@ class StvrArchiveResolver(
             ),
         )
 
-        val body = httpClient.get("$STVR_ARCHIVE_JSON_URL?id=$archiveId", headers)
-        val hlsUrl = parser.parse(body).hlsUrl
-            ?: throw StreamResolveException("STVR archive response does not contain an HLS source")
-
-        return StreamSource(
-            url = hlsUrl,
-            userAgent = STVR_USER_AGENT,
-        )
+        return resolveArchiveSource(archiveId, headers)
+            ?: throw StreamResolveException("STVR archive response does not contain a playable HLS source")
     }
 
     suspend fun isAvailable(
@@ -68,13 +64,15 @@ class StvrArchiveResolver(
     ): Boolean {
         if (channel.archive?.provider != ArchiveProvider.STVR) return false
         val startsAtMs = program.startsAtMs ?: return false
-        return findArchive(
+        val headers = mapOf("User-Agent" to STVR_USER_AGENT)
+        val archiveId = findArchive(
             channel = channel,
             startsAtMs = startsAtMs,
             title = program.title,
             originalStartsAtMs = program.archiveOriginalStartsAtMs,
-            headers = mapOf("User-Agent" to STVR_USER_AGENT),
-        ).archiveId != null
+            headers = headers,
+        ).archiveId ?: return false
+        return resolveArchiveSource(archiveId, headers) != null
     }
 
     private suspend fun findArchive(
@@ -240,6 +238,38 @@ class StvrArchiveResolver(
         return archiveId
     }
 
+    private suspend fun resolveArchiveSource(
+        archiveId: String,
+        headers: Map<String, String>,
+    ): StreamSource? {
+        val currentNowMs = nowMs()
+        val cached = archiveSourceMutex.withLock {
+            archiveSources[archiveId]
+        }
+        if (cached != null && cached.isValidAt(currentNowMs)) {
+            return cached.source
+        }
+
+        val source = runCatching {
+            val body = httpClient.get("$STVR_ARCHIVE_JSON_URL?id=$archiveId", headers)
+            parser.parse(body).hlsUrl
+                ?.let { hlsUrl ->
+                    StreamSource(
+                        url = hlsUrl,
+                        userAgent = STVR_USER_AGENT,
+                    )
+                }
+        }.getOrNull()
+
+        archiveSourceMutex.withLock {
+            archiveSources[archiveId] = ArchiveSourceCacheEntry(
+                source = source,
+                fetchedAtMs = currentNowMs,
+            )
+        }
+        return source
+    }
+
     private fun String.absoluteStvrUrl(): String =
         if (startsWith("http://") || startsWith("https://")) {
             this
@@ -352,6 +382,14 @@ class StvrArchiveResolver(
             archiveId != null || currentNowMs - fetchedAtMs < UNAVAILABLE_REDIRECT_TTL_MS
     }
 
+    private data class ArchiveSourceCacheEntry(
+        val source: StreamSource?,
+        val fetchedAtMs: Long,
+    ) {
+        fun isValidAt(currentNowMs: Long): Boolean =
+            source != null || currentNowMs - fetchedAtMs < UNAVAILABLE_SOURCE_TTL_MS
+    }
+
     private data class ProgrammeItem(
         val programUrl: String,
         val time: String,
@@ -364,6 +402,7 @@ class StvrArchiveResolver(
         const val ARCHIVE_TIME_TOLERANCE_MINUTES = 30
         const val TODAY_ARCHIVE_LISTING_TTL_MS = 5 * 60_000L
         const val UNAVAILABLE_REDIRECT_TTL_MS = 5 * 60_000L
+        const val UNAVAILABLE_SOURCE_TTL_MS = 5 * 60_000L
         const val MINUTES_PER_DAY = 24 * 60
         const val MAX_DIAGNOSTIC_IDS = 12
         val TIME_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
