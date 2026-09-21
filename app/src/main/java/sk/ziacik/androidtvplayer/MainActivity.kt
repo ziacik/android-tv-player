@@ -144,6 +144,12 @@ class MainActivity : ComponentActivity() {
                     player = playerPort.player,
                     overlayController = overlayController,
                     epgRepository = epgRepository,
+                    archiveAvailable = { channel, program ->
+                        when (channel.archive?.provider) {
+                            ArchiveProvider.STVR -> stvrArchiveResolver.isAvailable(channel, program)
+                            null -> false
+                        }
+                    },
                     onExit = ::finish,
                 )
             }

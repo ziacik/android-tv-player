@@ -3,6 +3,25 @@ package sk.ziacik.androidtvplayer.ui
 import sk.ziacik.androidtvplayer.channel.TvChannel
 import sk.ziacik.androidtvplayer.resolver.ProgramMetadata
 
+enum class MiniEpgArchiveState {
+    NOT_APPLICABLE,
+    LOADING,
+    AVAILABLE,
+    UNAVAILABLE,
+}
+
+enum class MiniEpgSelectionAction {
+    SELECT_LIVE,
+    PLAY_ARCHIVE,
+    IGNORE,
+}
+
+data class MiniEpgProgrammeKey(
+    val channelStorageKey: String,
+    val startsAtMs: Long?,
+    val title: String,
+)
+
 data class MiniEpgRow(
     val channel: TvChannel,
     val channelNumber: Int,
@@ -10,6 +29,7 @@ data class MiniEpgRow(
     val progress: Float?,
     val isSelected: Boolean,
     val isCurrent: Boolean,
+    val archiveState: MiniEpgArchiveState = MiniEpgArchiveState.NOT_APPLICABLE,
 )
 
 internal fun buildMiniEpgRows(
@@ -18,6 +38,7 @@ internal fun buildMiniEpgRows(
     selectedChannel: TvChannel,
     programmes: Map<String, ProgramMetadata>,
     nowMs: Long,
+    archiveStates: Map<MiniEpgProgrammeKey, MiniEpgArchiveState> = emptyMap(),
     visibleCount: Int = 5,
 ): List<MiniEpgRow> {
     if (channels.isEmpty()) return emptyList()
@@ -32,6 +53,14 @@ internal fun buildMiniEpgRows(
         val channelIndex = floorMod(selectedIndex + firstOffset + rowIndex, channels.size)
         val channel = channels[channelIndex]
         val programme = programmes[channel.storageKey]
+        val archiveState = programme?.let { selectedProgramme ->
+            val key = miniEpgProgrammeKey(channel, selectedProgramme)
+            when {
+                !isPastProgramme(selectedProgramme, nowMs) -> MiniEpgArchiveState.NOT_APPLICABLE
+                channel.archive == null -> MiniEpgArchiveState.UNAVAILABLE
+                else -> archiveStates[key] ?: MiniEpgArchiveState.LOADING
+            }
+        } ?: MiniEpgArchiveState.NOT_APPLICABLE
         MiniEpgRow(
             channel = channel,
             channelNumber = channelIndex + 1,
@@ -39,6 +68,7 @@ internal fun buildMiniEpgRows(
             progress = programmeProgress(programme, nowMs),
             isSelected = channel.storageKey == selectedChannel.storageKey,
             isCurrent = channel.storageKey == currentChannel.storageKey,
+            archiveState = archiveState,
         )
     }
 }
@@ -64,11 +94,42 @@ internal fun nextProgrammeLookupTime(programme: ProgramMetadata): Long? =
 internal fun isPastProgramme(programme: ProgramMetadata, nowMs: Long): Boolean =
     programme.endsAtMs?.let { it <= nowMs } == true
 
-internal fun canPlayArchive(
+internal fun miniEpgArchiveState(
     channel: TvChannel,
     programme: ProgramMetadata,
     nowMs: Long,
-): Boolean = channel.archive != null && isPastProgramme(programme, nowMs)
+    available: Boolean?,
+): MiniEpgArchiveState = when {
+    !isPastProgramme(programme, nowMs) -> MiniEpgArchiveState.NOT_APPLICABLE
+    channel.archive == null -> MiniEpgArchiveState.UNAVAILABLE
+    available == true -> MiniEpgArchiveState.AVAILABLE
+    available == false -> MiniEpgArchiveState.UNAVAILABLE
+    else -> MiniEpgArchiveState.LOADING
+}
+
+internal fun miniEpgSelectionAction(
+    programme: ProgramMetadata?,
+    nowMs: Long,
+    archiveState: MiniEpgArchiveState,
+): MiniEpgSelectionAction {
+    if (programme == null || !isPastProgramme(programme, nowMs)) {
+        return MiniEpgSelectionAction.SELECT_LIVE
+    }
+    return if (archiveState == MiniEpgArchiveState.AVAILABLE) {
+        MiniEpgSelectionAction.PLAY_ARCHIVE
+    } else {
+        MiniEpgSelectionAction.IGNORE
+    }
+}
+
+internal fun miniEpgProgrammeKey(
+    channel: TvChannel,
+    programme: ProgramMetadata,
+): MiniEpgProgrammeKey = MiniEpgProgrammeKey(
+    channelStorageKey = channel.storageKey,
+    startsAtMs = programme.startsAtMs,
+    title = programme.title,
+)
 
 private fun programmeProgress(programme: ProgramMetadata?, nowMs: Long): Float? {
     val start = programme?.startsAtMs ?: return null

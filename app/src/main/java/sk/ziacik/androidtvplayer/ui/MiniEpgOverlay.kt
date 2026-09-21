@@ -33,11 +33,27 @@ private val MiniEpgNearBlack = Color(0xFF0C0C11)
 private val MiniEpgMuted = Color.White.copy(alpha = 0.58f)
 private val MiniEpgTrack = Color.White.copy(alpha = 0.16f)
 
+internal fun miniEpgArchiveBadge(archiveState: MiniEpgArchiveState): String? =
+    if (archiveState == MiniEpgArchiveState.AVAILABLE) "↺" else null
+
+internal fun miniEpgFooterText(archiveState: MiniEpgArchiveState): String = when (archiveState) {
+    MiniEpgArchiveState.LOADING ->
+        "↑ ↓ kanál    ← → program    Overujem archív…    BACK zavrieť"
+    MiniEpgArchiveState.UNAVAILABLE ->
+        "↑ ↓ kanál    ← → program    Nedostupné v archíve    BACK zavrieť"
+    MiniEpgArchiveState.AVAILABLE,
+    MiniEpgArchiveState.NOT_APPLICABLE,
+    -> "↑ ↓ kanál    ← → program    OK prehrať    BACK zavrieť"
+}
+
 @Composable
 fun MiniEpgOverlay(
     rows: List<MiniEpgRow>,
     modifier: Modifier = Modifier,
 ) {
+    val selectedArchiveState = rows.firstOrNull { it.isSelected }?.archiveState
+        ?: MiniEpgArchiveState.NOT_APPLICABLE
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -70,10 +86,12 @@ fun MiniEpgOverlay(
                 MiniEpgRowItem(row)
             }
             Text(
-                text = "↑ ↓ kanál    ← → program    OK prehrať    BACK zavrieť",
+                text = miniEpgFooterText(selectedArchiveState),
                 color = MiniEpgMuted,
                 fontSize = 11.sp,
-                modifier = Modifier.padding(start = 14.dp, top = 6.dp),
+                modifier = Modifier
+                    .padding(start = 14.dp, top = 6.dp)
+                    .testTag("mini-epg-footer"),
             )
         }
     }
@@ -92,6 +110,7 @@ private fun MiniEpgRowItem(row: MiniEpgRow) {
     } else {
         Color.White.copy(alpha = 0.08f)
     }
+    val archiveUnavailable = row.archiveState == MiniEpgArchiveState.UNAVAILABLE
 
     Row(
         modifier = Modifier
@@ -137,21 +156,47 @@ private fun MiniEpgRowItem(row: MiniEpgRow) {
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(7.dp),
         ) {
-            Text(
-                text = row.programmeTitle.ifBlank { "Bez EPG" },
-                color = if (row.programmeTitle.isBlank()) MiniEpgMuted else Color.White,
-                fontSize = 15.sp,
-                fontWeight = if (row.isSelected) FontWeight.SemiBold else FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = row.programmeTitle.ifBlank { "Bez EPG" },
+                    color = when {
+                        row.programmeTitle.isBlank() -> MiniEpgMuted
+                        archiveUnavailable -> Color.White.copy(alpha = 0.46f)
+                        else -> Color.White
+                    },
+                    fontSize = 15.sp,
+                    fontWeight = if (row.isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                miniEpgArchiveBadge(row.archiveState)?.let { badge ->
+                    Text(
+                        text = badge,
+                        color = MiniEpgBrandYellow,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.testTag("mini-epg-archive-available"),
+                    )
+                }
+            }
+            MiniEpgProgress(
+                progress = row.progress,
+                muted = archiveUnavailable,
             )
-            MiniEpgProgress(row.progress)
         }
     }
 }
 
 @Composable
-private fun MiniEpgProgress(progress: Float?) {
+private fun MiniEpgProgress(
+    progress: Float?,
+    muted: Boolean,
+) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -164,7 +209,13 @@ private fun MiniEpgProgress(progress: Float?) {
                 modifier = Modifier
                     .fillMaxWidth(progress.coerceIn(0f, 1f))
                     .fillMaxHeight()
-                    .background(MiniEpgBrandYellow),
+                    .background(
+                        if (muted) {
+                            MiniEpgBrandYellow.copy(alpha = 0.28f)
+                        } else {
+                            MiniEpgBrandYellow
+                        },
+                    ),
             )
         }
     }
