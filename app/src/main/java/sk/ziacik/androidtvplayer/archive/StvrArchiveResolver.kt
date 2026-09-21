@@ -115,7 +115,7 @@ class StvrArchiveResolver(
         start: ZonedDateTime,
         headers: Map<String, String>,
     ): String {
-        val url = start.archiveListingUrl()
+        val url = start.programListingUrl()
         return archiveListingMutex.withLock {
             val currentNowMs = nowMs()
             val cached = archiveListings[url]
@@ -206,8 +206,8 @@ class StvrArchiveResolver(
         }
     }
 
-    private fun ZonedDateTime.archiveListingUrl(): String =
-        "$STVR_ARCHIVE_URL?date=${toLocalDate()}&ord=dt"
+    private fun ZonedDateTime.programListingUrl(): String =
+        "$STVR_PROGRAM_URL?date=${toLocalDate()}"
 
     private fun String.channelSection(channel: TvChannel): String {
         val heading = channel.archiveHeading()
@@ -232,7 +232,7 @@ class StvrArchiveResolver(
         return when (archiveConfig.channelId) {
             "1" -> "Jednotka"
             "2" -> "Dvojka"
-            "3" -> ":24"
+            "3" -> "24"
             "15" -> "Šport"
             else -> null
         }
@@ -282,7 +282,7 @@ class StvrArchiveResolver(
     )
 
     private companion object {
-        const val STVR_ARCHIVE_URL = "https://www.stvr.sk/televizia/archiv"
+        const val STVR_PROGRAM_URL = "https://www.stvr.sk/televizia/program/"
         const val STVR_ARCHIVE_JSON_URL = "https://www.rtvs.sk/json/archive5f.json"
         const val ARCHIVE_TIME_TOLERANCE_MINUTES = 30
         const val TODAY_ARCHIVE_LISTING_TTL_MS = 5 * 60_000L
@@ -293,11 +293,11 @@ class StvrArchiveResolver(
         val NON_ALPHANUMERIC_REGEX = Regex("[^\\p{L}\\p{N}]+")
         val WHITESPACE_REGEX = Regex("\\s+")
         val ARCHIVE_LINK_ID_REGEX = Regex(
-            """/televizia/archiv/[^/"']+/(?<id>\d+)""",
+            """href=["'][^"']*/televizia/program/[^/"']+/(?<id>\d+)["']""",
             RegexOption.IGNORE_CASE,
         )
         val ARCHIVE_ITEM_REGEX = Regex(
-            """<div\b[^>]*class=["'][^"']*time--start[^"']*["'][^>]*>\s*(?<time>\d{2}:\d{2}).*?<a\b[^>]*href=["'][^"']*/televizia/archiv/[^/"']+/(?<id>\d+)["'][^>]*>.*?<a\b[^>]*title=["'](?<title>[^"']+)["'][^>]*>""",
+            """(?<time>\d{2}:\d{2}).{0,4000}?<a\b[^>]*href=["'][^"']*/televizia/program/[^/"']+/(?<id>\d+)["'][^>]*>(?<title>.*?)</a>""",
             setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
         )
     }
