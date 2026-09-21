@@ -293,11 +293,11 @@ class StvrArchiveResolver(
         val NON_ALPHANUMERIC_REGEX = Regex("[^\\p{L}\\p{N}]+")
         val WHITESPACE_REGEX = Regex("\\s+")
         val ARCHIVE_LINK_ID_REGEX = Regex(
-            """href=["'][^"']*/televizia/program/[^/"']+/(?<id>\d+)["']""",
+            """/televizia/archiv/[^/"']+/(?<id>\d+)""",
             RegexOption.IGNORE_CASE,
         )
         val ARCHIVE_ITEM_REGEX = Regex(
-            """(?<time>\d{2}:\d{2}).{0,4000}?<a\b[^>]*href=["'][^"']*/televizia/program/[^/"']+/(?<id>\d+)["'][^>]*>(?<title>.*?)</a>""",
+            """(?<time>\d{2}:\d{2})(?:(?!\d{2}:\d{2}).){0,4000}?<a\b[^>]*href=["'][^"']*/televizia/program/[^/"']+/\d+["'][^>]*>(?<title>.*?)</a>(?:(?!\d{2}:\d{2}).){0,4000}?<a\b[^>]*href=["'][^"']*/televizia/archiv/[^/"']+/(?<id>\d+)["']""",
             setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
         )
     }
