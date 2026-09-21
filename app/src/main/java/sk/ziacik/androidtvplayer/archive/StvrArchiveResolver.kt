@@ -177,14 +177,14 @@ class StvrArchiveResolver(
     ): List<ArchiveItem> {
         val channelListing = listing.channelSection(channel)
         val starts = PROGRAMME_START_REGEX.findAll(channelListing).toList()
-        return starts.mapNotNullIndexed { index, match ->
+        return starts.mapIndexedNotNull { index, match ->
             val blockEnd = starts.getOrNull(index + 1)?.range?.first ?: channelListing.length
             val block = channelListing.substring(match.range.first, blockEnd)
             val archiveId = ARCHIVE_LINK_ID_REGEX.find(block)
                 ?.groups
                 ?.get("id")
                 ?.value
-                ?: return@mapNotNullIndexed null
+                ?: return@mapIndexedNotNull null
             val title = PROGRAMME_TITLE_REGEX.find(block)
                 ?.groups
                 ?.get("title")
@@ -336,6 +336,6 @@ class StvrArchiveResolver(
             """<a\b[^>]*href=["'][^"']*/televizia/(?:program|archiv)/[^"']+["'][^>]*>(?<title>.*?)</a>""",
             setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
         )
-        val PROGRAMME_ACTION_TITLES = setOf("o programe", "pozriet v archive")
+        val PROGRAMME_ACTION_TITLES = setOf("o programe", "pozrieť v archíve")
     }
 }
