@@ -22,11 +22,11 @@ class StvrArchiveListingCacheTest {
 					<h2>Jednotka</h2>
 					<div class="media">
 						<div class="program time--start">07:00 <span>- 08:29</span></div>
-						<h5><a href="/televizia/program/14026/617992">Ranné správy</a></h5>
+						<h5><a href="/televizia/program/14026/617992">Ranné správy</a></h5>\n\t\t\t\t\t\t<a href="/televizia/archiv/14026/617992">Pozrieť v archíve</a>
 					</div>
 					<div class="media">
 						<div class="program time--start">17:44 <span>- 18:12</span></div>
-						<h5><a href="/televizia/program/14126/618007">Duel</a></h5>
+						<h5><a href="/televizia/program/14126/618007">Duel</a></h5>\n\t\t\t\t\t\t<a href="/televizia/archiv/14126/618007">Pozrieť v archíve</a>
 					</div>
 					<h2>Dvojka</h2>
 				""".trimIndent(),
