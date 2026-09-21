@@ -65,6 +65,32 @@ class StvrArchiveAvailabilityTest {
 	}
 
 	@Test
+	fun `does not treat programme detail link as archive availability`() = runTest {
+		val client = AvailabilityStvrHttpClient(
+			mapOf(
+				"https://www.stvr.sk/televizia/program/?date=2026-09-21" to programOnlyListing(
+					time = "10:45",
+					id = "620518",
+					title = "Duel",
+				),
+			),
+		)
+		val resolver = StvrArchiveResolver(client)
+
+		val available = resolver.isAvailable(
+			channel = directJednotka(),
+			program = ProgramMetadata(
+				title = "Duel",
+				startsAtMs = 1_790_000_700_000L,
+				endsAtMs = 1_790_002_500_000L,
+				internetAllowed = true,
+			),
+		)
+
+		assertFalse(available)
+	}
+
+	@Test
 	fun `reports repeat as available from original airing`() = runTest {
 		val client = AvailabilityStvrHttpClient(
 			mapOf(
@@ -112,6 +138,20 @@ class StvrArchiveAvailabilityTest {
 		<h2>Jednotka</h2>
 		<div class="media">
 			<div class="program time--start">$time <span>- 18:12</span></div>
+			<h5><a href="/televizia/program/14126/$id">$title</a></h5>
+			<a href="/televizia/archiv/14126/$id">Pozrieť v archíve</a>
+		</div>
+		<h2>Dvojka</h2>
+	""".trimIndent()
+
+	private fun programOnlyListing(
+		time: String,
+		id: String,
+		title: String,
+	): String = """
+		<h2>Jednotka</h2>
+		<div class="media">
+			<div class="program time--start">$time <span>- 11:15</span></div>
 			<h5><a href="/televizia/program/14126/$id">$title</a></h5>
 		</div>
 		<h2>Dvojka</h2>
