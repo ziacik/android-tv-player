@@ -26,7 +26,7 @@ class StvrArchiveResolver(
     private val archiveListingMutex = Mutex()
     private val archiveListings = mutableMapOf<String, ArchiveListingCacheEntry>()
     private val archiveRedirectMutex = Mutex()
-    private val archiveRedirects = mutableMapOf<String, String?>()
+    private val archiveRedirects = mutableMapOf<String, ArchiveRedirectCacheEntry>()
 
     suspend fun resolve(
         channel: TvChannel,
@@ -208,14 +208,13 @@ class StvrArchiveResolver(
         programUrl: String,
         headers: Map<String, String>,
     ): String? {
+        val currentNowMs = nowMs()
         val cached = archiveRedirectMutex.withLock {
-            if (archiveRedirects.containsKey(programUrl)) {
-                true to archiveRedirects[programUrl]
-            } else {
-                false to null
-            }
+            archiveRedirects[programUrl]
         }
-        if (cached.first) return cached.second
+        if (cached != null && cached.isValidAt(currentNowMs)) {
+            return cached.archiveId
+        }
 
         val finalUrl = runCatching {
             httpClient.finalUrl(programUrl, headers)
@@ -225,7 +224,10 @@ class StvrArchiveResolver(
             ?.get("id")
             ?.value
         archiveRedirectMutex.withLock {
-            archiveRedirects[programUrl] = archiveId
+            archiveRedirects[programUrl] = ArchiveRedirectCacheEntry(
+                archiveId = archiveId,
+                fetchedAtMs = currentNowMs,
+            )
         }
         return archiveId
     }
@@ -334,6 +336,14 @@ class StvrArchiveResolver(
         val originalStart: ZonedDateTime?,
     )
 
+    private data class ArchiveRedirectCacheEntry(
+        val archiveId: String?,
+        val fetchedAtMs: Long,
+    ) {
+        fun isValidAt(currentNowMs: Long): Boolean =
+            archiveId != null || currentNowMs - fetchedAtMs < UNAVAILABLE_REDIRECT_TTL_MS
+    }
+
     private data class ProgrammeItem(
         val programUrl: String,
         val time: String,
@@ -345,6 +355,7 @@ class StvrArchiveResolver(
         const val STVR_ARCHIVE_JSON_URL = "https://www.rtvs.sk/json/archive5f.json"
         const val ARCHIVE_TIME_TOLERANCE_MINUTES = 30
         const val TODAY_ARCHIVE_LISTING_TTL_MS = 5 * 60_000L
+        const val UNAVAILABLE_REDIRECT_TTL_MS = 5 * 60_000L
         const val MINUTES_PER_DAY = 24 * 60
         const val MAX_DIAGNOSTIC_IDS = 12
         val TIME_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
