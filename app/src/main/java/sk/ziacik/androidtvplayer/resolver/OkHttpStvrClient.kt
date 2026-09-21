@@ -22,7 +22,22 @@ class OkHttpStvrClient(
     override suspend fun get(
         url: String,
         headers: Map<String, String>,
-    ): String {
+    ): String = execute(url, headers) { response ->
+        response.body.string()
+    }
+
+    override suspend fun finalUrl(
+        url: String,
+        headers: Map<String, String>,
+    ): String = execute(url, headers) { response ->
+        response.request.url.toString()
+    }
+
+    private suspend fun <T> execute(
+        url: String,
+        headers: Map<String, String>,
+        extract: (Response) -> T,
+    ): T {
         val request = Request.Builder()
             .url(url)
             .apply {
@@ -46,12 +61,12 @@ class OkHttpStvrClient(
 
                 override fun onResponse(call: Call, response: Response) {
                     try {
-                        val body = response.use {
+                        val result = response.use {
                             if (!it.isSuccessful) throw IOException("HTTP ${it.code}")
-                            it.body.string()
+                            extract(it)
                         }
                         if (completed.compareAndSet(false, true)) {
-                            continuation.resumeWith(Result.success(body))
+                            continuation.resumeWith(Result.success(result))
                         }
                     } catch (error: Exception) {
                         if (completed.compareAndSet(false, true)) {
