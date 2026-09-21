@@ -81,8 +81,8 @@ class StvrArchiveAvailabilityTest {
 			channel = directJednotka(),
 			program = ProgramMetadata(
 				title = "Duel",
-				startsAtMs = 1_790_000_700_000L,
-				endsAtMs = 1_790_002_500_000L,
+				startsAtMs = 1_789_980_300_000L,
+				endsAtMs = 1_789_982_100_000L,
 				internetAllowed = true,
 			),
 		)
