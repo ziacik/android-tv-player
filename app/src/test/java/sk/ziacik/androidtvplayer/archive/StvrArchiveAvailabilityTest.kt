@@ -67,12 +67,15 @@ class StvrArchiveAvailabilityTest {
 	@Test
 	fun `does not treat programme detail link as archive availability`() = runTest {
 		val client = AvailabilityStvrHttpClient(
-			mapOf(
+			responses = mapOf(
 				"https://www.stvr.sk/televizia/program/?date=2026-09-21" to programOnlyListing(
 					time = "10:45",
 					id = "620518",
 					title = "Duel",
 				),
+			),
+			finalUrls = mapOf(
+				"https://www.stvr.sk/televizia/program/14126/620518" to "https://www.stvr.sk/televizia/archiv/14126",
 			),
 		)
 		val resolver = StvrArchiveResolver(client)
@@ -88,6 +91,57 @@ class StvrArchiveAvailabilityTest {
 		)
 
 		assertFalse(available)
+	}
+
+	@Test
+	fun `treats different broadcasts as available when they redirect to the same archive episode`() = runTest {
+		val firstProgramUrl = "https://www.stvr.sk/televizia/program/14126/700001"
+		val secondProgramUrl = "https://www.stvr.sk/televizia/program/14126/700002"
+		val archiveUrl = "https://www.stvr.sk/televizia/archiv/14126/699999"
+		val client = AvailabilityStvrHttpClient(
+			responses = mapOf(
+				"https://www.stvr.sk/televizia/program/?date=2026-09-22" to """
+					<h2>Jednotka</h2>
+					<div class="media">
+						<div class="program time--start">10:45 <span>- 11:15</span></div>
+						<h5><a href="/televizia/program/14126/700001">Duel</a></h5>
+					</div>
+					<div class="media">
+						<div class="program time--start">17:45 <span>- 18:15</span></div>
+						<h5><a href="/televizia/program/14126/700002">Duel</a></h5>
+					</div>
+					<h2>Dvojka</h2>
+				""".trimIndent(),
+			),
+			finalUrls = mapOf(
+				firstProgramUrl to archiveUrl,
+				secondProgramUrl to archiveUrl,
+			),
+		)
+		val resolver = StvrArchiveResolver(client)
+
+		assertTrue(
+			resolver.isAvailable(
+				directJednotka(),
+				ProgramMetadata(
+					title = "Duel",
+					startsAtMs = 1_790_066_700_000L,
+					endsAtMs = 1_790_068_500_000L,
+					internetAllowed = true,
+				),
+			),
+		)
+		assertTrue(
+			resolver.isAvailable(
+				directJednotka(),
+				ProgramMetadata(
+					title = "Duel",
+					startsAtMs = 1_790_091_900_000L,
+					endsAtMs = 1_790_093_700_000L,
+					internetAllowed = true,
+				),
+			),
+		)
 	}
 
 	@Test
@@ -138,8 +192,7 @@ class StvrArchiveAvailabilityTest {
 		<h2>Jednotka</h2>
 		<div class="media">
 			<div class="program time--start">$time <span>- 18:12</span></div>
-			<h5><a href="/televizia/archiv/14126/$id">$title</a></h5>
-			<a href="/televizia/program/14126/999999">O programe</a>
+			<h5><a href="/televizia/program/14126/$id">$title</a></h5>
 		</div>
 		<h2>Dvojka</h2>
 	""".trimIndent()
@@ -160,9 +213,15 @@ class StvrArchiveAvailabilityTest {
 
 private class AvailabilityStvrHttpClient(
 	private val responses: Map<String, String>,
+	private val finalUrls: Map<String, String> = emptyMap(),
 ) : StvrHttpClient {
 	override suspend fun get(
 		url: String,
 		headers: Map<String, String>,
 	): String = responses.getValue(url)
+
+	override suspend fun finalUrl(
+		url: String,
+		headers: Map<String, String>,
+	): String = finalUrls[url] ?: url.replace("/televizia/program/", "/televizia/archiv/")
 }
