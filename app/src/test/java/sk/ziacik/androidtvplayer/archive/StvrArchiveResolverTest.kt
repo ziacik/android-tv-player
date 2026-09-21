@@ -59,8 +59,7 @@ class StvrArchiveResolverTest {
                     <div class="media media--archive">
                         <div class="media__body">
                             <div data-role="start" class="time--start program">17:44 <span>- 18:12</span></div>
-                            <h5><a href="/televizia/archiv/14126/618007">Duel</a></h5>
-                            <a href="/televizia/program/14126/620518">O programe</a>
+                            <h5><a href="/televizia/program/14126/618007">Duel</a></h5>
                         </div>
                     </div>
                     <h2>Dvojka</h2>
@@ -152,9 +151,9 @@ class StvrArchiveResolverTest {
             val message = error.message.orEmpty()
             assertTrue(message.contains("expectedTime=17:40"))
             assertTrue(message.contains("expectedTitle=duel"))
-            assertTrue(message.contains("archiveLinks=1"))
+            assertTrue(message.contains("programmeLinks=0"))
             assertTrue(message.contains("parsedCandidates=0"))
-            assertTrue(message.contains("archiveIds=618007"))
+            assertTrue(message.contains("programmeUrls="))
         }
     }
 
@@ -166,19 +165,16 @@ class StvrArchiveResolverTest {
                     <h2>Jednotka</h2>
                     <div class="media">
                         <div class="program time--start">06:00 <span>- 06:29</span></div>
-                        <h5><a href="/televizia/archiv/14026/111111">Skoré správy</a></h5>
-                        <a href="/televizia/program/14026/111110">O programe</a>
+                        <h5><a href="/televizia/program/14026/111111">Skoré správy</a></h5>
                     </div>
                     <div class="media">
                         <div class="program time--start">07:00 <span>- 08:29</span></div>
-                        <h5><a href="/televizia/archiv/14026/617992">Ranné správy</a></h5>
-                        <a href="/televizia/program/14026/617991">O programe</a>
+                        <h5><a href="/televizia/program/14026/617992">Ranné správy</a></h5>
                     </div>
                     <h2>Dvojka</h2>
                     <div class="media">
                         <div class="program time--start">07:00 <span>- 08:29</span></div>
-                        <h5><a href="/televizia/archiv/14026/999999">Ranné správy</a></h5>
-                        <a href="/televizia/program/14026/999998">O programe</a>
+                        <h5><a href="/televizia/program/14026/999999">Ranné správy</a></h5>
                     </div>
                 """.trimIndent(),
                 "https://www.rtvs.sk/json/archive5f.json?id=617992" to """
@@ -221,4 +217,9 @@ private class FakeStvrHttpClient(
         requestedUrls += url
         return responses.getValue(url)
     }
+
+    override suspend fun finalUrl(
+        url: String,
+        headers: Map<String, String>,
+    ): String = url.replace("/televizia/program/", "/televizia/archiv/")
 }
