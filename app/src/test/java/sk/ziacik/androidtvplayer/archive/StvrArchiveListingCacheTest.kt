@@ -15,20 +15,18 @@ import sk.ziacik.androidtvplayer.resolver.StvrHttpClient
 class StvrArchiveListingCacheTest {
 	@Test
 	fun `reuses one STVR day listing for multiple archive programmes`() = runTest {
-		val listingUrl = "https://www.stvr.sk/televizia/archiv?date=2026-09-08&ord=dt"
+		val listingUrl = "https://www.stvr.sk/televizia/program/?date=2026-09-08"
 		val client = RecordingStvrHttpClient(
 			responses = mapOf(
 				listingUrl to """
 					<h2>Jednotka</h2>
 					<div class="media">
 						<div class="program time--start">07:00 <span>- 08:29</span></div>
-						<a href="/televizia/archiv/14026/617992"><img src="morning.jpg"></a>
-						<h5><a class="link" title="Ranné správy">Ranné správy</a></h5>
+						<h5><a href="/televizia/program/14026/617992">Ranné správy</a></h5>
 					</div>
 					<div class="media">
 						<div class="program time--start">17:44 <span>- 18:12</span></div>
-						<a href="/televizia/archiv/14126/618007"><img src="duel.jpg"></a>
-						<h5><a class="link" title="Duel">Duel</a></h5>
+						<h5><a href="/televizia/program/14126/618007">Duel</a></h5>
 					</div>
 					<h2>Dvojka</h2>
 				""".trimIndent(),
@@ -57,7 +55,7 @@ class StvrArchiveListingCacheTest {
 
 	@Test
 	fun `refreshes todays archive listing after cache ttl`() = runTest {
-		val listingUrl = "https://www.stvr.sk/televizia/archiv?date=2026-09-09&ord=dt"
+		val listingUrl = "https://www.stvr.sk/televizia/program/?date=2026-09-09"
 		val client = SequentialListingStvrHttpClient(
 			listingUrl = listingUrl,
 			listings = listOf(
@@ -99,8 +97,7 @@ class StvrArchiveListingCacheTest {
 		<h2>Jednotka</h2>
 		<div class="media">
 			<div class="program time--start">$time <span>- 18:12</span></div>
-			<a href="/televizia/archiv/14126/$id"><img src="item.jpg"></a>
-			<h5><a class="link" title="$title">$title</a></h5>
+			<h5><a href="/televizia/program/14126/$id">$title</a></h5>
 		</div>
 		<h2>Dvojka</h2>
 	""".trimIndent()
