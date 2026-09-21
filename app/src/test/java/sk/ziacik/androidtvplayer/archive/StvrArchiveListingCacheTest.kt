@@ -118,6 +118,11 @@ private class RecordingStvrHttpClient(
 		requestedUrls += url
 		return responses.getValue(url)
 	}
+
+	override suspend fun finalUrl(
+		url: String,
+		headers: Map<String, String>,
+	): String = url.replace("/televizia/program/", "/televizia/archiv/")
 }
 
 private class SequentialListingStvrHttpClient(
@@ -137,4 +142,9 @@ private class SequentialListingStvrHttpClient(
 			listingIndex += 1
 		}
 	}
+
+	override suspend fun finalUrl(
+		url: String,
+		headers: Map<String, String>,
+	): String = url.replace("/televizia/program/", "/televizia/archiv/")
 }
