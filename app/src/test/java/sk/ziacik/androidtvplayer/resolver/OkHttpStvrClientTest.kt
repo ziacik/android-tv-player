@@ -8,10 +8,35 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class OkHttpStvrClientTest {
+    @Test
+    fun `returns final response URL after redirects`() = runBlocking {
+        val finalUrl = "https://www.stvr.sk/televizia/archiv/14126/620530"
+        val okHttpClient = OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                okhttp3.Response.Builder()
+                    .request(chain.request().newBuilder().url(finalUrl).build())
+                    .protocol(Protocol.HTTP_1_1)
+                    .code(200)
+                    .message("OK")
+                    .build()
+            }
+            .build()
+
+        assertEquals(
+            finalUrl,
+            OkHttpStvrClient(okHttpClient).finalUrl(
+                "https://www.stvr.sk/televizia/program/14126/620530",
+                emptyMap(),
+            ),
+        )
+    }
+
     @Test
     fun `cancelling coroutine cancels active OkHttp call`() = runBlocking {
         val requestStarted = CountDownLatch(1)
