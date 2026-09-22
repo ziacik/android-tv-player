@@ -146,13 +146,12 @@ class StvrArchiveResolver(
 		channel: TvChannel,
 		start: ZonedDateTime,
 	): String {
-		val archive = channel.archive
+		channel.archive
 			?.takeIf { it.provider == ArchiveProvider.STVR }
 			?: throw StreamResolveException("STVR archive is not configured for channel")
 		return buildString {
 			append(STVR_ARCHIVE_API_URL)
-			append("?e=").append(archive.channelId)
-			append("&archive=1")
+			append("?e=1&archive=1")
 			append("&d=").append(start.toLocalDate())
 			append("&p=1&l=100&o=desc")
 		}
