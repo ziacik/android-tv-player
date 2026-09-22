@@ -183,28 +183,30 @@ class StvrArchiveResolver(
 			?.id
 	}
 
-	private fun parseArchiveItems(listing: String): List<ArchiveItem> = try {
-		val programs = JSONObject(listing).optJSONArray("program") ?: return emptyList()
-		(0 until programs.length()).mapNotNull { index ->
-			val item = programs.optJSONObject(index) ?: return@mapNotNull null
-			val id = item.optLong("ID", -1L).takeIf { it > 0L }?.toString()
-				?: return@mapNotNull null
-			val title = item.optString("name").normalizedTitle()
-			if (title.isBlank()) return@mapNotNull null
-			val air = item.optString("air")
-			val airMinutes = runCatching {
-				LocalDateTime.parse(air, ARCHIVE_AIR_FORMAT).let {
-					it.hour * 60 + it.minute
-				}
-			}.getOrNull() ?: return@mapNotNull null
-			ArchiveItem(
-				id = id,
-				title = title,
-				airMinutes = airMinutes,
-			)
+	private fun parseArchiveItems(listing: String): List<ArchiveItem> {
+		return try {
+			val programs = JSONObject(listing).optJSONArray("program") ?: return emptyList()
+			(0 until programs.length()).mapNotNull { index ->
+				val item = programs.optJSONObject(index) ?: return@mapNotNull null
+				val id = item.optLong("ID", -1L).takeIf { it > 0L }?.toString()
+					?: return@mapNotNull null
+				val title = item.optString("name").normalizedTitle()
+				if (title.isBlank()) return@mapNotNull null
+				val air = item.optString("air")
+				val airMinutes = runCatching {
+					LocalDateTime.parse(air, ARCHIVE_AIR_FORMAT).let {
+						it.hour * 60 + it.minute
+					}
+				}.getOrNull() ?: return@mapNotNull null
+				ArchiveItem(
+					id = id,
+					title = title,
+					airMinutes = airMinutes,
+				)
+			}
+		} catch (error: Exception) {
+			throw StreamResolveException("STVR archive API returned invalid JSON", error)
 		}
-	} catch (error: Exception) {
-		throw StreamResolveException("STVR archive API returned invalid JSON", error)
 	}
 
 	private fun archiveLookupFailureMessage(
