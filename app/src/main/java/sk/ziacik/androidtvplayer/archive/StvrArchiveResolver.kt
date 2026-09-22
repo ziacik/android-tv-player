@@ -70,12 +70,23 @@ class StvrArchiveResolver(
 		val schedule = programSchedule(start, headers)
 		val section = schedule.channelSection(channel)
 		val expectedTime = start.format(TIME_FORMAT)
-		val match = section.findExplicitArchiveAt(expectedTime)
+		val programme = section.findProgrammeAt(expectedTime)
+
+		val finalUrl = programme.programmeUrl?.let { url ->
+			httpClient.finalUrl(url, headers)
+		}
+		val archiveId = finalUrl
+			?.let { ARCHIVE_EPISODE_URL_REGEX.matchEntire(it) }
+			?.groups
+			?.get("id")
+			?.value
+
 		return ArchiveLookup(
-			archiveId = match.archiveId,
+			archiveId = archiveId,
 			expectedTime = expectedTime,
-			timeMatches = match.timeMatches,
-			archiveIds = match.archiveIds,
+			timeMatches = programme.timeMatches,
+			programmeUrl = programme.programmeUrl,
+			finalUrl = finalUrl,
 			channelSectionChars = section.length,
 		)
 	}
@@ -139,43 +150,34 @@ class StvrArchiveResolver(
 		}
 	}
 
-	private fun String.findExplicitArchiveAt(expectedTime: String): ExplicitArchiveMatch {
-		val allTimes = PROGRAM_TIME_REGEX.findAll(this).toList()
-		val matchingTimes = allTimes.filter { match ->
-			match.groups["time"]?.value == expectedTime
-		}
+	private fun String.findProgrammeAt(expectedTime: String): ProgrammeMatch {
+		val matchingTimes = PROGRAM_TIME_REGEX.findAll(this)
+			.filter { match -> match.groups["time"]?.value == expectedTime }
+			.toList()
 		if (matchingTimes.size != 1) {
-			return ExplicitArchiveMatch(
-				archiveId = null,
+			return ProgrammeMatch(
+				programmeUrl = null,
 				timeMatches = matchingTimes.size,
-				archiveIds = emptyList(),
 			)
 		}
 
 		val timeMatch = matchingTimes.single()
-		val nextTime = allTimes.firstOrNull { it.range.first > timeMatch.range.first }
-		val programmeHtml = substring(
-			timeMatch.range.last + 1,
-			nextTime?.range?.first ?: length,
-		)
-		val archiveIds = ARCHIVE_LINK_REGEX.findAll(programmeHtml)
-			.map { match -> requireNotNull(match.groups["id"]).value }
-			.distinct()
-			.toList()
+		val programmeLink = PROGRAMME_LINK_REGEX.find(this, timeMatch.range.last + 1)
+			?: return ProgrammeMatch(programmeUrl = null, timeMatches = 1)
 
-		return ExplicitArchiveMatch(
-			archiveId = archiveIds.singleOrNull(),
+		return ProgrammeMatch(
+			programmeUrl = STVR_BASE_URL + requireNotNull(programmeLink.groups["path"]).value,
 			timeMatches = 1,
-			archiveIds = archiveIds,
 		)
 	}
 
 	private fun archiveLookupFailureMessage(lookup: ArchiveLookup): String =
 		buildString {
-			append("STVR programme does not contain an explicit archive link")
+			append("STVR programme does not resolve to a concrete archive episode")
 			append("; expectedTime=").append(lookup.expectedTime)
 			append("; exactTimeMatches=").append(lookup.timeMatches)
-			append("; archiveIds=").append(lookup.archiveIds.joinToString(","))
+			append("; programmeUrl=").append(lookup.programmeUrl)
+			append("; finalUrl=").append(lookup.finalUrl)
 			append("; channelSectionChars=").append(lookup.channelSectionChars)
 		}
 
@@ -184,30 +186,35 @@ class StvrArchiveResolver(
 		val fetchedAtMs: Long,
 	)
 
-	private data class ExplicitArchiveMatch(
-		val archiveId: String?,
+	private data class ProgrammeMatch(
+		val programmeUrl: String?,
 		val timeMatches: Int,
-		val archiveIds: List<String>,
 	)
 
 	private data class ArchiveLookup(
 		val archiveId: String?,
 		val expectedTime: String,
 		val timeMatches: Int,
-		val archiveIds: List<String>,
+		val programmeUrl: String?,
+		val finalUrl: String?,
 		val channelSectionChars: Int,
 	)
 
 	private companion object {
-		const val STVR_PROGRAM_URL = "https://www.stvr.sk/televizia/program/"
+		const val STVR_BASE_URL = "https://www.stvr.sk"
+		const val STVR_PROGRAM_URL = "$STVR_BASE_URL/televizia/program/"
 		const val STVR_ARCHIVE_STREAM_JSON_URL = "https://www.rtvs.sk/json/archive5f.json"
 		const val TODAY_SCHEDULE_TTL_MS = 5 * 60_000L
 		val TIME_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 		val PROGRAM_TIME_REGEX = Regex(
 			""">\s*(?<time>(?:[01]\d|2[0-3]):[0-5]\d)\s*<""",
 		)
-		val ARCHIVE_LINK_REGEX = Regex(
-			"""href\s*=\s*["'](?:https?://www\.stvr\.sk)?/televizia/archiv/\d+/(?<id>\d+)(?:[^\d]|$)""",
+		val PROGRAMME_LINK_REGEX = Regex(
+			"""href\s*=\s*["'](?<path>/televizia/program/\d+/\d+)(?:[^\d]|$)""",
+			RegexOption.IGNORE_CASE,
+		)
+		val ARCHIVE_EPISODE_URL_REGEX = Regex(
+			"""https://www\.stvr\.sk/televizia/archiv/\d+/(?<id>\d+)/?""",
 			RegexOption.IGNORE_CASE,
 		)
 	}
