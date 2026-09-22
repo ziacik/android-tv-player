@@ -13,12 +13,12 @@ import sk.ziacik.androidtvplayer.resolver.StvrHttpClient
 
 class StvrArchiveAvailabilityTest {
 	@Test
-	fun `reports Duel archive listed by JSON API as available`() = runTest {
-		val apiUrl = availabilityArchiveApiUrl("2026-09-21")
+	fun `reports programme as available only when STVR schedule has explicit archive link`() = runTest {
+		val scheduleUrl = availabilityScheduleUrl("2026-09-21")
 		val client = RecordingStvrHttpClient(
 			mapOf(
-				apiUrl to availabilityArchiveListing(
-					availabilityArchiveItem(id = 620530, name = "Duel", air = "2026-09-21 17:45:00"),
+				scheduleUrl to availabilitySchedule(
+					"""<div><span>17:45</span><a href="/televizia/archiv/14126/620530">Duel</a></div>""",
 				),
 			),
 		)
@@ -34,15 +34,14 @@ class StvrArchiveAvailabilityTest {
 		)
 
 		assertTrue(available)
-		assertTrue(client.requestedUrls == listOf(apiUrl))
 	}
 
 	@Test
-	fun `does not report morning Duel as available when JSON API only contains evening Duel`() = runTest {
+	fun `does not report programme-only repeat as available`() = runTest {
 		val client = RecordingStvrHttpClient(
 			mapOf(
-				availabilityArchiveApiUrl("2026-09-21") to availabilityArchiveListing(
-					availabilityArchiveItem(id = 620530, name = "Duel", air = "2026-09-21 17:45:00"),
+				availabilityScheduleUrl("2026-09-21") to availabilitySchedule(
+					"""<div><span>10:45</span><a href="/televizia/program/14126/620557">Duel</a></div>""",
 				),
 			),
 		)
@@ -61,35 +60,11 @@ class StvrArchiveAvailabilityTest {
 	}
 
 	@Test
-	fun `does not report Profesionali as available when missing from JSON archive API`() = runTest {
+	fun `does not shift time to find nearby archive item`() = runTest {
 		val client = RecordingStvrHttpClient(
 			mapOf(
-				availabilityArchiveApiUrl("2026-09-21") to availabilityArchiveListing(
-					availabilityArchiveItem(id = 620530, name = "Duel", air = "2026-09-21 17:45:00"),
-				),
-			),
-		)
-
-		val available = StvrArchiveResolver(client).isAvailable(
-			channel = directJednotka(),
-			program = ProgramMetadata(
-				title = "Profesionáli IV",
-				startsAtMs = 1_789_977_300_000L,
-				endsAtMs = 1_789_980_300_000L,
-				internetAllowed = true,
-			),
-		)
-
-		assertFalse(available)
-	}
-
-	@Test
-	fun `reports repeat as available from original airing JSON archive date`() = runTest {
-		val client = RecordingStvrHttpClient(
-			mapOf(
-				availabilityArchiveApiUrl("2026-09-09") to availabilityArchiveListing(),
-				availabilityArchiveApiUrl("2026-09-08") to availabilityArchiveListing(
-					availabilityArchiveItem(id = 618007, name = "Duel", air = "2026-09-08 17:44:00"),
+				availabilityScheduleUrl("2026-09-08") to availabilitySchedule(
+					"""<div><span>17:44</span><a href="/televizia/archiv/14126/618007">Duel</a></div>""",
 				),
 			),
 		)
@@ -98,14 +73,13 @@ class StvrArchiveAvailabilityTest {
 			channel = directJednotka(),
 			program = ProgramMetadata(
 				title = "Duel",
-				startsAtMs = 1_788_943_500_000L,
-				endsAtMs = 1_788_945_300_000L,
+				startsAtMs = 1_788_882_000_000L,
+				endsAtMs = 1_788_884_000_000L,
 				internetAllowed = true,
-				archiveOriginalStartsAtMs = 1_788_882_300_000L,
 			),
 		)
 
-		assertTrue(available)
+		assertFalse(available)
 	}
 
 	private fun directJednotka() = TvChannel(
@@ -117,28 +91,17 @@ class StvrArchiveAvailabilityTest {
 	)
 }
 
-private fun availabilityArchiveApiUrl(date: String): String =
-	"https://www.stvr.sk/json/tv/archiv?e=1&archive=1&d=" + date + "&p=1&l=100&o=desc"
+private fun availabilityScheduleUrl(date: String): String =
+	"https://www.stvr.sk/televizia/program/?date=$date"
 
-private fun availabilityArchiveListing(vararg items: String): String =
-	"""{"paging":{"page":"1","size":"100","results":"${items.size}"},"program":[${items.joinToString(",")}]}"""
-
-private fun availabilityArchiveItem(
-	id: Int,
-	name: String,
-	air: String,
-): String = """{"ID":$id,"series":22948,"name":"$name","air":"$air","license":""}"""
+private fun availabilitySchedule(jednotka: String): String =
+	"""<html><h2>Jednotka</h2>$jednotka<h2>Dvojka</h2></html>"""
 
 private class RecordingStvrHttpClient(
 	private val responses: Map<String, String>,
 ) : StvrHttpClient {
-	val requestedUrls = mutableListOf<String>()
-
 	override suspend fun get(
 		url: String,
 		headers: Map<String, String>,
-	): String {
-		requestedUrls += url
-		return responses.getValue(url)
-	}
+	): String = responses.getValue(url)
 }
