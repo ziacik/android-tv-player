@@ -14,24 +14,14 @@ import sk.ziacik.androidtvplayer.resolver.StvrHttpClient
 
 class StvrArchiveListingCacheTest {
 	@Test
-	fun `reuses one STVR day listing for multiple archive programmes`() = runTest {
-		val listingUrl = "https://www.stvr.sk/televizia/program/?date=2026-09-08"
-		val client = RecordingStvrHttpClient(
+	fun `reuses one STVR JSON day listing for multiple archive programmes`() = runTest {
+		val listingUrl = archiveApiUrl("2026-09-08")
+		val client = RecordingCacheStvrHttpClient(
 			responses = mapOf(
-				listingUrl to """
-					<h2>Jednotka</h2>
-					<div class="media">
-						<div class="program time--start">07:00 <span>- 08:29</span></div>
-						<h5><a href="/televizia/program/14026/617992">Ranné správy</a></h5>
-						<a href="/televizia/archiv/14026/617992">Pozrieť v archíve</a>
-					</div>
-					<div class="media">
-						<div class="program time--start">17:44 <span>- 18:12</span></div>
-						<h5><a href="/televizia/program/14126/618007">Duel</a></h5>
-						<a href="/televizia/archiv/14126/618007">Pozrieť v archíve</a>
-					</div>
-					<h2>Dvojka</h2>
-				""".trimIndent(),
+				listingUrl to archiveListing(
+					archiveItem(id = 617992, name = "Ranné správy", air = "2026-09-08 07:00:00"),
+					archiveItem(id = 618007, name = "Duel", air = "2026-09-08 17:44:00"),
+				),
 				"https://www.rtvs.sk/json/archive5f.json?id=617992" to
 					"""{"clip":{"sources":[{"src":"https://cdn.example/morning.m3u8","type":"application/x-mpegurl"}]}}""",
 				"https://www.rtvs.sk/json/archive5f.json?id=618007" to
@@ -56,16 +46,18 @@ class StvrArchiveListingCacheTest {
 	}
 
 	@Test
-	fun `refreshes todays archive listing after cache ttl`() = runTest {
-		val listingUrl = "https://www.stvr.sk/televizia/program/?date=2026-09-09"
-		val client = SequentialListingStvrHttpClient(
+	fun `refreshes todays JSON archive listing after cache ttl`() = runTest {
+		val listingUrl = archiveApiUrl("2026-09-09")
+		val client = SequentialCacheStvrHttpClient(
 			listingUrl = listingUrl,
 			listings = listOf(
-				listing(time = "07:00", id = "618025", title = "Ranné správy"),
-				listing(time = "10:45", id = "618031", title = "Duel"),
+				archiveListing(),
+				archiveListing(
+					archiveItem(id = 618031, name = "Duel", air = "2026-09-09 10:45:00"),
+				),
 			),
 		)
-		var nowMs = 1_788_948_000_000L // 2026-09-09 12:00 Europe/Bratislava
+		var nowMs = 1_788_948_000_000L
 		val resolver = StvrArchiveResolver(
 			httpClient = client,
 			nowMs = { nowMs },
@@ -90,23 +82,21 @@ class StvrArchiveListingCacheTest {
 		providerValue = "https://example.com/live.m3u8",
 		archive = ArchiveConfig(ArchiveProvider.STVR, channelId = "1"),
 	)
-
-	private fun listing(
-		time: String,
-		id: String,
-		title: String,
-	): String = """
-		<h2>Jednotka</h2>
-		<div class="media">
-			<div class="program time--start">$time <span>- 18:12</span></div>
-			<h5><a href="/televizia/program/14126/$id">$title</a></h5>
-			<a href="/televizia/archiv/14126/$id">Pozrieť v archíve</a>
-		</div>
-		<h2>Dvojka</h2>
-	""".trimIndent()
 }
 
-private class RecordingStvrHttpClient(
+private fun archiveApiUrl(date: String): String =
+	"https://www.stvr.sk/json/tv/archiv?e=1&archive=1&d=" + date + "&p=1&l=100&o=desc"
+
+private fun archiveListing(vararg items: String): String =
+	"""{"paging":{"page":"1","size":"100","results":"${items.size}"},"program":[${items.joinToString(",")}]}"""
+
+private fun archiveItem(
+	id: Int,
+	name: String,
+	air: String,
+): String = """{"ID":$id,"series":22948,"name":"$name","air":"$air","license":""}"""
+
+private class RecordingCacheStvrHttpClient(
 	private val responses: Map<String, String>,
 ) : StvrHttpClient {
 	val requestedUrls = mutableListOf<String>()
@@ -118,14 +108,9 @@ private class RecordingStvrHttpClient(
 		requestedUrls += url
 		return responses.getValue(url)
 	}
-
-	override suspend fun finalUrl(
-		url: String,
-		headers: Map<String, String>,
-	): String = url.replace("/televizia/program/", "/televizia/archiv/")
 }
 
-private class SequentialListingStvrHttpClient(
+private class SequentialCacheStvrHttpClient(
 	private val listingUrl: String,
 	private val listings: List<String>,
 ) : StvrHttpClient {
@@ -142,9 +127,4 @@ private class SequentialListingStvrHttpClient(
 			listingIndex += 1
 		}
 	}
-
-	override suspend fun finalUrl(
-		url: String,
-		headers: Map<String, String>,
-	): String = url.replace("/televizia/program/", "/televizia/archiv/")
 }
