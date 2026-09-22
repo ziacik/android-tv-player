@@ -100,6 +100,7 @@ class StvrArchiveResolver(
 				listing = archiveListing(original, channel, headers),
 				startTime = original.format(TIME_FORMAT),
 				title = title,
+				allowExactTimeFallback = true,
 			)
 		}
 
@@ -161,6 +162,7 @@ class StvrArchiveResolver(
 		listing: String,
 		startTime: String,
 		title: String,
+		allowExactTimeFallback: Boolean = false,
 	): String? {
 		val expectedMinutes = startTime.minutesOfDay() ?: return null
 		val expectedTitle = title.normalizedTitle()
@@ -173,11 +175,17 @@ class StvrArchiveResolver(
 			.minByOrNull { (_, distance) -> distance }
 		if (exact != null) return exact.first.id
 
-		return nearby
+		val partial = nearby
 			.filter { (item, _) ->
 				item.title.contains(expectedTitle) || expectedTitle.contains(item.title)
 			}
 			.minByOrNull { (_, distance) -> distance }
+		if (partial != null) return partial.first.id
+
+		if (!allowExactTimeFallback) return null
+		return nearby
+			.filter { (_, distance) -> distance == 0 }
+			.singleOrNull()
 			?.first
 			?.id
 	}
