@@ -13,213 +13,132 @@ import sk.ziacik.androidtvplayer.resolver.StvrHttpClient
 import sk.ziacik.androidtvplayer.resolver.StreamResolveException
 
 class StvrArchiveResolverTest {
-    @Test
-    fun `resolves archive id from metadata on a direct live channel`() = runTest {
-        val client = FakeStvrHttpClient(
-            responses = mapOf(
-                "https://www.stvr.sk/televizia/program/?date=2026-09-08" to """
-                    <div class="media">
-                        <div class="media__body">
-                            <div class="program time--start">07:00 <span>- 08:29</span></div>
-                            <a href="/televizia/program/14026/617992">Ranné správy</a>
-                            <a href="/televizia/archiv/14026/617992">Pozrieť v archíve</a>
-                        </div>
-                    </div>
-                """.trimIndent(),
-                "https://www.rtvs.sk/json/archive5f.json?id=617992" to """
-                    {"clip":{"sources":[{"src":"https://cdn.example/archive.m3u8","type":"application/x-mpegurl"}]}}
-                """.trimIndent(),
-            ),
-        )
-        val resolver = StvrArchiveResolver(client)
-        val directJednotka = directJednotka()
+	@Test
+	fun `resolves archive stream from JSON archive API item`() = runTest {
+		val apiUrl = archiveApiUrl("2026-09-08")
+		val client = ResolverStvrHttpClient(
+			mapOf(
+				apiUrl to archiveListing(
+					archiveItem(id = 617992, name = "Ranné správy", air = "2026-09-08 07:00:00"),
+				),
+				"https://www.rtvs.sk/json/archive5f.json?id=617992" to
+					"""{"clip":{"sources":[{"src":"https://cdn.example/archive.m3u8","type":"application/x-mpegurl"}]}}""",
+			),
+		)
 
-        val result = resolver.resolve(
-            channel = directJednotka,
-            startsAtMs = 1_788_843_600_000L,
-            title = "Ranné správy",
-        )
+		val result = StvrArchiveResolver(client).resolve(
+			channel = directJednotka(),
+			startsAtMs = 1_788_843_600_000L,
+			title = "Ranné správy",
+		)
 
-        assertEquals("https://cdn.example/archive.m3u8", result.url)
-        assertEquals(
-            listOf(
-                "https://www.stvr.sk/televizia/program/?date=2026-09-08",
-                "https://www.rtvs.sk/json/archive5f.json?id=617992",
-            ),
-            client.requestedUrls,
-        )
-    }
+		assertEquals("https://cdn.example/archive.m3u8", result.url)
+		assertEquals(
+			listOf(
+				apiUrl,
+				"https://www.rtvs.sk/json/archive5f.json?id=617992",
+			),
+			client.requestedUrls,
+		)
+	}
 
-    @Test
-    fun `matches archive programme when actual STVR start is shifted from EPG`() = runTest {
-        val client = FakeStvrHttpClient(
-            responses = mapOf(
-                "https://www.stvr.sk/televizia/program/?date=2026-09-08" to """
-                    <h2>Jednotka</h2>
-                    <div class="media media--archive">
-                        <div class="media__body">
-                            <div data-role="start" class="time--start program">17:44 <span>- 18:12</span></div>
-                            <h5><a href="/televizia/program/14126/618007">Duel</a></h5>
-                        </div>
-                    </div>
-                    <h2>Dvojka</h2>
-                """.trimIndent(),
-                "https://www.rtvs.sk/json/archive5f.json?id=618007" to """
-                    {"clip":{"sources":[{"src":"https://cdn.example/duel.m3u8","type":"application/x-mpegurl"}]}}
-                """.trimIndent(),
-            ),
-        )
+	@Test
+	fun `matches nearest JSON archive item when STVR start is shifted from EPG`() = runTest {
+		val client = ResolverStvrHttpClient(
+			mapOf(
+				archiveApiUrl("2026-09-08") to archiveListing(
+					archiveItem(id = 618007, name = "Duel", air = "2026-09-08 17:44:00"),
+				),
+				"https://www.rtvs.sk/json/archive5f.json?id=618007" to
+					"""{"clip":{"sources":[{"src":"https://cdn.example/duel.m3u8","type":"application/x-mpegurl"}]}}""",
+			),
+		)
 
-        val result = StvrArchiveResolver(client).resolve(
-            channel = directJednotka(),
-            startsAtMs = 1_788_882_000_000L,
-            title = "Duel",
-        )
+		val result = StvrArchiveResolver(client).resolve(
+			channel = directJednotka(),
+			startsAtMs = 1_788_882_000_000L,
+			title = "Duel",
+		)
 
-        assertEquals("https://cdn.example/duel.m3u8", result.url)
-    }
+		assertEquals("https://cdn.example/duel.m3u8", result.url)
+	}
 
-    @Test
-    fun `resolves a repeat from the original airing archive date`() = runTest {
-        val client = FakeStvrHttpClient(
-            responses = mapOf(
-                "https://www.stvr.sk/televizia/program/?date=2026-09-09" to """
-                    <h2>Jednotka</h2>
-                    <div class="media">
-                        <div class="program time--start">07:00 <span>- 08:29</span></div>
-                        <h5><a href="/televizia/program/14126/618025">Ranné správy</a></h5>
-                    </div>
-                    <h2>Dvojka</h2>
-                """.trimIndent(),
-                "https://www.stvr.sk/televizia/program/?date=2026-09-08" to """
-                    <h2>Jednotka</h2>
-                    <div class="media media--archive">
-                        <div class="media__body">
-                            <div class="program time--start">17:44 <span>- 18:12</span></div>
-                            <h5><a href="/televizia/program/14126/618007">Duel</a></h5>
-                            <a href="/televizia/archiv/14126/618007">Pozrieť v archíve</a>
-                        </div>
-                    </div>
-                    <h2>Dvojka</h2>
-                """.trimIndent(),
-                "https://www.rtvs.sk/json/archive5f.json?id=618007" to """
-                    {"clip":{"sources":[{"src":"https://cdn.example/duel-repeat.m3u8","type":"application/x-mpegurl"}]}}
-                """.trimIndent(),
-            ),
-        )
+	@Test
+	fun `resolves repeat from original airing JSON archive date`() = runTest {
+		val client = ResolverStvrHttpClient(
+			mapOf(
+				archiveApiUrl("2026-09-09") to archiveListing(),
+				archiveApiUrl("2026-09-08") to archiveListing(
+					archiveItem(id = 618007, name = "Duel", air = "2026-09-08 17:44:00"),
+				),
+				"https://www.rtvs.sk/json/archive5f.json?id=618007" to
+					"""{"clip":{"sources":[{"src":"https://cdn.example/duel-repeat.m3u8","type":"application/x-mpegurl"}]}}""",
+			),
+		)
 
-        val result = StvrArchiveResolver(client).resolve(
-            channel = directJednotka(),
-            startsAtMs = 1_788_943_500_000L,
-            title = "Duel",
-            originalStartsAtMs = 1_788_882_300_000L,
-        )
+		val result = StvrArchiveResolver(client).resolve(
+			channel = directJednotka(),
+			startsAtMs = 1_788_943_500_000L,
+			title = "Duel",
+			originalStartsAtMs = 1_788_882_300_000L,
+		)
 
-        assertEquals("https://cdn.example/duel-repeat.m3u8", result.url)
-        assertEquals(
-            listOf(
-                "https://www.stvr.sk/televizia/program/?date=2026-09-09",
-                "https://www.stvr.sk/televizia/program/?date=2026-09-08",
-                "https://www.rtvs.sk/json/archive5f.json?id=618007",
-            ),
-            client.requestedUrls,
-        )
-    }
+		assertEquals("https://cdn.example/duel-repeat.m3u8", result.url)
+		assertEquals(
+			listOf(
+				archiveApiUrl("2026-09-09"),
+				archiveApiUrl("2026-09-08"),
+				"https://www.rtvs.sk/json/archive5f.json?id=618007",
+			),
+			client.requestedUrls,
+		)
+	}
 
-    @Test
-    fun `reports useful diagnostics when archive HTML cannot be parsed`() = runTest {
-        val client = FakeStvrHttpClient(
-            responses = mapOf(
-                "https://www.stvr.sk/televizia/program/?date=2026-09-08" to """
-                    <h2>Jednotka</h2>
-                    <div class="media media--archive">
-                        <a class="media__image" href="/televizia/archiv/14126/618007">Duel</a>
-                    </div>
-                    <h2>Dvojka</h2>
-                """.trimIndent(),
-            ),
-        )
+	@Test
+	fun `reports JSON archive diagnostics when item is missing`() = runTest {
+		val client = ResolverStvrHttpClient(
+			mapOf(
+				archiveApiUrl("2026-09-21") to archiveListing(
+					archiveItem(id = 620530, name = "Duel", air = "2026-09-21 17:45:00"),
+				),
+			),
+		)
 
-        try {
-            StvrArchiveResolver(client).resolve(
-                channel = directJednotka(),
-                startsAtMs = 1_788_882_000_000L,
-                title = "Duel",
-            )
-            fail("Expected archive lookup to fail")
-        } catch (error: StreamResolveException) {
-            val message = error.message.orEmpty()
-            assertTrue(message.contains("expectedTime=17:40"))
-            assertTrue(message.contains("expectedTitle=duel"))
-            assertTrue(message.contains("programmeLinks=0"))
-            assertTrue(message.contains("parsedCandidates=0"))
-            assertTrue(message.contains("programmeUrls="))
-        }
-    }
+		try {
+			StvrArchiveResolver(client).resolve(
+				channel = directJednotka(),
+				startsAtMs = 1_789_980_300_000L,
+				title = "Duel",
+			)
+			fail("Expected archive lookup to fail")
+		} catch (error: StreamResolveException) {
+			val message = error.message.orEmpty()
+			assertTrue(message.contains("expectedTime=10:45"))
+			assertTrue(message.contains("expectedTitle=duel"))
+			assertTrue(message.contains("archiveItems=1"))
+			assertTrue(message.contains("archiveIds=620530"))
+		}
+	}
 
-    @Test
-    fun `keeps searching inside channel when programme titles use headings`() = runTest {
-        val client = FakeStvrHttpClient(
-            responses = mapOf(
-                "https://www.stvr.sk/televizia/program/?date=2026-09-08" to """
-                    <h2>Jednotka</h2>
-                    <div class="media">
-                        <div class="program time--start">06:00 <span>- 06:29</span></div>
-                        <h5><a href="/televizia/program/14026/111111">Skoré správy</a></h5>
-                    </div>
-                    <div class="media">
-                        <div class="program time--start">07:00 <span>- 08:29</span></div>
-                        <h5><a href="/televizia/program/14026/617992">Ranné správy</a></h5>
-                    </div>
-                    <h2>Dvojka</h2>
-                    <div class="media">
-                        <div class="program time--start">07:00 <span>- 08:29</span></div>
-                        <h5><a href="/televizia/program/14026/999999">Ranné správy</a></h5>
-                    </div>
-                """.trimIndent(),
-                "https://www.rtvs.sk/json/archive5f.json?id=617992" to """
-                    {"clip":{"sources":[{"src":"https://cdn.example/archive.m3u8","type":"application/x-mpegurl"}]}}
-                """.trimIndent(),
-            ),
-        )
-
-        val result = StvrArchiveResolver(client).resolve(
-            channel = directJednotka(),
-            startsAtMs = 1_788_843_600_000L,
-            title = "Ranné správy",
-        )
-
-        assertEquals("https://cdn.example/archive.m3u8", result.url)
-        assertEquals(
-            "https://www.rtvs.sk/json/archive5f.json?id=617992",
-            client.requestedUrls.last(),
-        )
-    }
-
-    private fun directJednotka() = TvChannel(
-        storageKey = "jednotka",
-        displayName = "JEDNOTKA",
-        provider = ChannelProvider.DIRECT,
-        providerValue = "https://example.com/live.m3u8",
-        archive = ArchiveConfig(ArchiveProvider.STVR, channelId = "1"),
-    )
+	private fun directJednotka() = TvChannel(
+		storageKey = "jednotka",
+		displayName = "JEDNOTKA",
+		provider = ChannelProvider.DIRECT,
+		providerValue = "https://example.com/live.m3u8",
+		archive = ArchiveConfig(ArchiveProvider.STVR, channelId = "1"),
+	)
 }
 
-private class FakeStvrHttpClient(
-    private val responses: Map<String, String>,
+private class ResolverStvrHttpClient(
+	private val responses: Map<String, String>,
 ) : StvrHttpClient {
-    val requestedUrls = mutableListOf<String>()
+	val requestedUrls = mutableListOf<String>()
 
-    override suspend fun get(
-        url: String,
-        headers: Map<String, String>,
-    ): String {
-        requestedUrls += url
-        return responses.getValue(url)
-    }
-
-    override suspend fun finalUrl(
-        url: String,
-        headers: Map<String, String>,
-    ): String = url.replace("/televizia/program/", "/televizia/archiv/")
+	override suspend fun get(
+		url: String,
+		headers: Map<String, String>,
+	): String {
+		requestedUrls += url
+		return responses.getValue(url)
+	}
 }
