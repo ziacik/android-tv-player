@@ -15,93 +15,41 @@ class ArchiveRepeatEpgRepositoryTest {
     val temporaryFolder = TemporaryFolder()
 
     @Test
-    fun `links a numbered repeat to its previous airing from a secondary EPG source`() = runTest {
-        val repository = repository()
-
-        val programme = repository.currentProgram(TEST_CHANNEL, MORNING_DUEL_MS)
-
-        assertEquals("Duel", programme?.title)
-        assertEquals(PREVIOUS_EVENING_DUEL_MS, programme?.archiveOriginalStartsAtMs)
-    }
-
-    @Test
-    fun `links repeat through secondary EPG even when primary title differs`() = runTest {
+    fun `does not infer original airing from matching external EPG titles`() = runTest {
         val repository = CachedXmltvEpgRepository(
             sources = listOf(
                 XmltvEpgSource(
                     id = EpgSourceId.OPEN_EPG,
-                    cacheFile = File(temporaryFolder.root, "open-doctor.xml"),
+                    cacheFile = File(temporaryFolder.root, "open.xml"),
                     download = {
                         """<tv>
-                            <programme channel="Jednotka HD.sk" start="20260922020500 +0200" stop="20260922025000 +0200"><title>Doktor z hôr - Chladné ticho</title></programme>
+                            <programme channel="Jednotka HD.sk" start="20260909104500 +0200" stop="20260909111500 +0200"><title>Duel</title></programme>
                         </tv>""".trimIndent().encodeToByteArray()
                     },
                 ),
                 XmltvEpgSource(
                     id = EpgSourceId.SKYLINK,
-                    cacheFile = File(temporaryFolder.root, "skylink-doctor.xml"),
+                    cacheFile = File(temporaryFolder.root, "skylink.xml"),
                     download = {
                         """<tv>
-                            <programme channel="jednotka-skylink" start="20260921145500 +0200" stop="20260921154000 +0200"><title>Doktor z hôr: Nové príbehy XV (2)</title><sub-title>Chladné ticho - 2. časť.</sub-title></programme>
-                            <programme channel="jednotka-skylink" start="20260922020500 +0200" stop="20260922025000 +0200"><title>Doktor z hôr: Nové príbehy XV (2)</title><sub-title>Chladné ticho - 2. časť.</sub-title></programme>
+                            <programme channel="jednotka-skylink" start="20260908174500 +0200" stop="20260908181500 +0200"><title>Duel (74)</title></programme>
+                            <programme channel="jednotka-skylink" start="20260909104500 +0200" stop="20260909111500 +0200"><title>Duel (74)</title></programme>
                         </tv>""".trimIndent().encodeToByteArray()
                     },
                 ),
             ),
-            clockMs = { DOCTOR_REPEAT_MS },
+            clockMs = { MORNING_DUEL_MS },
             parser = XmltvEpgParser(),
         )
 
-        val programme = repository.currentProgram(TEST_CHANNEL, DOCTOR_REPEAT_MS)
-
-        assertEquals("Doktor z hôr - Chladné ticho", programme?.title)
-        assertEquals(DOCTOR_ORIGINAL_MS, programme?.archiveOriginalStartsAtMs)
-    }
-
-    @Test
-    fun `does not mark a new numbered episode as an archive repeat`() = runTest {
-        val repository = repository()
-
-        val programme = repository.currentProgram(TEST_CHANNEL, EVENING_DUEL_MS)
+        val programme = repository.currentProgram(TEST_CHANNEL, MORNING_DUEL_MS)
 
         assertEquals("Duel", programme?.title)
         assertNull(programme?.archiveOriginalStartsAtMs)
     }
 
-    private fun repository() = CachedXmltvEpgRepository(
-        sources = listOf(
-            XmltvEpgSource(
-                id = EpgSourceId.OPEN_EPG,
-                cacheFile = File(temporaryFolder.root, "open.xml"),
-                download = {
-                    """<tv>
-                        <programme channel="Jednotka HD.sk" start="20260909104500 +0200" stop="20260909111500 +0200"><title>Duel</title></programme>
-                        <programme channel="Jednotka HD.sk" start="20260909174500 +0200" stop="20260909181500 +0200"><title>Duel</title></programme>
-                    </tv>""".trimIndent().encodeToByteArray()
-                },
-            ),
-            XmltvEpgSource(
-                id = EpgSourceId.SKYLINK,
-                cacheFile = File(temporaryFolder.root, "skylink.xml"),
-                download = {
-                    """<tv>
-                        <programme channel="jednotka-skylink" start="20260908174500 +0200" stop="20260908181500 +0200"><title>Duel (74)</title></programme>
-                        <programme channel="jednotka-skylink" start="20260909104500 +0200" stop="20260909111500 +0200"><title>Duel (74)</title></programme>
-                        <programme channel="jednotka-skylink" start="20260909174500 +0200" stop="20260909181500 +0200"><title>Duel (75)</title></programme>
-                    </tv>""".trimIndent().encodeToByteArray()
-                },
-            ),
-        ),
-        clockMs = { MORNING_DUEL_MS },
-        parser = XmltvEpgParser(),
-    )
-
     private companion object {
-        const val PREVIOUS_EVENING_DUEL_MS = 1_788_882_300_000L
         const val MORNING_DUEL_MS = 1_788_943_500_000L
-        const val EVENING_DUEL_MS = 1_788_968_700_000L
-        const val DOCTOR_ORIGINAL_MS = 1_789_995_300_000L
-        const val DOCTOR_REPEAT_MS = 1_790_035_500_000L
         val TEST_CHANNEL = TvChannel.JEDNOTKA.copy(
             epgIds = mapOf(
                 EpgSourceId.OPEN_EPG to "Jednotka HD.sk",
