@@ -14,11 +14,11 @@ import sk.ziacik.androidtvplayer.resolver.StvrHttpClient
 class StvrArchiveAvailabilityTest {
 	@Test
 	fun `reports Duel archive listed by JSON API as available`() = runTest {
-		val apiUrl = archiveApiUrl("2026-09-21")
+		val apiUrl = availabilityArchiveApiUrl("2026-09-21")
 		val client = RecordingStvrHttpClient(
 			mapOf(
-				apiUrl to archiveListing(
-					archiveItem(id = 620530, name = "Duel", air = "2026-09-21 17:45:00"),
+				apiUrl to availabilityArchiveListing(
+					availabilityArchiveItem(id = 620530, name = "Duel", air = "2026-09-21 17:45:00"),
 				),
 			),
 		)
@@ -41,8 +41,8 @@ class StvrArchiveAvailabilityTest {
 	fun `does not report morning Duel as available when JSON API only contains evening Duel`() = runTest {
 		val client = RecordingStvrHttpClient(
 			mapOf(
-				archiveApiUrl("2026-09-21") to archiveListing(
-					archiveItem(id = 620530, name = "Duel", air = "2026-09-21 17:45:00"),
+				availabilityArchiveApiUrl("2026-09-21") to availabilityArchiveListing(
+					availabilityArchiveItem(id = 620530, name = "Duel", air = "2026-09-21 17:45:00"),
 				),
 			),
 		)
@@ -64,8 +64,8 @@ class StvrArchiveAvailabilityTest {
 	fun `does not report Profesionali as available when missing from JSON archive API`() = runTest {
 		val client = RecordingStvrHttpClient(
 			mapOf(
-				archiveApiUrl("2026-09-21") to archiveListing(
-					archiveItem(id = 620530, name = "Duel", air = "2026-09-21 17:45:00"),
+				availabilityArchiveApiUrl("2026-09-21") to availabilityArchiveListing(
+					availabilityArchiveItem(id = 620530, name = "Duel", air = "2026-09-21 17:45:00"),
 				),
 			),
 		)
@@ -87,9 +87,9 @@ class StvrArchiveAvailabilityTest {
 	fun `reports repeat as available from original airing JSON archive date`() = runTest {
 		val client = RecordingStvrHttpClient(
 			mapOf(
-				archiveApiUrl("2026-09-09") to archiveListing(),
-				archiveApiUrl("2026-09-08") to archiveListing(
-					archiveItem(id = 618007, name = "Duel", air = "2026-09-08 17:44:00"),
+				availabilityArchiveApiUrl("2026-09-09") to availabilityArchiveListing(),
+				availabilityArchiveApiUrl("2026-09-08") to availabilityArchiveListing(
+					availabilityArchiveItem(id = 618007, name = "Duel", air = "2026-09-08 17:44:00"),
 				),
 			),
 		)
@@ -117,13 +117,13 @@ class StvrArchiveAvailabilityTest {
 	)
 }
 
-private fun archiveApiUrl(date: String): String =
+private fun availabilityArchiveApiUrl(date: String): String =
 	"https://www.stvr.sk/json/tv/archiv?e=1&archive=1&d=" + date + "&p=1&l=100&o=desc"
 
-private fun archiveListing(vararg items: String): String =
+private fun availabilityArchiveListing(vararg items: String): String =
 	"""{"paging":{"page":"1","size":"100","results":"${items.size}"},"program":[${items.joinToString(",")}]}"""
 
-private fun archiveItem(
+private fun availabilityArchiveItem(
 	id: Int,
 	name: String,
 	air: String,
