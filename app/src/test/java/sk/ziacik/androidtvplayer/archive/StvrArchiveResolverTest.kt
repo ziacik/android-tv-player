@@ -95,6 +95,33 @@ class StvrArchiveResolverTest {
 	}
 
 	@Test
+	fun `resolves repeat by exact original airing time when archive title differs`() = runTest {
+		val client = ResolverStvrHttpClient(
+			mapOf(
+				resolverArchiveApiUrl("2026-09-22") to resolverArchiveListing(),
+				resolverArchiveApiUrl("2026-09-21") to resolverArchiveListing(
+					resolverArchiveItem(
+						id = 620523,
+						name = "Doktor z hôr - Nové osudy XV",
+						air = "2026-09-21 14:55:00",
+					),
+				),
+				"https://www.rtvs.sk/json/archive5f.json?id=620523" to
+					"""{"clip":{"sources":[{"src":"https://cdn.example/doctor.m3u8","type":"application/x-mpegurl"}]}}""",
+			),
+		)
+
+		val result = StvrArchiveResolver(client).resolve(
+			channel = directJednotka(),
+			startsAtMs = 1_790_035_500_000L,
+			title = "Doktor z hôr - Chladné ticho",
+			originalStartsAtMs = 1_789_995_300_000L,
+		)
+
+		assertEquals("https://cdn.example/doctor.m3u8", result.url)
+	}
+
+	@Test
 	fun `uses fixed STVR archive endpoint for Dvojka instead of treating e as channel id`() = runTest {
 		val apiUrl = resolverArchiveApiUrl("2026-09-08")
 		val client = ResolverStvrHttpClient(
