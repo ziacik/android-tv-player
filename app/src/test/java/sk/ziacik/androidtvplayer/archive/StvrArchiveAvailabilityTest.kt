@@ -13,13 +13,16 @@ import sk.ziacik.androidtvplayer.resolver.StvrHttpClient
 
 class StvrArchiveAvailabilityTest {
 	@Test
-	fun `reports programme as available only when STVR schedule has explicit archive link`() = runTest {
-		val scheduleUrl = availabilityScheduleUrl("2026-09-21")
+	fun `reports programme available when exact programme redirects to archive episode`() = runTest {
+		val programmeUrl = "https://www.stvr.sk/televizia/program/14126/620530"
 		val client = RecordingStvrHttpClient(
-			mapOf(
-				scheduleUrl to availabilitySchedule(
-					"""<div><span>17:45</span><a href="/televizia/archiv/14126/620530">Duel</a></div>""",
+			responses = mapOf(
+				availabilityScheduleUrl("2026-09-21") to availabilitySchedule(
+					"""<div><span>17:45</span><a href="/televizia/program/14126/620530">Duel</a></div>""",
 				),
+			),
+			finalUrls = mapOf(
+				programmeUrl to "https://www.stvr.sk/televizia/archiv/14126/620530",
 			),
 		)
 
@@ -37,36 +40,47 @@ class StvrArchiveAvailabilityTest {
 	}
 
 	@Test
-	fun `does not report programme-only repeat as available`() = runTest {
+	fun `does not report series-only programme redirect as available`() = runTest {
+		val programmeUrl = "https://www.stvr.sk/televizia/program/14658/620562"
 		val client = RecordingStvrHttpClient(
-			mapOf(
-				availabilityScheduleUrl("2026-09-21") to availabilitySchedule(
-					"""<div><span>10:45</span><a href="/televizia/program/14126/620557">Duel</a></div>""",
+			responses = mapOf(
+				availabilityScheduleUrl("2026-09-22") to availabilitySchedule(
+					"""
+						<div><span>14:50</span><a href="/televizia/program/14658/620562">Zdravá maškrta</a></div>
+						<div><span>15:15</span><a href="/televizia/program/14029/620563">Doktor z hôr</a></div>
+					""".trimIndent(),
 				),
+			),
+			finalUrls = mapOf(
+				programmeUrl to "https://www.stvr.sk/televizia/archiv/14658",
+				"https://www.stvr.sk/televizia/program/14029/620563" to
+					"https://www.stvr.sk/televizia/archiv/14029/620563",
 			),
 		)
 
 		val available = StvrArchiveResolver(client).isAvailable(
 			channel = directJednotka(),
 			program = ProgramMetadata(
-				title = "Duel",
-				startsAtMs = 1_789_980_300_000L,
-				endsAtMs = 1_789_982_100_000L,
+				title = "Zdravá maškrta (19)",
+				startsAtMs = 1_790_081_400_000L,
+				endsAtMs = 1_790_082_900_000L,
 				internetAllowed = true,
 			),
 		)
 
 		assertFalse(available)
+		assertTrue(client.requestedFinalUrls == listOf(programmeUrl))
 	}
 
 	@Test
-	fun `does not shift time to find nearby archive item`() = runTest {
+	fun `does not shift exact programme time`() = runTest {
 		val client = RecordingStvrHttpClient(
-			mapOf(
+			responses = mapOf(
 				availabilityScheduleUrl("2026-09-08") to availabilitySchedule(
-					"""<div><span>17:44</span><a href="/televizia/archiv/14126/618007">Duel</a></div>""",
+					"""<div><span>17:44</span><a href="/televizia/program/14126/618007">Duel</a></div>""",
 				),
 			),
+			finalUrls = emptyMap(),
 		)
 
 		val available = StvrArchiveResolver(client).isAvailable(
@@ -80,6 +94,7 @@ class StvrArchiveAvailabilityTest {
 		)
 
 		assertFalse(available)
+		assertTrue(client.requestedFinalUrls.isEmpty())
 	}
 
 	private fun directJednotka() = TvChannel(
@@ -99,9 +114,20 @@ private fun availabilitySchedule(jednotka: String): String =
 
 private class RecordingStvrHttpClient(
 	private val responses: Map<String, String>,
+	private val finalUrls: Map<String, String>,
 ) : StvrHttpClient {
+	val requestedFinalUrls = mutableListOf<String>()
+
 	override suspend fun get(
 		url: String,
 		headers: Map<String, String>,
 	): String = responses.getValue(url)
+
+	override suspend fun finalUrl(
+		url: String,
+		headers: Map<String, String>,
+	): String {
+		requestedFinalUrls += url
+		return finalUrls.getValue(url)
+	}
 }
