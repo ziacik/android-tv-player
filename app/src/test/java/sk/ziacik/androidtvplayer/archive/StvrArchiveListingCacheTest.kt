@@ -14,13 +14,15 @@ import sk.ziacik.androidtvplayer.resolver.StvrHttpClient
 
 class StvrArchiveListingCacheTest {
 	@Test
-	fun `reuses one STVR JSON day listing for multiple archive programmes`() = runTest {
-		val listingUrl = cacheArchiveApiUrl("2026-09-08")
+	fun `reuses one STVR programme schedule for multiple archive programmes`() = runTest {
+		val scheduleUrl = cacheScheduleUrl("2026-09-08")
 		val client = RecordingCacheStvrHttpClient(
 			responses = mapOf(
-				listingUrl to cacheArchiveListing(
-					cacheArchiveItem(id = 617992, name = "Ranné správy", air = "2026-09-08 07:00:00"),
-					cacheArchiveItem(id = 618007, name = "Duel", air = "2026-09-08 17:44:00"),
+				scheduleUrl to cacheSchedule(
+					"""
+						<div><span>07:00</span><a href="/televizia/archiv/22948/617992">Ranné správy</a></div>
+						<div><span>17:44</span><a href="/televizia/archiv/14126/618007">Duel</a></div>
+					""".trimIndent(),
 				),
 				"https://www.rtvs.sk/json/archive5f.json?id=617992" to
 					"""{"clip":{"sources":[{"src":"https://cdn.example/morning.m3u8","type":"application/x-mpegurl"}]}}""",
@@ -31,29 +33,23 @@ class StvrArchiveListingCacheTest {
 		val resolver = StvrArchiveResolver(client)
 		val channel = directJednotka()
 
-		resolver.resolve(
-			channel = channel,
-			startsAtMs = 1_788_843_600_000L,
-			title = "Ranné správy",
-		)
-		resolver.resolve(
-			channel = channel,
-			startsAtMs = 1_788_882_000_000L,
-			title = "Duel",
-		)
+		resolver.resolve(channel = channel, startsAtMs = 1_788_843_600_000L)
+		resolver.resolve(channel = channel, startsAtMs = 1_788_882_240_000L)
 
-		assertEquals(1, client.requestedUrls.count { it == listingUrl })
+		assertEquals(1, client.requestedUrls.count { it == scheduleUrl })
 	}
 
 	@Test
-	fun `refreshes todays JSON archive listing after cache ttl`() = runTest {
-		val listingUrl = cacheArchiveApiUrl("2026-09-09")
+	fun `refreshes todays STVR programme schedule after cache ttl`() = runTest {
+		val scheduleUrl = cacheScheduleUrl("2026-09-09")
 		val client = SequentialCacheStvrHttpClient(
-			listingUrl = listingUrl,
-			listings = listOf(
-				cacheArchiveListing(),
-				cacheArchiveListing(
-					cacheArchiveItem(id = 618031, name = "Duel", air = "2026-09-09 10:45:00"),
+			scheduleUrl = scheduleUrl,
+			schedules = listOf(
+				cacheSchedule(
+					"""<div><span>10:45</span><a href="/televizia/program/14126/618031">Duel</a></div>""",
+				),
+				cacheSchedule(
+					"""<div><span>10:45</span><a href="/televizia/archiv/14126/618031">Duel</a></div>""",
 				),
 			),
 		)
@@ -72,7 +68,7 @@ class StvrArchiveListingCacheTest {
 		assertFalse(resolver.isAvailable(directJednotka(), programme))
 		nowMs += 6 * 60_000L
 		assertTrue(resolver.isAvailable(directJednotka(), programme))
-		assertEquals(2, client.requestedUrls.count { it == listingUrl })
+		assertEquals(2, client.requestedUrls.count { it == scheduleUrl })
 	}
 
 	private fun directJednotka() = TvChannel(
@@ -84,17 +80,11 @@ class StvrArchiveListingCacheTest {
 	)
 }
 
-private fun cacheArchiveApiUrl(date: String): String =
-	"https://www.stvr.sk/json/tv/archiv?e=1&archive=1&d=" + date + "&p=1&l=100&o=desc"
+private fun cacheScheduleUrl(date: String): String =
+	"https://www.stvr.sk/televizia/program/?date=$date"
 
-private fun cacheArchiveListing(vararg items: String): String =
-	"""{"paging":{"page":"1","size":"100","results":"${items.size}"},"program":[${items.joinToString(",")}]}"""
-
-private fun cacheArchiveItem(
-	id: Int,
-	name: String,
-	air: String,
-): String = """{"ID":$id,"series":22948,"name":"$name","air":"$air","license":""}"""
+private fun cacheSchedule(jednotka: String): String =
+	"""<html><h2>Jednotka</h2>$jednotka<h2>Dvojka</h2></html>"""
 
 private class RecordingCacheStvrHttpClient(
 	private val responses: Map<String, String>,
@@ -111,20 +101,20 @@ private class RecordingCacheStvrHttpClient(
 }
 
 private class SequentialCacheStvrHttpClient(
-	private val listingUrl: String,
-	private val listings: List<String>,
+	private val scheduleUrl: String,
+	private val schedules: List<String>,
 ) : StvrHttpClient {
 	val requestedUrls = mutableListOf<String>()
-	private var listingIndex = 0
+	private var scheduleIndex = 0
 
 	override suspend fun get(
 		url: String,
 		headers: Map<String, String>,
 	): String {
 		requestedUrls += url
-		check(url == listingUrl)
-		return listings[listingIndex.coerceAtMost(listings.lastIndex)].also {
-			listingIndex += 1
+		check(url == scheduleUrl)
+		return schedules[scheduleIndex.coerceAtMost(schedules.lastIndex)].also {
+			scheduleIndex += 1
 		}
 	}
 }
