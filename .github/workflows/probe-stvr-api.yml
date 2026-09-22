@@ -13,12 +13,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          url='https://www.stvr.sk/json/tv/archiv?e=1&archive=1&d=2026-09-09&p=1&l=100&o=desc'
-          curl --fail --silent --show-error --location "$url" -o /tmp/stvr.json
-          echo "=== bytes ==="
-          wc -c /tmp/stvr.json
-          echo "=== type/top-level ==="
-          jq -r 'type' /tmp/stvr.json
-          jq -r 'if type=="object" then keys[] else "array-length="+(length|tostring) end' /tmp/stvr.json | head -100
-          echo "=== sample ==="
-          jq '.' /tmp/stvr.json | head -600
+          for d in 2026-09-21 2026-09-22; do
+            url="https://www.stvr.sk/json/tv/archiv?e=1&archive=1&d=$d&p=1&l=100&o=desc"
+            curl --fail --silent --show-error --location "$url" -o "/tmp/stvr-$d.json"
+            echo "=== $d paging ==="
+            jq '.paging' "/tmp/stvr-$d.json"
+            echo "=== $d Duel / Profesional ==="
+            jq '.program[] | select((.name|ascii_downcase|contains("duel")) or (.name|ascii_downcase|contains("profesion"))) | {ID,series,name,air,license,status_premiere,subtitle,description}' "/tmp/stvr-$d.json"
+            echo "=== $d 09:30-18:30 ==="
+            jq '.program[] | select(.air >= "'$d' 09:30:00" and .air <= "'$d' 18:30:00") | {ID,series,name,air,license}' "/tmp/stvr-$d.json"
+          done
