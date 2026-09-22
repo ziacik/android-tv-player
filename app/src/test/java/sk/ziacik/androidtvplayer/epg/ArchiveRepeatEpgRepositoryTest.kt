@@ -3,7 +3,6 @@ package sk.ziacik.androidtvplayer.epg
 import java.io.File
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -15,7 +14,8 @@ class ArchiveRepeatEpgRepositoryTest {
     val temporaryFolder = TemporaryFolder()
 
     @Test
-    fun `does not infer original airing from matching external EPG titles`() = runTest {
+    fun `does not inspect secondary EPG to infer a repeat`() = runTest {
+        var secondaryDownloads = 0
         val repository = CachedXmltvEpgRepository(
             sources = listOf(
                 XmltvEpgSource(
@@ -31,6 +31,7 @@ class ArchiveRepeatEpgRepositoryTest {
                     id = EpgSourceId.SKYLINK,
                     cacheFile = File(temporaryFolder.root, "skylink.xml"),
                     download = {
+                        secondaryDownloads += 1
                         """<tv>
                             <programme channel="jednotka-skylink" start="20260908174500 +0200" stop="20260908181500 +0200"><title>Duel (74)</title></programme>
                             <programme channel="jednotka-skylink" start="20260909104500 +0200" stop="20260909111500 +0200"><title>Duel (74)</title></programme>
@@ -45,7 +46,7 @@ class ArchiveRepeatEpgRepositoryTest {
         val programme = repository.currentProgram(TEST_CHANNEL, MORNING_DUEL_MS)
 
         assertEquals("Duel", programme?.title)
-        assertNull(programme?.archiveOriginalStartsAtMs)
+        assertEquals(0, secondaryDownloads)
     }
 
     private companion object {
