@@ -5,10 +5,5 @@ interface StvrHttpClient {
         url: String,
         headers: Map<String, String>,
     ): String
-
-    suspend fun finalUrl(
-        url: String,
-        headers: Map<String, String>,
-    ): String = url
 }
 
