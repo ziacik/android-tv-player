@@ -15,11 +15,11 @@ import sk.ziacik.androidtvplayer.resolver.StreamResolveException
 class StvrArchiveResolverTest {
 	@Test
 	fun `resolves archive stream from JSON archive API item`() = runTest {
-		val apiUrl = archiveApiUrl("2026-09-08")
+		val apiUrl = resolverArchiveApiUrl("2026-09-08")
 		val client = ResolverStvrHttpClient(
 			mapOf(
-				apiUrl to archiveListing(
-					archiveItem(id = 617992, name = "Ranné správy", air = "2026-09-08 07:00:00"),
+				apiUrl to resolverArchiveListing(
+					resolverArchiveItem(id = 617992, name = "Ranné správy", air = "2026-09-08 07:00:00"),
 				),
 				"https://www.rtvs.sk/json/archive5f.json?id=617992" to
 					"""{"clip":{"sources":[{"src":"https://cdn.example/archive.m3u8","type":"application/x-mpegurl"}]}}""",
@@ -46,8 +46,8 @@ class StvrArchiveResolverTest {
 	fun `matches nearest JSON archive item when STVR start is shifted from EPG`() = runTest {
 		val client = ResolverStvrHttpClient(
 			mapOf(
-				archiveApiUrl("2026-09-08") to archiveListing(
-					archiveItem(id = 618007, name = "Duel", air = "2026-09-08 17:44:00"),
+				resolverArchiveApiUrl("2026-09-08") to resolverArchiveListing(
+					resolverArchiveItem(id = 618007, name = "Duel", air = "2026-09-08 17:44:00"),
 				),
 				"https://www.rtvs.sk/json/archive5f.json?id=618007" to
 					"""{"clip":{"sources":[{"src":"https://cdn.example/duel.m3u8","type":"application/x-mpegurl"}]}}""",
@@ -67,9 +67,9 @@ class StvrArchiveResolverTest {
 	fun `resolves repeat from original airing JSON archive date`() = runTest {
 		val client = ResolverStvrHttpClient(
 			mapOf(
-				archiveApiUrl("2026-09-09") to archiveListing(),
-				archiveApiUrl("2026-09-08") to archiveListing(
-					archiveItem(id = 618007, name = "Duel", air = "2026-09-08 17:44:00"),
+				resolverArchiveApiUrl("2026-09-09") to resolverArchiveListing(),
+				resolverArchiveApiUrl("2026-09-08") to resolverArchiveListing(
+					resolverArchiveItem(id = 618007, name = "Duel", air = "2026-09-08 17:44:00"),
 				),
 				"https://www.rtvs.sk/json/archive5f.json?id=618007" to
 					"""{"clip":{"sources":[{"src":"https://cdn.example/duel-repeat.m3u8","type":"application/x-mpegurl"}]}}""",
@@ -86,8 +86,8 @@ class StvrArchiveResolverTest {
 		assertEquals("https://cdn.example/duel-repeat.m3u8", result.url)
 		assertEquals(
 			listOf(
-				archiveApiUrl("2026-09-09"),
-				archiveApiUrl("2026-09-08"),
+				resolverArchiveApiUrl("2026-09-09"),
+				resolverArchiveApiUrl("2026-09-08"),
 				"https://www.rtvs.sk/json/archive5f.json?id=618007",
 			),
 			client.requestedUrls,
@@ -95,11 +95,40 @@ class StvrArchiveResolverTest {
 	}
 
 	@Test
+	fun `uses fixed STVR archive endpoint for Dvojka instead of treating e as channel id`() = runTest {
+		val apiUrl = resolverArchiveApiUrl("2026-09-08")
+		val client = ResolverStvrHttpClient(
+			mapOf(
+				apiUrl to resolverArchiveListing(
+					resolverArchiveItem(id = 700002, name = "Večerný program", air = "2026-09-08 17:44:00"),
+				),
+				"https://www.rtvs.sk/json/archive5f.json?id=700002" to
+					"""{"clip":{"sources":[{"src":"https://cdn.example/dvojka.m3u8","type":"application/x-mpegurl"}]}}""",
+			),
+		)
+
+		val result = StvrArchiveResolver(client).resolve(
+			channel = TvChannel(
+				storageKey = "dvojka",
+				displayName = "DVOJKA",
+				provider = ChannelProvider.DIRECT,
+				providerValue = "https://example.com/live.m3u8",
+				archive = ArchiveConfig(ArchiveProvider.STVR, channelId = "2"),
+			),
+			startsAtMs = 1_788_882_000_000L,
+			title = "Večerný program",
+		)
+
+		assertEquals("https://cdn.example/dvojka.m3u8", result.url)
+		assertEquals(apiUrl, client.requestedUrls.first())
+	}
+
+	@Test
 	fun `reports JSON archive diagnostics when item is missing`() = runTest {
 		val client = ResolverStvrHttpClient(
 			mapOf(
-				archiveApiUrl("2026-09-21") to archiveListing(
-					archiveItem(id = 620530, name = "Duel", air = "2026-09-21 17:45:00"),
+				resolverArchiveApiUrl("2026-09-21") to resolverArchiveListing(
+					resolverArchiveItem(id = 620530, name = "Duel", air = "2026-09-21 17:45:00"),
 				),
 			),
 		)
