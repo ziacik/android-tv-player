@@ -204,10 +204,10 @@ class StvrArchiveResolver(
 		const val TODAY_SCHEDULE_TTL_MS = 5 * 60_000L
 		val TIME_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 		val PROGRAM_TIME_REGEX = Regex(
-			""">\\s*(?<time>(?:[01]\\d|2[0-3]):[0-5]\\d)\\s*<""",
+			""">\s*(?<time>(?:[01]\d|2[0-3]):[0-5]\d)\s*<""",
 		)
 		val ARCHIVE_LINK_REGEX = Regex(
-			"""href\\s*=\\s*["'](?:https?://www\\.stvr\\.sk)?/televizia/archiv/\\d+/(?<id>\\d+)(?:[^\\d]|$)""",
+			"""href\s*=\s*["'](?:https?://www\.stvr\.sk)?/televizia/archiv/\d+/(?<id>\d+)(?:[^\d]|$)""",
 			RegexOption.IGNORE_CASE,
 		)
 	}
