@@ -9,18 +9,27 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Compare archive API params
+      - name: Inspect STVR archive frontend
         shell: bash
         run: |
           set -euo pipefail
-          base='https://www.stvr.sk/json/tv/archiv?archive=1&d=2026-09-21&p=1&l=100&o=desc'
-          for suffix in 'e=1' 'e=2' 'e=3' 'e=15' ''; do
-            label="${suffix:-no-e}"
-            url="$base"
-            [ -z "$suffix" ] || url="$url&$suffix"
-            curl --fail --silent --show-error --location "$url" -o "/tmp/${label//=/}.json"
-            echo "=== $label ==="
-            jq -c '{paging, items: [.program[] | {ID,series,name,air}]}' "/tmp/${label//=/}.json" | sha256sum
-            jq -c '.paging' "/tmp/${label//=/}.json"
-            jq -c '.program[] | select(.name=="Duel" or (.name|contains("Profesion"))) | {ID,series,name,air}' "/tmp/${label//=/}.json"
-          done
+          curl --fail --silent --show-error --location 'https://www.stvr.sk/televizia/archiv?date=2026-09-21&ord=dt' -o /tmp/page.html
+          echo '=== endpoint in html ==='
+          grep -oE '.{0,160}json/tv/archiv.{0,240}' /tmp/page.html || true
+          echo '=== script src ==='
+          grep -oE '<script[^>]+src=["'\'''][^"'\''']+' /tmp/page.html | sed -E 's/.*src=["'\''']//g' | tee /tmp/scripts.txt
+          n=0
+          while IFS= read -r src; do
+            case "$src" in
+              http*) url="$src" ;;
+              //*) url="https:$src" ;;
+              /*) url="https://www.stvr.sk$src" ;;
+              *) url="https://www.stvr.sk/televizia/$src" ;;
+            esac
+            n=$((n+1))
+            curl --fail --silent --show-error --location "$url" -o "/tmp/script-$n.js" || continue
+            if grep -q 'json/tv/archiv' "/tmp/script-$n.js"; then
+              echo "=== FOUND $url ==="
+              grep -oE '.{0,400}json/tv/archiv.{0,500}' "/tmp/script-$n.js" | head -20
+            fi
+          done < /tmp/scripts.txt
