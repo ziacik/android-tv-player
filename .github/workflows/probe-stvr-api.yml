@@ -1,0 +1,24 @@
+name: Probe STVR JSON API
+
+on:
+  push:
+    branches:
+      - fix/stvr-archive-program-page
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch STVR archive API
+        shell: bash
+        run: |
+          set -euo pipefail
+          url='https://www.stvr.sk/json/tv/archiv?e=1&archive=1&d=2026-09-09&p=1&l=100&o=desc'
+          curl --fail --silent --show-error --location "$url" -o /tmp/stvr.json
+          echo "=== bytes ==="
+          wc -c /tmp/stvr.json
+          echo "=== type/top-level ==="
+          jq -r 'type' /tmp/stvr.json
+          jq -r 'if type=="object" then keys[] else "array-length="+(length|tostring) end' /tmp/stvr.json | head -100
+          echo "=== sample ==="
+          jq '.' /tmp/stvr.json | head -600
