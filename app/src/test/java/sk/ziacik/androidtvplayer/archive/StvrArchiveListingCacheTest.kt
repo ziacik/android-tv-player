@@ -16,18 +16,24 @@ class StvrArchiveListingCacheTest {
 	@Test
 	fun `reuses one STVR programme schedule for multiple archive programmes`() = runTest {
 		val scheduleUrl = cacheScheduleUrl("2026-09-08")
+		val morningUrl = "https://www.stvr.sk/televizia/program/22948/617992"
+		val duelUrl = "https://www.stvr.sk/televizia/program/14126/618007"
 		val client = RecordingCacheStvrHttpClient(
 			responses = mapOf(
 				scheduleUrl to cacheSchedule(
 					"""
-						<div><span>07:00</span><a href="/televizia/archiv/22948/617992">Ranné správy</a></div>
-						<div><span>17:44</span><a href="/televizia/archiv/14126/618007">Duel</a></div>
+						<div><span>07:00</span><a href="/televizia/program/22948/617992">Ranné správy</a></div>
+						<div><span>17:44</span><a href="/televizia/program/14126/618007">Duel</a></div>
 					""".trimIndent(),
 				),
 				"https://www.rtvs.sk/json/archive5f.json?id=617992" to
 					"""{"clip":{"sources":[{"src":"https://cdn.example/morning.m3u8","type":"application/x-mpegurl"}]}}""",
 				"https://www.rtvs.sk/json/archive5f.json?id=618007" to
 					"""{"clip":{"sources":[{"src":"https://cdn.example/duel.m3u8","type":"application/x-mpegurl"}]}}""",
+			),
+			finalUrls = mapOf(
+				morningUrl to "https://www.stvr.sk/televizia/archiv/22948/617992",
+				duelUrl to "https://www.stvr.sk/televizia/archiv/14126/618007",
 			),
 		)
 		val resolver = StvrArchiveResolver(client)
@@ -42,16 +48,18 @@ class StvrArchiveListingCacheTest {
 	@Test
 	fun `refreshes todays STVR programme schedule after cache ttl`() = runTest {
 		val scheduleUrl = cacheScheduleUrl("2026-09-09")
+		val programmeUrl = "https://www.stvr.sk/televizia/program/14126/618031"
 		val client = SequentialCacheStvrHttpClient(
 			scheduleUrl = scheduleUrl,
 			schedules = listOf(
-				cacheSchedule(
-					"""<div><span>10:45</span><a href="/televizia/program/14126/618031">Duel</a></div>""",
-				),
-				cacheSchedule(
-					"""<div><span>10:45</span><a href="/televizia/archiv/14126/618031">Duel</a></div>""",
-				),
+				cacheSchedule("""<div><span>10:45</span><a href="/televizia/program/14126/618031">Duel</a></div>"""),
+				cacheSchedule("""<div><span>10:45</span><a href="/televizia/program/14126/618031">Duel</a></div>"""),
 			),
+			finalUrls = listOf(
+				"https://www.stvr.sk/televizia/archiv/14126",
+				"https://www.stvr.sk/televizia/archiv/14126/618031",
+			),
+			programmeUrl = programmeUrl,
 		)
 		var nowMs = 1_788_948_000_000L
 		val resolver = StvrArchiveResolver(
@@ -88,6 +96,7 @@ private fun cacheSchedule(jednotka: String): String =
 
 private class RecordingCacheStvrHttpClient(
 	private val responses: Map<String, String>,
+	private val finalUrls: Map<String, String>,
 ) : StvrHttpClient {
 	val requestedUrls = mutableListOf<String>()
 
@@ -98,14 +107,22 @@ private class RecordingCacheStvrHttpClient(
 		requestedUrls += url
 		return responses.getValue(url)
 	}
+
+	override suspend fun finalUrl(
+		url: String,
+		headers: Map<String, String>,
+	): String = finalUrls.getValue(url)
 }
 
 private class SequentialCacheStvrHttpClient(
 	private val scheduleUrl: String,
 	private val schedules: List<String>,
+	private val finalUrls: List<String>,
+	private val programmeUrl: String,
 ) : StvrHttpClient {
 	val requestedUrls = mutableListOf<String>()
 	private var scheduleIndex = 0
+	private var finalUrlIndex = 0
 
 	override suspend fun get(
 		url: String,
@@ -115,6 +132,16 @@ private class SequentialCacheStvrHttpClient(
 		check(url == scheduleUrl)
 		return schedules[scheduleIndex.coerceAtMost(schedules.lastIndex)].also {
 			scheduleIndex += 1
+		}
+	}
+
+	override suspend fun finalUrl(
+		url: String,
+		headers: Map<String, String>,
+	): String {
+		check(url == programmeUrl)
+		return finalUrls[finalUrlIndex.coerceAtMost(finalUrls.lastIndex)].also {
+			finalUrlIndex += 1
 		}
 	}
 }
