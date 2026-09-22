@@ -158,6 +158,18 @@ class StvrArchiveResolverTest {
 	)
 }
 
+private fun resolverArchiveApiUrl(date: String): String =
+	"https://www.stvr.sk/json/tv/archiv?e=1&archive=1&d=" + date + "&p=1&l=100&o=desc"
+
+private fun resolverArchiveListing(vararg items: String): String =
+	"""{"paging":{"page":"1","size":"100","results":"${items.size}"},"program":[${items.joinToString(",")}]}"""
+
+private fun resolverArchiveItem(
+	id: Int,
+	name: String,
+	air: String,
+): String = """{"ID":$id,"series":22948,"name":"$name","air":"$air","license":""}"""
+
 private class ResolverStvrHttpClient(
 	private val responses: Map<String, String>,
 ) : StvrHttpClient {
