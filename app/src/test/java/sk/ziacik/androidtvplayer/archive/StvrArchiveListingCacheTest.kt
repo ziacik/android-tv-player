@@ -15,12 +15,12 @@ import sk.ziacik.androidtvplayer.resolver.StvrHttpClient
 class StvrArchiveListingCacheTest {
 	@Test
 	fun `reuses one STVR JSON day listing for multiple archive programmes`() = runTest {
-		val listingUrl = archiveApiUrl("2026-09-08")
+		val listingUrl = cacheArchiveApiUrl("2026-09-08")
 		val client = RecordingCacheStvrHttpClient(
 			responses = mapOf(
-				listingUrl to archiveListing(
-					archiveItem(id = 617992, name = "Ranné správy", air = "2026-09-08 07:00:00"),
-					archiveItem(id = 618007, name = "Duel", air = "2026-09-08 17:44:00"),
+				listingUrl to cacheArchiveListing(
+					cacheArchiveItem(id = 617992, name = "Ranné správy", air = "2026-09-08 07:00:00"),
+					cacheArchiveItem(id = 618007, name = "Duel", air = "2026-09-08 17:44:00"),
 				),
 				"https://www.rtvs.sk/json/archive5f.json?id=617992" to
 					"""{"clip":{"sources":[{"src":"https://cdn.example/morning.m3u8","type":"application/x-mpegurl"}]}}""",
@@ -47,13 +47,13 @@ class StvrArchiveListingCacheTest {
 
 	@Test
 	fun `refreshes todays JSON archive listing after cache ttl`() = runTest {
-		val listingUrl = archiveApiUrl("2026-09-09")
+		val listingUrl = cacheArchiveApiUrl("2026-09-09")
 		val client = SequentialCacheStvrHttpClient(
 			listingUrl = listingUrl,
 			listings = listOf(
-				archiveListing(),
-				archiveListing(
-					archiveItem(id = 618031, name = "Duel", air = "2026-09-09 10:45:00"),
+				cacheArchiveListing(),
+				cacheArchiveListing(
+					cacheArchiveItem(id = 618031, name = "Duel", air = "2026-09-09 10:45:00"),
 				),
 			),
 		)
@@ -84,13 +84,13 @@ class StvrArchiveListingCacheTest {
 	)
 }
 
-private fun archiveApiUrl(date: String): String =
+private fun cacheArchiveApiUrl(date: String): String =
 	"https://www.stvr.sk/json/tv/archiv?e=1&archive=1&d=" + date + "&p=1&l=100&o=desc"
 
-private fun archiveListing(vararg items: String): String =
+private fun cacheArchiveListing(vararg items: String): String =
 	"""{"paging":{"page":"1","size":"100","results":"${items.size}"},"program":[${items.joinToString(",")}]}"""
 
-private fun archiveItem(
+private fun cacheArchiveItem(
 	id: Int,
 	name: String,
 	air: String,
