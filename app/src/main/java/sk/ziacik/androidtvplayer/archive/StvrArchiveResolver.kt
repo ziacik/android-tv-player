@@ -1,6 +1,7 @@
 package sk.ziacik.androidtvplayer.archive
 
 import java.time.Instant
+import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -8,6 +9,7 @@ import java.util.Locale
 import kotlin.math.abs
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import org.json.JSONObject
 import sk.ziacik.androidtvplayer.channel.ArchiveProvider
 import sk.ziacik.androidtvplayer.channel.TvChannel
 import sk.ziacik.androidtvplayer.resolver.ProgramMetadata
@@ -18,410 +20,263 @@ import sk.ziacik.androidtvplayer.resolver.StreamResolveException
 import sk.ziacik.androidtvplayer.resolver.StreamSource
 
 class StvrArchiveResolver(
-    private val httpClient: StvrHttpClient,
-    private val parser: StvrJsonParser = StvrJsonParser(),
-    private val zoneId: ZoneId = ZoneId.of("Europe/Bratislava"),
-    private val nowMs: () -> Long = System::currentTimeMillis,
+	private val httpClient: StvrHttpClient,
+	private val parser: StvrJsonParser = StvrJsonParser(),
+	private val zoneId: ZoneId = ZoneId.of("Europe/Bratislava"),
+	private val nowMs: () -> Long = System::currentTimeMillis,
 ) {
-    private val archiveListingMutex = Mutex()
-    private val archiveListings = mutableMapOf<String, ArchiveListingCacheEntry>()
-    private val archiveRedirectMutex = Mutex()
-    private val archiveRedirects = mutableMapOf<String, ArchiveRedirectCacheEntry>()
-    private val archiveSourceMutex = Mutex()
-    private val archiveSources = mutableMapOf<String, ArchiveSourceCacheEntry>()
+	private val archiveListingMutex = Mutex()
+	private val archiveListings = mutableMapOf<String, ArchiveListingCacheEntry>()
 
-    suspend fun resolve(
-        channel: TvChannel,
-        startsAtMs: Long,
-        title: String,
-        originalStartsAtMs: Long? = null,
-    ): StreamSource {
-        val headers = mapOf("User-Agent" to STVR_USER_AGENT)
-        val lookup = findArchive(
-            channel = channel,
-            startsAtMs = startsAtMs,
-            title = title,
-            originalStartsAtMs = originalStartsAtMs,
-            headers = headers,
-        )
-        val archiveId = lookup.archiveId ?: throw StreamResolveException(
-            archiveLookupFailureMessage(
-                listing = lookup.listing,
-                channel = channel,
-                expectedTime = lookup.expectedTime,
-                expectedTitle = title,
-                originalStart = lookup.originalStart,
-            ),
-        )
+	suspend fun resolve(
+		channel: TvChannel,
+		startsAtMs: Long,
+		title: String,
+		originalStartsAtMs: Long? = null,
+	): StreamSource {
+		val headers = mapOf("User-Agent" to STVR_USER_AGENT)
+		val lookup = findArchive(
+			channel = channel,
+			startsAtMs = startsAtMs,
+			title = title,
+			originalStartsAtMs = originalStartsAtMs,
+			headers = headers,
+		)
+		val archiveId = lookup.archiveId ?: throw StreamResolveException(
+			archiveLookupFailureMessage(
+				listing = lookup.listing,
+				expectedTime = lookup.expectedTime,
+				expectedTitle = title,
+				originalStart = lookup.originalStart,
+			),
+		)
 
-        return resolveArchiveSource(archiveId, headers)
-            ?: throw StreamResolveException("STVR archive response does not contain a playable HLS source")
-    }
+		val body = httpClient.get("$STVR_ARCHIVE_STREAM_JSON_URL?id=$archiveId", headers)
+		val hlsUrl = parser.parse(body).hlsUrl
+			?: throw StreamResolveException("STVR archive response does not contain a playable HLS source")
 
-    suspend fun isAvailable(
-        channel: TvChannel,
-        program: ProgramMetadata,
-    ): Boolean {
-        if (channel.archive?.provider != ArchiveProvider.STVR) return false
-        val startsAtMs = program.startsAtMs ?: return false
-        val headers = mapOf("User-Agent" to STVR_USER_AGENT)
-        val archiveId = findArchive(
-            channel = channel,
-            startsAtMs = startsAtMs,
-            title = program.title,
-            originalStartsAtMs = program.archiveOriginalStartsAtMs,
-            headers = headers,
-        ).archiveId ?: return false
-        return resolveArchiveSource(archiveId, headers) != null
-    }
+		return StreamSource(
+			url = hlsUrl,
+			userAgent = STVR_USER_AGENT,
+		)
+	}
 
-    private suspend fun findArchive(
-        channel: TvChannel,
-        startsAtMs: Long,
-        title: String,
-        originalStartsAtMs: Long?,
-        headers: Map<String, String>,
-    ): ArchiveLookup {
-        val start = Instant.ofEpochMilli(startsAtMs).atZone(zoneId)
-        val startTime = start.format(TIME_FORMAT)
-        val listing = archiveListing(start, headers)
-        val directArchiveId = findArchiveId(
-            listing = listing,
-            channel = channel,
-            startTime = startTime,
-            title = title,
-            headers = headers,
-        )
-        val originalStart = originalStartsAtMs
-            ?.takeIf { it != startsAtMs }
-            ?.let { Instant.ofEpochMilli(it).atZone(zoneId) }
-        val archiveId = directArchiveId ?: originalStart?.let { original ->
-            val originalListing = archiveListing(original, headers)
-            findArchiveId(
-                listing = originalListing,
-                channel = channel,
-                startTime = original.format(TIME_FORMAT),
-                title = title,
-                headers = headers,
-            )
-        }
-        return ArchiveLookup(
-            archiveId = archiveId,
-            listing = listing,
-            expectedTime = startTime,
-            originalStart = originalStart,
-        )
-    }
+	suspend fun isAvailable(
+		channel: TvChannel,
+		program: ProgramMetadata,
+	): Boolean {
+		if (channel.archive?.provider != ArchiveProvider.STVR) return false
+		val startsAtMs = program.startsAtMs ?: return false
+		return findArchive(
+			channel = channel,
+			startsAtMs = startsAtMs,
+			title = program.title,
+			originalStartsAtMs = program.archiveOriginalStartsAtMs,
+			headers = mapOf("User-Agent" to STVR_USER_AGENT),
+		).archiveId != null
+	}
 
-    private suspend fun archiveListing(
-        start: ZonedDateTime,
-        headers: Map<String, String>,
-    ): String {
-        val url = start.programListingUrl()
-        return archiveListingMutex.withLock {
-            val currentNowMs = nowMs()
-            val cached = archiveListings[url]
-            if (cached != null && cached.isValidFor(start, currentNowMs)) {
-                return@withLock cached.listing
-            }
+	private suspend fun findArchive(
+		channel: TvChannel,
+		startsAtMs: Long,
+		title: String,
+		originalStartsAtMs: Long?,
+		headers: Map<String, String>,
+	): ArchiveLookup {
+		val start = Instant.ofEpochMilli(startsAtMs).atZone(zoneId)
+		val startTime = start.format(TIME_FORMAT)
+		val listing = archiveListing(start, channel, headers)
+		val directArchiveId = findArchiveId(
+			listing = listing,
+			startTime = startTime,
+			title = title,
+		)
 
-            httpClient.get(url, headers).also { listing ->
-                archiveListings[url] = ArchiveListingCacheEntry(
-                    listing = listing,
-                    fetchedAtMs = currentNowMs,
-                )
-            }
-        }
-    }
+		val originalStart = originalStartsAtMs
+			?.takeIf { it != startsAtMs }
+			?.let { Instant.ofEpochMilli(it).atZone(zoneId) }
+		val archiveId = directArchiveId ?: originalStart?.let { original ->
+			findArchiveId(
+				listing = archiveListing(original, channel, headers),
+				startTime = original.format(TIME_FORMAT),
+				title = title,
+			)
+		}
 
-    private fun ArchiveListingCacheEntry.isValidFor(
-        start: ZonedDateTime,
-        currentNowMs: Long,
-    ): Boolean {
-        val today = Instant.ofEpochMilli(currentNowMs).atZone(zoneId).toLocalDate()
-        if (start.toLocalDate() != today) return true
-        return currentNowMs - fetchedAtMs < TODAY_ARCHIVE_LISTING_TTL_MS
-    }
+		return ArchiveLookup(
+			archiveId = archiveId,
+			listing = listing,
+			expectedTime = startTime,
+			originalStart = originalStart,
+		)
+	}
 
-    private suspend fun findArchiveId(
-        listing: String,
-        channel: TvChannel,
-        startTime: String,
-        title: String,
-        headers: Map<String, String>,
-    ): String? {
-        val expectedMinutes = startTime.minutesOfDay() ?: return null
-        val expectedTitle = title.normalizedTitle()
-        val nearbyCandidates = parseProgrammeItems(listing, channel)
-            .mapNotNull { candidate ->
-                val candidateMinutes = candidate.time.minutesOfDay() ?: return@mapNotNull null
-                candidate to minuteDistance(expectedMinutes, candidateMinutes)
-            }
-            .filter { (_, distance) -> distance <= ARCHIVE_TIME_TOLERANCE_MINUTES }
-            .toList()
+	private suspend fun archiveListing(
+		start: ZonedDateTime,
+		channel: TvChannel,
+		headers: Map<String, String>,
+	): String {
+		val url = archiveApiUrl(channel, start)
+		return archiveListingMutex.withLock {
+			val currentNowMs = nowMs()
+			val cached = archiveListings[url]
+			if (cached != null && cached.isValidFor(start, currentNowMs)) {
+				return@withLock cached.listing
+			}
 
-        val exact = nearbyCandidates
-            .filter { (candidate, _) -> candidate.title == expectedTitle }
-            .sortedBy { (_, distance) -> distance }
-        val partial = nearbyCandidates
-            .filter { (candidate, _) ->
-                candidate.title.contains(expectedTitle) || expectedTitle.contains(candidate.title)
-            }
-            .sortedBy { (_, distance) -> distance }
-        val fallback = nearbyCandidates.singleOrNull()?.let(::listOf).orEmpty()
-        val candidates = (exact + partial + fallback)
-            .map { (candidate, _) -> candidate }
-            .distinctBy { it.programUrl }
+			httpClient.get(url, headers).also { listing ->
+				archiveListings[url] = ArchiveListingCacheEntry(
+					listing = listing,
+					fetchedAtMs = currentNowMs,
+				)
+			}
+		}
+	}
 
-        for (candidate in candidates) {
-            resolveArchiveId(candidate.programUrl, headers)?.let { return it }
-        }
-        return null
-    }
+	private fun ArchiveListingCacheEntry.isValidFor(
+		start: ZonedDateTime,
+		currentNowMs: Long,
+	): Boolean {
+		val today = Instant.ofEpochMilli(currentNowMs).atZone(zoneId).toLocalDate()
+		if (start.toLocalDate() != today) return true
+		return currentNowMs - fetchedAtMs < TODAY_ARCHIVE_LISTING_TTL_MS
+	}
 
-    private fun parseProgrammeItems(
-        listing: String,
-        channel: TvChannel,
-    ): List<ProgrammeItem> {
-        val channelListing = listing.channelSection(channel)
-        val starts = PROGRAMME_START_REGEX.findAll(channelListing).toList()
-        return starts.mapIndexedNotNull { index, match ->
-            val blockEnd = starts.getOrNull(index + 1)?.range?.first ?: channelListing.length
-            val block = channelListing.substring(match.range.first, blockEnd)
-            val programmeLink = PROGRAMME_LINK_REGEX.findAll(block)
-                .mapNotNull { link ->
-                    val title = requireNotNull(link.groups["title"]).value.normalizedTitle()
-                    if (title.isBlank() || title in PROGRAMME_ACTION_TITLES) {
-                        null
-                    } else {
-                        link to title
-                    }
-                }
-                .firstOrNull()
-                ?: return@mapIndexedNotNull null
+	private fun archiveApiUrl(
+		channel: TvChannel,
+		start: ZonedDateTime,
+	): String {
+		val archive = channel.archive
+			?.takeIf { it.provider == ArchiveProvider.STVR }
+			?: throw StreamResolveException("STVR archive is not configured for channel")
+		return buildString {
+			append(STVR_ARCHIVE_API_URL)
+			append("?e=").append(archive.channelId)
+			append("&archive=1")
+			append("&d=").append(start.toLocalDate())
+			append("&p=1&l=100&o=desc")
+		}
+	}
 
-            ProgrammeItem(
-                programUrl = requireNotNull(programmeLink.first.groups["url"])
-                    .value
-                    .absoluteStvrUrl(),
-                time = requireNotNull(match.groups["time"]).value,
-                title = programmeLink.second,
-            )
-        }
-    }
+	private fun findArchiveId(
+		listing: String,
+		startTime: String,
+		title: String,
+	): String? {
+		val expectedMinutes = startTime.minutesOfDay() ?: return null
+		val expectedTitle = title.normalizedTitle()
+		val nearby = parseArchiveItems(listing)
+			.map { item -> item to minuteDistance(expectedMinutes, item.airMinutes) }
+			.filter { (_, distance) -> distance <= ARCHIVE_TIME_TOLERANCE_MINUTES }
 
-    private suspend fun resolveArchiveId(
-        programUrl: String,
-        headers: Map<String, String>,
-    ): String? {
-        val currentNowMs = nowMs()
-        val cached = archiveRedirectMutex.withLock {
-            archiveRedirects[programUrl]
-        }
-        if (cached != null && cached.isValidAt(currentNowMs)) {
-            return cached.archiveId
-        }
+		val exact = nearby
+			.filter { (item, _) -> item.title == expectedTitle }
+			.minByOrNull { (_, distance) -> distance }
+		if (exact != null) return exact.first.id
 
-        val finalUrl = runCatching {
-            httpClient.finalUrl(programUrl, headers)
-        }.getOrNull() ?: return null
-        val archiveId = ARCHIVE_FINAL_URL_REGEX.find(finalUrl)
-            ?.groups
-            ?.get("id")
-            ?.value
-        archiveRedirectMutex.withLock {
-            archiveRedirects[programUrl] = ArchiveRedirectCacheEntry(
-                archiveId = archiveId,
-                fetchedAtMs = currentNowMs,
-            )
-        }
-        return archiveId
-    }
+		return nearby
+			.filter { (item, _) ->
+				item.title.contains(expectedTitle) || expectedTitle.contains(item.title)
+			}
+			.minByOrNull { (_, distance) -> distance }
+			?.first
+			?.id
+	}
 
-    private suspend fun resolveArchiveSource(
-        archiveId: String,
-        headers: Map<String, String>,
-    ): StreamSource? {
-        val currentNowMs = nowMs()
-        val cached = archiveSourceMutex.withLock {
-            archiveSources[archiveId]
-        }
-        if (cached != null && cached.isValidAt(currentNowMs)) {
-            return cached.source
-        }
+	private fun parseArchiveItems(listing: String): List<ArchiveItem> = try {
+		val programs = JSONObject(listing).optJSONArray("program") ?: return emptyList()
+		(0 until programs.length()).mapNotNull { index ->
+			val item = programs.optJSONObject(index) ?: return@mapNotNull null
+			val id = item.optLong("ID", -1L).takeIf { it > 0L }?.toString()
+				?: return@mapNotNull null
+			val title = item.optString("name").normalizedTitle()
+			if (title.isBlank()) return@mapNotNull null
+			val air = item.optString("air")
+			val airMinutes = runCatching {
+				LocalDateTime.parse(air, ARCHIVE_AIR_FORMAT).let {
+					it.hour * 60 + it.minute
+				}
+			}.getOrNull() ?: return@mapNotNull null
+			ArchiveItem(
+				id = id,
+				title = title,
+				airMinutes = airMinutes,
+			)
+		}
+	} catch (error: Exception) {
+		throw StreamResolveException("STVR archive API returned invalid JSON", error)
+	}
 
-        val source = runCatching {
-            val body = httpClient.get("$STVR_ARCHIVE_JSON_URL?id=$archiveId", headers)
-            parser.parse(body).hlsUrl
-                ?.let { hlsUrl ->
-                    StreamSource(
-                        url = hlsUrl,
-                        userAgent = STVR_USER_AGENT,
-                    )
-                }
-        }.getOrNull()
+	private fun archiveLookupFailureMessage(
+		listing: String,
+		expectedTime: String,
+		expectedTitle: String,
+		originalStart: ZonedDateTime?,
+	): String {
+		val archiveItems = parseArchiveItems(listing)
+		return buildString {
+			append("STVR archive item was not found")
+			append("; expectedTime=").append(expectedTime)
+			append("; expectedTitle=").append(expectedTitle.normalizedTitle())
+			append("; archiveItems=").append(archiveItems.size)
+			append("; archiveIds=").append(
+				archiveItems.take(MAX_DIAGNOSTIC_IDS).joinToString(",") { it.id },
+			)
+			originalStart?.let {
+				append("; originalDate=").append(it.toLocalDate())
+				append("; originalTime=").append(it.format(TIME_FORMAT))
+			}
+		}
+	}
 
-        archiveSourceMutex.withLock {
-            archiveSources[archiveId] = ArchiveSourceCacheEntry(
-                source = source,
-                fetchedAtMs = currentNowMs,
-            )
-        }
-        return source
-    }
+	private fun String.normalizedTitle(): String =
+		lowercase(Locale.ROOT)
+			.replace(NON_ALPHANUMERIC_REGEX, " ")
+			.replace(WHITESPACE_REGEX, " ")
+			.trim()
 
-    private fun String.absoluteStvrUrl(): String =
-        if (startsWith("http://") || startsWith("https://")) {
-            this
-        } else {
-            "$STVR_ORIGIN${if (startsWith('/')) this else "/$this"}"
-        }
+	private fun String.minutesOfDay(): Int? {
+		val parts = split(':')
+		if (parts.size != 2) return null
+		val hours = parts[0].toIntOrNull() ?: return null
+		val minutes = parts[1].toIntOrNull() ?: return null
+		if (hours !in 0..23 || minutes !in 0..59) return null
+		return hours * 60 + minutes
+	}
 
-    private fun archiveLookupFailureMessage(
-        listing: String,
-        channel: TvChannel,
-        expectedTime: String,
-        expectedTitle: String,
-        originalStart: ZonedDateTime? = null,
-    ): String {
-        val channelListing = listing.channelSection(channel)
-        val programmeItems = parseProgrammeItems(listing, channel)
-        val parsedCandidates = programmeItems.size
-        return buildString {
-            append("STVR archive item was not found")
-            append("; expectedTime=").append(expectedTime)
-            append("; expectedTitle=").append(expectedTitle.normalizedTitle())
-            append("; programmeLinks=").append(programmeItems.size)
-            append("; parsedCandidates=").append(parsedCandidates)
-            append("; programmeUrls=").append(
-                programmeItems.take(MAX_DIAGNOSTIC_IDS).joinToString(",") { it.programUrl },
-            )
-            append("; sectionChars=").append(channelListing.length)
-            append("; listingChars=").append(listing.length)
-            originalStart?.let {
-                append("; originalDate=").append(it.toLocalDate())
-                append("; originalTime=").append(it.format(TIME_FORMAT))
-            }
-        }
-    }
+	private fun minuteDistance(first: Int, second: Int): Int {
+		val direct = abs(first - second)
+		return minOf(direct, MINUTES_PER_DAY - direct)
+	}
 
-    private fun ZonedDateTime.programListingUrl(): String =
-        "$STVR_PROGRAM_URL?date=${toLocalDate()}"
+	private data class ArchiveListingCacheEntry(
+		val listing: String,
+		val fetchedAtMs: Long,
+	)
 
-    private fun String.channelSection(channel: TvChannel): String {
-        val heading = channel.archiveHeading()
-            ?: throw StreamResolveException("STVR archive is not configured for channel")
-        val headingMatch = Regex(
-            "<h(?<level>[1-6])[^>]*>\\s*${Regex.escape(heading)}\\s*</h[1-6]>",
-            setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
-        ).find(this) ?: return this
-        val headingLevel = requireNotNull(headingMatch.groups["level"]).value
-        val nextChannelHeading = Regex(
-            "<h$headingLevel[^>]*>.*?</h$headingLevel>",
-            setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
-        ).find(this, headingMatch.range.last + 1)
-        return substring(
-            headingMatch.range.last + 1,
-            nextChannelHeading?.range?.first ?: length,
-        )
-    }
+	private data class ArchiveLookup(
+		val archiveId: String?,
+		val listing: String,
+		val expectedTime: String,
+		val originalStart: ZonedDateTime?,
+	)
 
-    private fun TvChannel.archiveHeading(): String? {
-        val archiveConfig = archive?.takeIf { it.provider == ArchiveProvider.STVR } ?: return null
-        return when (archiveConfig.channelId) {
-            "1" -> "Jednotka"
-            "2" -> "Dvojka"
-            "3" -> "24"
-            "15" -> "Šport"
-            else -> null
-        }
-    }
+	private data class ArchiveItem(
+		val id: String,
+		val title: String,
+		val airMinutes: Int,
+	)
 
-    private fun String.normalizedTitle(): String =
-        replace(HTML_TAG_REGEX, " ")
-            .replace("&amp;", "&", ignoreCase = true)
-            .replace("&quot;", "\"", ignoreCase = true)
-            .replace("&#39;", "'", ignoreCase = true)
-            .replace("&nbsp;", " ", ignoreCase = true)
-            .lowercase(Locale.ROOT)
-            .replace(NON_ALPHANUMERIC_REGEX, " ")
-            .replace(WHITESPACE_REGEX, " ")
-            .trim()
-
-    private fun String.minutesOfDay(): Int? {
-        val parts = split(':')
-        if (parts.size != 2) return null
-        val hours = parts[0].toIntOrNull() ?: return null
-        val minutes = parts[1].toIntOrNull() ?: return null
-        if (hours !in 0..23 || minutes !in 0..59) return null
-        return hours * 60 + minutes
-    }
-
-    private fun minuteDistance(first: Int, second: Int): Int {
-        val direct = abs(first - second)
-        return minOf(direct, MINUTES_PER_DAY - direct)
-    }
-
-    private data class ArchiveListingCacheEntry(
-        val listing: String,
-        val fetchedAtMs: Long,
-    )
-
-    private data class ArchiveLookup(
-        val archiveId: String?,
-        val listing: String,
-        val expectedTime: String,
-        val originalStart: ZonedDateTime?,
-    )
-
-    private data class ArchiveRedirectCacheEntry(
-        val archiveId: String?,
-        val fetchedAtMs: Long,
-    ) {
-        fun isValidAt(currentNowMs: Long): Boolean =
-            archiveId != null || currentNowMs - fetchedAtMs < UNAVAILABLE_REDIRECT_TTL_MS
-    }
-
-    private data class ArchiveSourceCacheEntry(
-        val source: StreamSource?,
-        val fetchedAtMs: Long,
-    ) {
-        fun isValidAt(currentNowMs: Long): Boolean =
-            source != null || currentNowMs - fetchedAtMs < UNAVAILABLE_SOURCE_TTL_MS
-    }
-
-    private data class ProgrammeItem(
-        val programUrl: String,
-        val time: String,
-        val title: String,
-    )
-
-    private companion object {
-        const val STVR_PROGRAM_URL = "https://www.stvr.sk/televizia/program/"
-        const val STVR_ARCHIVE_JSON_URL = "https://www.rtvs.sk/json/archive5f.json"
-        const val ARCHIVE_TIME_TOLERANCE_MINUTES = 30
-        const val TODAY_ARCHIVE_LISTING_TTL_MS = 5 * 60_000L
-        const val UNAVAILABLE_REDIRECT_TTL_MS = 5 * 60_000L
-        const val UNAVAILABLE_SOURCE_TTL_MS = 5 * 60_000L
-        const val MINUTES_PER_DAY = 24 * 60
-        const val MAX_DIAGNOSTIC_IDS = 12
-        val TIME_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
-        val HTML_TAG_REGEX = Regex("<[^>]+>")
-        val NON_ALPHANUMERIC_REGEX = Regex("[^\\p{L}\\p{N}]+")
-        val WHITESPACE_REGEX = Regex("\\s+")
-        const val STVR_ORIGIN = "https://www.stvr.sk"
-        val PROGRAMME_START_REGEX = Regex(
-            """<[^>]*class=["'][^"']*time--start[^"']*["'][^>]*>\s*(?<time>\d{2}:\d{2})""",
-            RegexOption.IGNORE_CASE,
-        )
-        val PROGRAMME_LINK_REGEX = Regex(
-            """<a\b[^>]*href=["'](?<url>(?:https?://[^"']+)?/televizia/program/[^/"']+/\d+)["'][^>]*>(?<title>.*?)</a>""",
-            setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
-        )
-        val ARCHIVE_FINAL_URL_REGEX = Regex(
-            """/televizia/archiv/[^/?#]+/(?<id>\d+)(?:[/?#]|$)""",
-            RegexOption.IGNORE_CASE,
-        )
-        val PROGRAMME_ACTION_TITLES = setOf("o programe")
-    }
+	private companion object {
+		const val STVR_ARCHIVE_API_URL = "https://www.stvr.sk/json/tv/archiv"
+		const val STVR_ARCHIVE_STREAM_JSON_URL = "https://www.rtvs.sk/json/archive5f.json"
+		const val ARCHIVE_TIME_TOLERANCE_MINUTES = 30
+		const val TODAY_ARCHIVE_LISTING_TTL_MS = 5 * 60_000L
+		const val MINUTES_PER_DAY = 24 * 60
+		const val MAX_DIAGNOSTIC_IDS = 12
+		val TIME_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+		val ARCHIVE_AIR_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+		val NON_ALPHANUMERIC_REGEX = Regex("[^\\p{L}\\p{N}]+")
+		val WHITESPACE_REGEX = Regex("\\s+")
+	}
 }
