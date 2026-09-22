@@ -98,7 +98,6 @@ class CachedXmltvEpgRepository(
             sourceId = resolvedSource.id,
             channelId = resolvedChannelId,
             sourceProgramme = programme,
-            displayTitle = programme.title,
         )?.let { return it }
 
         val lookupMs = programme.startsAtMs + (programme.endsAtMs - programme.startsAtMs) / 2L
@@ -117,7 +116,6 @@ class CachedXmltvEpgRepository(
                 sourceId = source.id,
                 channelId = channelId,
                 sourceProgramme = sourceProgramme,
-                displayTitle = programme.title,
             )?.let { return it }
         }
         return null
@@ -127,10 +125,8 @@ class CachedXmltvEpgRepository(
         sourceId: EpgSourceId,
         channelId: String,
         sourceProgramme: EpgProgramme,
-        displayTitle: String,
     ): Long? {
         val identity = sourceProgramme.numberedEpisodeIdentity() ?: return null
-        if (identity.baseTitle != displayTitle.normalizedProgrammeTitle()) return null
         return cachedFeeds[sourceId]
             ?.programmes
             ?.get(channelId)
