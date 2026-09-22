@@ -111,8 +111,6 @@ class MainActivity : ComponentActivity() {
                     ArchiveProvider.STVR -> stvrArchiveResolver.resolve(
                         channel = channel,
                         startsAtMs = requireNotNull(program.startsAtMs),
-                        title = program.title,
-                        originalStartsAtMs = program.archiveOriginalStartsAtMs,
                     )
                     null -> throw StreamResolveException("Archive playback is not configured")
                 }
