@@ -210,7 +210,7 @@ class StvrArchiveResolver(
 			""">\s*(?<time>(?:[01]\d|2[0-3]):[0-5]\d)\s*<""",
 		)
 		val PROGRAMME_LINK_REGEX = Regex(
-			"""href\s*=\s*["'](?<path>/televizia/program/\d+/\d+)(?:[^\d]|$)""",
+			"""href\s*=\s*["'](?:https?://www\.stvr\.sk)?(?<path>/televizia/program/\d+/\d+)(?:[^\d]|$)""",
 			RegexOption.IGNORE_CASE,
 		)
 		val ARCHIVE_EPISODE_URL_REGEX = Regex(
