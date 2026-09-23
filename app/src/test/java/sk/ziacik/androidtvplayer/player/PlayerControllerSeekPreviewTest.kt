@@ -48,6 +48,31 @@ class PlayerControllerSeekPreviewTest {
     }
 
     @Test
+    fun `scrub preview advances without touching player until commit`() = runTest {
+        val player = RecordingPlayerPort(
+            PlaybackSnapshot(
+                currentPositionMs = 40_000L,
+                durationMs = 100_000L,
+                liveOffsetMs = 60_000L,
+                isSeekable = true,
+                isPlaying = true,
+            ),
+        )
+        val controller = controller(player, nowMs = 1_000_000L)
+
+        val first = requireNotNull(controller.previewSeek(null, 10_000L))
+        val second = requireNotNull(controller.previewSeek(first.positionMs, 60_000L))
+
+        assertEquals(50_000L, first.positionMs)
+        assertEquals(100_000L, second.positionMs)
+        assertEquals(1_000_000L, second.clockTimeMs)
+        assertNull(player.seekPositionMs)
+
+        assertEquals(1_000_000L, controller.commitSeek(second.positionMs))
+        assertEquals(100_000L, player.seekPositionMs)
+    }
+
+    @Test
     fun `non seekable playback has no seek preview`() = runTest {
         val player = RecordingPlayerPort(
             PlaybackSnapshot(
