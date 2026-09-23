@@ -46,6 +46,7 @@ data class PlayerOverlayModel(
     val noticeText: String? = null,
     val statusText: String? = null,
     val stateIndicator: PlayerOverlayStateIndicator = PlayerOverlayStateIndicator.LIVE,
+    val playbackDurationMs: Long? = null,
 ) {
     companion object {
         fun from(
@@ -151,6 +152,7 @@ data class PlayerOverlayModel(
                 liveActionText = "NAŽIVO",
                 statusText = statusText,
                 stateIndicator = stateIndicator,
+                playbackDurationMs = streamDurationMs,
             )
         }
 
