@@ -18,6 +18,11 @@ import sk.ziacik.androidtvplayer.resolver.StreamResolution
 import sk.ziacik.androidtvplayer.resolver.StreamResolveException
 import sk.ziacik.androidtvplayer.resolver.StreamSource
 
+data class SeekPreviewTarget(
+    val positionMs: Long,
+    val clockTimeMs: Long?,
+)
+
 class PlayerController(
     private val scope: CoroutineScope,
     private val initialChannel: TvChannel,
@@ -270,26 +275,44 @@ class PlayerController(
         resolveCurrentChannel()
     }
 
-    fun seekBack(): Long? {
+    fun seekBack(): Long? = seekBy(-SEEK_INCREMENT_MS)
+
+    fun seekForward(): Long? = seekBy(SEEK_INCREMENT_MS)
+
+    fun previewSeek(fromPositionMs: Long?, deltaMs: Long): SeekPreviewTarget? {
         if (released) return null
         val snapshot = playerPort.snapshot()
         if (!snapshot.isSeekable) return null
-        val target = (snapshot.currentPositionMs - SEEK_INCREMENT_MS).coerceAtLeast(0L)
+        val basePositionMs = fromPositionMs ?: snapshot.currentPositionMs
+        val target = seekTarget(snapshot, basePositionMs + deltaMs)
+        return SeekPreviewTarget(
+            positionMs = target,
+            clockTimeMs = seekClockTime(snapshot, target),
+        )
+    }
+
+    fun commitSeek(positionMs: Long): Long? {
+        if (released) return null
+        val snapshot = playerPort.snapshot()
+        if (!snapshot.isSeekable) return null
+        val target = seekTarget(snapshot, positionMs)
         playerPort.seekTo(target)
         return seekClockTime(snapshot, target)
     }
 
-    fun seekForward(): Long? {
+    private fun seekBy(deltaMs: Long): Long? {
         if (released) return null
         val snapshot = playerPort.snapshot()
         if (!snapshot.isSeekable) return null
-        val requested = snapshot.currentPositionMs + SEEK_INCREMENT_MS
-        val target = snapshot.durationMs?.let { duration ->
-            requested.coerceIn(0L, duration.coerceAtLeast(0L))
-        } ?: requested
+        val target = seekTarget(snapshot, snapshot.currentPositionMs + deltaMs)
         playerPort.seekTo(target)
         return seekClockTime(snapshot, target)
     }
+
+    private fun seekTarget(snapshot: PlaybackSnapshot, requestedMs: Long): Long =
+        snapshot.durationMs?.let { duration ->
+            requestedMs.coerceIn(0L, duration.coerceAtLeast(0L))
+        } ?: requestedMs.coerceAtLeast(0L)
 
     private fun seekClockTime(snapshot: PlaybackSnapshot, targetPositionMs: Long): Long? {
         if (archivePlayback) {
