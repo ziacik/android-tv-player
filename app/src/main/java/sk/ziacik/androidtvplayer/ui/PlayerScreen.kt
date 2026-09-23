@@ -70,6 +70,7 @@ fun PlayerScreen(
     val overlayVisible by overlayController.visible.collectAsState()
     var focusedControl by remember { mutableStateOf(FocusedControl.TIMELINE) }
     var seekPreviewMs by remember { mutableStateOf<Long?>(null) }
+    var scrubPositionMs by remember { mutableStateOf<Long?>(null) }
     var miniEpgVisible by remember { mutableStateOf(false) }
     var miniEpgSelectedChannel by remember { mutableStateOf<TvChannel?>(null) }
     var miniEpgProgrammes by remember { mutableStateOf<Map<String, ProgramMetadata>>(emptyMap()) }
@@ -142,8 +143,8 @@ fun PlayerScreen(
         }
     }
 
-    LaunchedEffect(seekPreviewMs) {
-        if (seekPreviewMs == null) return@LaunchedEffect
+    LaunchedEffect(seekPreviewMs, scrubPositionMs) {
+        if (seekPreviewMs == null || scrubPositionMs != null) return@LaunchedEffect
         delay(SEEK_PREVIEW_DURATION_MS)
         seekPreviewMs = null
     }
@@ -235,6 +236,7 @@ fun PlayerScreen(
             }
             overlayVisible -> {
                 seekPreviewMs = null
+                scrubPositionMs = null
                 overlayController.hide()
             }
             else -> onExit()
@@ -252,6 +254,8 @@ fun PlayerScreen(
                         action = event.nativeKeyEvent.action,
                         keyCode = keyCode,
                         miniEpgVisible = miniEpgVisible,
+                        overlayVisible = overlayVisible,
+                        focusedControl = focusedControl,
                     )
                 ) {
                     return@onPreviewKeyEvent false
@@ -272,6 +276,49 @@ fun PlayerScreen(
                     return@onPreviewKeyEvent true
                 }
 
+                val horizontalSeekDirection = when (keyCode) {
+                    KeyEvent.KEYCODE_DPAD_LEFT -> -1L
+                    KeyEvent.KEYCODE_DPAD_RIGHT -> 1L
+                    else -> null
+                }
+                if (
+                    horizontalSeekDirection != null &&
+                    !miniEpgVisible &&
+                    (!overlayVisible || focusedControl == FocusedControl.TIMELINE)
+                ) {
+                    when (event.nativeKeyEvent.action) {
+                        KeyEvent.ACTION_DOWN -> {
+                            val repeatCount = event.nativeKeyEvent.repeatCount
+                            if (overlayVisible || repeatCount > 0 || scrubPositionMs != null) {
+                                controller.previewSeek(
+                                    fromPositionMs = scrubPositionMs,
+                                    deltaMs = horizontalSeekDirection * seekScrubStepMs(repeatCount),
+                                )?.let { preview ->
+                                    scrubPositionMs = preview.positionMs
+                                    seekPreviewMs = preview.clockTimeMs
+                                    focusedControl = FocusedControl.TIMELINE
+                                    overlayController.show(OverlayController.NORMAL_TIMEOUT_MS)
+                                }
+                            }
+                            return@onPreviewKeyEvent true
+                        }
+                        KeyEvent.ACTION_UP -> {
+                            val pendingPositionMs = scrubPositionMs
+                            seekPreviewMs = if (pendingPositionMs != null) {
+                                controller.commitSeek(pendingPositionMs) ?: seekPreviewMs
+                            } else if (horizontalSeekDirection < 0L) {
+                                controller.seekBack()
+                            } else {
+                                controller.seekForward()
+                            }
+                            scrubPositionMs = null
+                            controller.refreshPlaybackSnapshot()
+                            overlayController.show(OverlayController.NORMAL_TIMEOUT_MS)
+                            return@onPreviewKeyEvent true
+                        }
+                    }
+                }
+
                 when (command) {
                     is RemoteCommand.NumericDigit -> {
                         miniEpgVisible = false
@@ -282,6 +329,7 @@ fun PlayerScreen(
                         miniEpgVisible = false
                         miniEpgSelectedChannel = null
                         seekPreviewMs = null
+                        scrubPositionMs = null
                         overlayController.showUntilProgramTitleReady()
                         controller.channelUp()
                     }
@@ -289,6 +337,7 @@ fun PlayerScreen(
                         miniEpgVisible = false
                         miniEpgSelectedChannel = null
                         seekPreviewMs = null
+                        scrubPositionMs = null
                         overlayController.showUntilProgramTitleReady()
                         controller.channelDown()
                     }
@@ -306,6 +355,7 @@ fun PlayerScreen(
                         miniEpgNowMs = System.currentTimeMillis()
                         miniEpgVisible = true
                         seekPreviewMs = null
+                        scrubPositionMs = null
                         overlayController.hide()
                     }
                     RemoteCommand.MiniEpgUp -> {
@@ -395,6 +445,7 @@ fun PlayerScreen(
                     }
                     RemoteCommand.GoLive -> {
                         seekPreviewMs = null
+                        scrubPositionMs = null
                         controller.goLive()
                         controller.refreshPlaybackSnapshot()
                     }
@@ -409,6 +460,7 @@ fun PlayerScreen(
                     }
                     RemoteCommand.HideOverlay -> {
                         seekPreviewMs = null
+                        scrubPositionMs = null
                         overlayController.hide()
                     }
                     RemoteCommand.Exit -> onExit()
@@ -444,6 +496,7 @@ fun PlayerScreen(
             onSaveMarkizaCredentials = onSaveMarkizaCredentials,
             modifier = Modifier.align(Alignment.Center),
             seekPreviewMs = seekPreviewMs,
+            seekPreviewPositionMs = scrubPositionMs,
             formatSeekTime = { millis -> seekTimeFormat.format(Date(millis)) },
         )
 
@@ -498,6 +551,7 @@ internal fun PlayerStateLayer(
     onSaveMarkizaCredentials: (String, String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
     seekPreviewMs: Long? = null,
+    seekPreviewPositionMs: Long? = null,
     formatSeekTime: (Long) -> String = formatTime,
 ) {
     when (val current = state) {
@@ -529,6 +583,7 @@ internal fun PlayerStateLayer(
                 formatTime = formatTime,
                 modifier = modifier,
                 seekPreviewMs = seekPreviewMs,
+                seekPreviewPositionMs = seekPreviewPositionMs,
                 formatSeekTime = formatSeekTime,
             )
         }
@@ -646,15 +701,27 @@ internal fun shouldHandleRemoteKeyEvent(
     action: Int,
     keyCode: Int,
     miniEpgVisible: Boolean,
+    overlayVisible: Boolean = true,
+    focusedControl: FocusedControl = FocusedControl.TIMELINE,
 ): Boolean {
     val miniEpgVerticalNavigation = miniEpgVisible &&
         (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN)
+    val timelineScrub = !miniEpgVisible &&
+        (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) &&
+        (!overlayVisible || focusedControl == FocusedControl.TIMELINE)
 
-    return if (miniEpgVerticalNavigation) {
-        action == KeyEvent.ACTION_DOWN
-    } else {
-        action == KeyEvent.ACTION_UP
+    return when {
+        miniEpgVerticalNavigation -> action == KeyEvent.ACTION_DOWN
+        timelineScrub -> action == KeyEvent.ACTION_DOWN || action == KeyEvent.ACTION_UP
+        else -> action == KeyEvent.ACTION_UP
     }
+}
+
+internal fun seekScrubStepMs(repeatCount: Int): Long = when {
+    repeatCount >= 50 -> 300_000L
+    repeatCount >= 20 -> 60_000L
+    repeatCount >= 6 -> 30_000L
+    else -> 10_000L
 }
 
 private fun Int.isCenterKey(): Boolean =
