@@ -68,6 +68,7 @@ fun PlayerOverlay(
     formatTime: (Long) -> String,
     modifier: Modifier = Modifier,
     seekPreviewMs: Long? = null,
+    seekPreviewPositionMs: Long? = null,
     formatSeekTime: (Long) -> String = formatTime,
 ) {
     val channelParts = model.channelLabel.split("    ", limit = 2)
@@ -160,6 +161,8 @@ fun PlayerOverlay(
                         programmeNowMs = model.programmeNowMs,
                         programmeEndMs = model.programmeEndMs,
                         seekPreviewMs = seekPreviewMs,
+                        seekPreviewPositionMs = seekPreviewPositionMs,
+                        playbackDurationMs = model.playbackDurationMs,
                         formatTime = formatTime,
                         formatSeekTime = formatSeekTime,
                         focused = timelineFocused,
@@ -259,16 +262,36 @@ private fun EmptyTimeline(
             .height(TimelineSlotHeight)
             .testTag("live-window-progress"),
     ) {
-        val trackHeight = if (focused) 7.dp else 5.dp
+        val trackHeight = if (focused) 8.dp else 5.dp
         Box(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .offset(y = (-8).dp)
                 .fillMaxWidth()
-                .height(trackHeight)
-                .clip(CircleShape)
-                .background(TrackBackground.copy(alpha = 0.58f)),
-        )
+                .height(if (focused) 28.dp else 18.dp)
+                .then(
+                    if (focused) {
+                        Modifier
+                            .background(BrandYellow.copy(alpha = 0.06f), RoundedCornerShape(12.dp))
+                            .border(
+                                1.dp,
+                                BrandYellow.copy(alpha = 0.30f),
+                                RoundedCornerShape(12.dp),
+                            )
+                            .padding(horizontal = 8.dp)
+                    } else {
+                        Modifier
+                    },
+                ),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(trackHeight)
+                    .clip(CircleShape)
+                    .background(TrackBackground.copy(alpha = 0.58f)),
+            )
+        }
 
         seekPreviewMs?.let { previewMs ->
             SeekPreview(
@@ -286,6 +309,8 @@ private fun LiveTimeline(
     programmeNowMs: Long?,
     programmeEndMs: Long?,
     seekPreviewMs: Long?,
+    seekPreviewPositionMs: Long?,
+    playbackDurationMs: Long?,
     formatTime: (Long) -> String,
     formatSeekTime: (Long) -> String,
     focused: Boolean,
@@ -296,6 +321,26 @@ private fun LiveTimeline(
         animationSpec = tween(durationMillis = 240),
         label = "programme-progress",
     )
+    val previewProgress = when {
+        seekPreviewMs != null &&
+            programmeStartMs != null &&
+            programmeEndMs != null &&
+            programmeEndMs > programmeStartMs -> {
+            ((seekPreviewMs - programmeStartMs).toDouble() /
+                (programmeEndMs - programmeStartMs).toDouble())
+                .coerceIn(0.0, 1.0)
+                .toFloat()
+        }
+        seekPreviewPositionMs != null &&
+            playbackDurationMs != null &&
+            playbackDurationMs > 0L -> {
+            (seekPreviewPositionMs.toDouble() / playbackDurationMs.toDouble())
+                .coerceIn(0.0, 1.0)
+                .toFloat()
+        }
+        else -> null
+    }
+    val displayedProgress = previewProgress ?: animatedProgress
     val remainingLabel = formatRemainingTimeLabel(programmeNowMs, programmeEndMs)
 
     BoxWithConstraints(
@@ -304,9 +349,8 @@ private fun LiveTimeline(
             .height(TimelineSlotHeight)
             .testTag("live-window-progress"),
     ) {
-        val markerSize = if (focused) 15.dp else 13.dp
-        val trackHeight = if (focused) 7.dp else 5.dp
-        val markerOffset = (maxWidth - markerSize) * animatedProgress
+        val markerSize = if (focused) 18.dp else 12.dp
+        val trackHeight = if (focused) 8.dp else 5.dp
 
         programmeStartMs?.let { startMs ->
             Text(
@@ -331,37 +375,61 @@ private fun LiveTimeline(
             )
         }
 
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .offset(y = (-8).dp)
                 .fillMaxWidth()
-                .height(trackHeight)
-                .clip(CircleShape)
-                .background(TrackBackground),
-        )
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .offset(y = (-8).dp)
-                .fillMaxWidth(animatedProgress)
-                .height(trackHeight)
-                .clip(CircleShape)
-                .background(BrandViolet),
-        )
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .offset(x = markerOffset, y = (-4).dp)
-                .size(markerSize)
-                .shadow(if (focused) 8.dp else 5.dp, CircleShape)
-                .background(BrandYellow, CircleShape)
-                .testTag("programme-progress-marker"),
-        )
+                .height(if (focused) 28.dp else 18.dp)
+                .then(
+                    if (focused) {
+                        Modifier
+                            .background(BrandYellow.copy(alpha = 0.06f), RoundedCornerShape(12.dp))
+                            .border(
+                                1.dp,
+                                BrandYellow.copy(alpha = 0.30f),
+                                RoundedCornerShape(12.dp),
+                            )
+                            .padding(horizontal = 8.dp)
+                    } else {
+                        Modifier
+                    },
+                ),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            val markerOffset = (maxWidth - markerSize).coerceAtLeast(0.dp) * displayedProgress
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(trackHeight)
+                    .clip(CircleShape)
+                    .background(TrackBackground),
+            )
+            if (displayedProgress > 0f) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(displayedProgress)
+                        .height(trackHeight)
+                        .clip(CircleShape)
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(BrandViolet, BrandYellow),
+                            ),
+                        ),
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .offset(x = markerOffset)
+                    .size(markerSize)
+                    .shadow(if (focused) 10.dp else 5.dp, CircleShape)
+                    .background(BrandYellow, CircleShape)
+                    .testTag("programme-progress-marker"),
+            )
+        }
 
         seekPreviewMs?.let { previewMs ->
             val previewWidth = 94.dp
-            val previewOffset = (markerOffset + markerSize / 2 - previewWidth / 2)
+            val previewOffset = ((maxWidth - previewWidth).coerceAtLeast(0.dp) * displayedProgress)
                 .coerceIn(0.dp, (maxWidth - previewWidth).coerceAtLeast(0.dp))
             SeekPreview(
                 text = formatSeekTime(previewMs),
