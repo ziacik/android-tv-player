@@ -56,4 +56,4 @@ rm -f "$aligned_apk" "$signed_apk"
 
 adb -s "$target" install -r "$signed_apk"
 adb -s "$target" shell am force-stop "$package"
-adb -s "$target" shell monkey -p "$package" 1
+adb -s "$target" shell am start -n "$package/.MainActivity"
