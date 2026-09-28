@@ -14,7 +14,6 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
-import sk.ziacik.androidtvplayer.BuildConfig
 
 data class UpdateInfo(
     val versionCode: Int,
@@ -50,7 +49,7 @@ class GithubAppUpdater(
 
         val metadata = getJson(metadataUrl)
         val versionCode = metadata.getInt("versionCode")
-        if (versionCode <= BuildConfig.VERSION_CODE) return@withContext null
+        if (versionCode <= currentVersionCode()) return@withContext null
 
         val apkName = metadata.getString("apkName")
         val apkUrl = (0 until assets.length())
@@ -124,6 +123,16 @@ class GithubAppUpdater(
                 .setDataAndType(uri, APK_MIME_TYPE)
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),
         )
+    }
+
+    @Suppress("DEPRECATION")
+    private fun currentVersionCode(): Long {
+        val info = context.packageManager.getPackageInfo(context.packageName, 0)
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            info.longVersionCode
+        } else {
+            info.versionCode.toLong()
+        }
     }
 
     @Suppress("DEPRECATION")
