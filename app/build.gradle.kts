@@ -1,3 +1,5 @@
+import org.gradle.api.tasks.compile.JavaCompile
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.compose.compiler)
@@ -10,12 +12,12 @@ val releaseKeyPassword = System.getenv("KANALIK_KEY_PASSWORD")
 
 android {
     namespace = "sk.ziacik.androidtvplayer"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "sk.ziacik.androidtvplayer"
         minSdk = 26
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 4
         versionName = "0.1.3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -52,7 +54,8 @@ android {
     }
 
     lint {
-        baseline = file("lint-baseline.xml")
+        warningsAsErrors = true
+        abortOnError = true
     }
 
     sourceSets.named("debug") {
@@ -63,6 +66,17 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+}
+
+
+kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+}
+
+tasks.withType<JavaCompile>().configureEach {
+    options.compilerArgs.addAll(listOf("-Xlint:all", "-Werror"))
 }
 
 val copyChannelCatalog by tasks.registering(Copy::class) {
