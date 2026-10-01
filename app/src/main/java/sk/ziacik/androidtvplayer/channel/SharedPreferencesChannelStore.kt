@@ -1,6 +1,7 @@
 package sk.ziacik.androidtvplayer.channel
 
 import android.content.Context
+import androidx.core.content.edit
 
 class SharedPreferencesChannelStore(context: Context) : ChannelStore {
     private val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
@@ -9,7 +10,7 @@ class SharedPreferencesChannelStore(context: Context) : ChannelStore {
         catalog.fromStorageKey(preferences.getString(SELECTED_CHANNEL_KEY, null))
 
     override fun save(channel: TvChannel) {
-        preferences.edit().putString(SELECTED_CHANNEL_KEY, channel.storageKey).apply()
+        preferences.edit { putString(SELECTED_CHANNEL_KEY, channel.storageKey) }
     }
 
     private companion object {
