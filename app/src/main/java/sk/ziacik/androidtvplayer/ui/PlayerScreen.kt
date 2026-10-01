@@ -59,11 +59,11 @@ fun PlayerScreen(
     controller: PlayerController,
     player: Player,
     overlayController: OverlayController,
+    onExit: () -> Unit,
+    modifier: Modifier = Modifier,
     epgRepository: EpgRepository = EpgRepository { _, _ -> null },
     archiveAvailable: suspend (TvChannel, ProgramMetadata) -> Boolean = { _, _ -> false },
     onSaveMarkizaCredentials: (String, String) -> Unit = { _, _ -> },
-    onExit: () -> Unit,
-    modifier: Modifier = Modifier,
 ) {
     val state by controller.state.collectAsState()
     val streamHost by controller.streamHost.collectAsState()
@@ -544,12 +544,12 @@ internal fun NumericChannelIndicator(
 @Composable
 internal fun PlayerStateLayer(
     state: PlayerUiState,
-    streamHost: String? = null,
     overlayVisible: Boolean,
     focusedControl: FocusedControl,
     formatTime: (Long) -> String,
-    onSaveMarkizaCredentials: (String, String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
+    streamHost: String? = null,
+    onSaveMarkizaCredentials: (String, String) -> Unit = { _, _ -> },
     seekPreviewMs: Long? = null,
     seekPreviewPositionMs: Long? = null,
     formatSeekTime: (Long) -> String = formatTime,
