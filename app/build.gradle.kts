@@ -59,7 +59,7 @@ android {
     }
 
     sourceSets.named("debug") {
-        assets.srcDir(layout.buildDirectory.dir("generated/assets/channels").get().asFile)
+        assets.directories.add(layout.buildDirectory.dir("generated/assets/channels").get().asFile)
     }
 
     compileOptions {
