@@ -36,7 +36,11 @@ jobs:
           grep -q 'assets/channels.json' deploy.sh
           grep -q 'adb -s.*install -r' deploy.sh
       - name: Verify debug build
-        run: ./gradlew testDebugUnitTest lintDebug assembleDebug --stacktrace
+        run: |
+          if ! ./gradlew testDebugUnitTest lintDebug assembleDebug --stacktrace; then
+            cat app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt 2>/dev/null || true
+            exit 1
+          fi
       - name: Verify signed release build
         env:
           KANALIK_KEYSTORE_FILE: ${{ runner.temp }}/kanalik-ci-release.jks
