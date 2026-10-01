@@ -87,7 +87,7 @@ data class PlayerOverlayModel(
             }
             val isArchiveVod =
                 hasProgrammeInterval &&
-                endsAtMs!! <= nowMs &&
+                endsAtMs <= nowMs &&
                 playback?.liveOffsetMs == null &&
                 streamDurationMs != null
             val offset = if (isArchiveVod) {
@@ -101,7 +101,7 @@ data class PlayerOverlayModel(
                 }
             }
             val watchedNowMs = if (isArchiveVod) {
-                startsAtMs!! + playback!!.currentPositionMs.coerceAtLeast(0L)
+                startsAtMs + playback.currentPositionMs.coerceAtLeast(0L)
             } else {
                 offset?.let(nowMs::minus) ?: nowMs
             }
@@ -111,14 +111,14 @@ data class PlayerOverlayModel(
                 startsAtMs?.coerceAtMost(watchedNowMs)
             }
             val timelineEndMs = if (isArchiveVod) {
-                startsAtMs!! + streamDurationMs!!
+                startsAtMs + streamDurationMs
             } else {
                 endsAtMs
             }
             val progress = when {
                 isArchiveVod -> streamProgress
                 hasProgrammeInterval -> {
-                    ((watchedNowMs - timelineStartMs!!).toDouble() / (endsAtMs!! - timelineStartMs).toDouble())
+                    ((watchedNowMs - timelineStartMs).toDouble() / (endsAtMs - timelineStartMs).toDouble())
                         .coerceIn(0.0, 1.0)
                         .toFloat()
                 }
