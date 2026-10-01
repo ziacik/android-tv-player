@@ -6,10 +6,12 @@ import android.media.tv.TvContract
 import android.media.tv.TvInputManager
 import android.media.tv.TvInputService
 import android.net.Uri
+import android.os.Build
 import android.view.Surface
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -40,6 +42,7 @@ class KanalikTvInputService : TvInputService() {
     override fun onCreateSession(inputId: String): Session = KanalikTvInputSession(this)
 }
 
+@androidx.annotation.OptIn(UnstableApi::class)
 private class KanalikTvInputSession(context: Context) : TvInputService.Session(context) {
     private val appContext = context.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -70,7 +73,14 @@ private class KanalikTvInputSession(context: Context) : TvInputService.Session(c
                 is StreamResolution.Playable -> play(resolution.source.url, resolution.source.userAgent, resolution.source.headers, resolution.source.manifest)
                 is StreamResolution.Unavailable,
                 is StreamResolution.RequiresCredentials,
-                null -> notifyVideoUnavailable(TvInputManager.VIDEO_UNAVAILABLE_REASON_NOT_CONNECTED)
+                null -> {
+                    val reason = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        TvInputManager.VIDEO_UNAVAILABLE_REASON_NOT_CONNECTED
+                    } else {
+                        TvInputManager.VIDEO_UNAVAILABLE_REASON_UNKNOWN
+                    }
+                    notifyVideoUnavailable(reason)
+                }
             }
         }
         return true
