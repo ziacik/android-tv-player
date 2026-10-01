@@ -7,7 +7,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -64,9 +63,9 @@ internal fun formatRemainingTimeLabel(currentMs: Long?, endMs: Long?): String? {
 fun PlayerOverlay(
     model: PlayerOverlayModel,
     focusedControl: FocusedControl,
-    timelineFocused: Boolean = false,
     formatTime: (Long) -> String,
     modifier: Modifier = Modifier,
+    timelineFocused: Boolean = false,
     seekPreviewMs: Long? = null,
     seekPreviewPositionMs: Long? = null,
     formatSeekTime: (Long) -> String = formatTime,
@@ -256,7 +255,7 @@ private fun EmptyTimeline(
     formatSeekTime: (Long) -> String,
     focused: Boolean,
 ) {
-    BoxWithConstraints(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(TimelineSlotHeight)
