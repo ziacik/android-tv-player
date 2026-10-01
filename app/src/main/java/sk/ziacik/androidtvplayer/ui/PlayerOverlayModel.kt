@@ -118,7 +118,9 @@ data class PlayerOverlayModel(
             val progress = when {
                 isArchiveVod -> streamProgress
                 hasProgrammeInterval -> {
-                    ((watchedNowMs - timelineStartMs).toDouble() / (endsAtMs - timelineStartMs).toDouble())
+                    val intervalStartMs = requireNotNull(timelineStartMs)
+                    val intervalEndMs = requireNotNull(endsAtMs)
+                    ((watchedNowMs - intervalStartMs).toDouble() / (intervalEndMs - intervalStartMs).toDouble())
                         .coerceIn(0.0, 1.0)
                         .toFloat()
                 }
